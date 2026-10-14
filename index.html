@@ -119,7 +119,7 @@ input.ed.num{text-align:right}
   </div>
   <h3 style="margin-top:14px">Tâches à suivre</h3>
   <div style="color:#666">Cochez les tâches de cette commande et donnez une échéance à chacune.</div>
-  <table><thead><tr><th style="width:30px"></th><th>Tâche</th><th style="width:150px">Échéance</th><th>Note</th></tr></thead><tbody id="mTaches"></tbody></table>
+  <table><thead><tr><th style="width:30px"></th><th>Tâche</th><th style="width:140px">Échéance</th><th style="width:160px">Référent</th><th>Note</th></tr></thead><tbody id="mTaches"></tbody></table>
   <div class="btns"><button id="mAnnul">Annuler</button><button id="mOk" class="ok">Enregistrer la commande</button></div>
 </div></div>
 <div class="page" id="page" style="display:none">
@@ -241,7 +241,8 @@ async function init(){
     [clients,refs]=await Promise.all([tout(T_CLIENTS),tout(T_REF)]);
     clients.sort((a,b)=>(a.Entreprise||'').localeCompare(b.Entreprise||''));
     $('fClient').innerHTML='<option value="">— Client —</option>'+clients.map(c=>`<option value="${c.id}">${c.Entreprise||c['Code client']}</option>`).join('');
-    $('fRef').innerHTML=refs.map(r=>`<option value="${r.id}">${r.Nom}</option>`).join('');
+    const refsAff=refs.some(r=>"Référent d'affaire" in r)?refs.filter(r=>r["Référent d'affaire"]):refs;
+    $('fRef').innerHTML=refsAff.map(r=>`<option value="${r.id}">${r.Nom}</option>`).join('');
     const p=new URLSearchParams(location.search);
     for(const k of ['devis','arc','bl'])if(p.get(k)){TYPE=k;break}
     $('type').value=TYPE;await chargerListe();msg('');
@@ -439,13 +440,19 @@ async function ouvrirCommande(){
   $('mCde').value=CDE?.['N° Cde Client']||'';$('mDateCde').value=(CDE?.['Date cde client']||aujourd()).slice(0,10);
   $('mDateLiv').value=(CDE?.['Date Livraison']||'').slice(0,10);$('mDelai').value=CDE?.['Délai']||cur['Délai']||'';
   $('mAdr').value=CDE?.['Adresse de livraison']||'';$('mCondLiv').value=CDE?.['Conditions de livraison']||'';$('mObs').value=CDE?.Observations||'';
+  const refAff=ids(cur['Référent KTE'])[0];
+  CATALOGUE.sort((a,b)=>(+a.Ordre||a.id)-(+b.Ordre||b.id));
   $('mTaches').innerHTML=CATALOGUE.map(t=>{const d=deja.find(x=>(x['Type de tâche']||[]).some(y=>y.id===t.id));
-    return `<tr data-id="${t.id}" data-tc="${d?.id||''}"><td><input type="checkbox" ${d?'checked':''} style="width:auto"></td><td>${t.Nom||''}</td><td><input type="date" value="${(d?.['Échéance']||'').slice(0,10)}"></td><td><input value="${(d?.Notes||'').replace(/"/g,'&quot;')}"></td></tr>`}).join('');
+    const rdef=ids(d?.['Référent'])[0]||ids(t['Référent par défaut'])[0]||refAff;
+    const sel=`<select style="width:100%;font:inherit;padding:3px">${refs.map(r=>`<option value="${r.id}" ${r.id==rdef?'selected':''}>${r.Nom}</option>`).join('')}</select>`;
+    return `<tr data-id="${t.id}" data-tc="${d?.id||''}"><td><input type="checkbox" ${d?'checked':''} style="width:auto"></td><td>${t.Nom||''}</td><td><input type="date" value="${(d?.['Échéance']||'').slice(0,10)}"></td><td>${sel}</td><td><input value="${(d?.Notes||'').replace(/"/g,'&quot;')}"></td></tr>`}).join('');
   $('mTaches').querySelectorAll('tr').forEach(tr=>{const [cb,dt]=tr.querySelectorAll('input');dt.addEventListener('input',()=>{if(dt.value)cb.checked=true})});
   $('modal').style.display='flex';msg('');
 }
 async function enregistrerCommande(){
   const n=cur['N° devis'];
+  const manque=[...$('mTaches').querySelectorAll('tr')].filter(tr=>{const [cb,dt]=tr.querySelectorAll('input');return cb.checked&&(!dt.value||!tr.querySelector('select').value)});
+  if(manque.length){alert('Chaque tâche cochée doit avoir une échéance et un référent : '+manque.map(tr=>tr.children[1].textContent).join(', '));return}
   const corps={'N° affaire':n,'Statut':'Commandé','N° Cde Client':$('mCde').value,'Date cde client':$('mDateCde').value||null,'Date Livraison':$('mDateLiv').value||null,
     'Délai':$('mDelai').value,'Adresse de livraison':$('mAdr').value,'Conditions de livraison':$('mCondLiv').value,'Observations':$('mObs').value,
     'Client':ids(cur.Client),'Référent KTE':ids(cur['Référent KTE']),'Objet':cur.Objet||'','Montant HT (€)':cur['Total HT']||null,
@@ -457,7 +464,7 @@ async function enregistrerCommande(){
   await api(`/rows/table/${DOCS.devis.table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Statut':'Accepté','Commande':[CDE.id]})});
   let nb=0;
   for(const tr of $('mTaches').querySelectorAll('tr')){const [cb,dt,no]=tr.querySelectorAll('input');const tc=tr.dataset.tc;const t=CATALOGUE.find(x=>x.id==tr.dataset.id);
-    const c={'Libellé':`${n} – ${t.Nom}`,'Commande':[CDE.id],'Type de tâche':[t.id],'Échéance':dt.value||null,'Notes':no.value};
+    const c={'Libellé':`${n} – ${t.Nom}`,'Commande':[CDE.id],'Type de tâche':[t.id],'Échéance':dt.value||null,'Référent':tr.querySelector('select').value?[+tr.querySelector('select').value]:[],'Notes':no.value};
     if(cb.checked){if(tc)await api(`/rows/table/${T_TC}/${tc}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)});else await api(`/rows/table/${T_TC}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});nb++}
     else if(tc)await api(`/rows/table/${T_TC}/${tc}/`,{method:'DELETE'})}
   $('modal').style.display='none';
