@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Éditeur de devis KTE</title>
+<style>
+:root{--bleu:#2B4C7E;--gris:#6B6B6B;--trait:#D0D0D0;--jaune:#FFF7D6;--fond:#E9ECF1}
+*{box-sizing:border-box}
+body{margin:0;background:var(--fond);font-family:Carlito,Calibri,"Source Sans Pro","Segoe UI",Arial,sans-serif;color:#000;font-size:13px}
+#barre{position:sticky;top:0;z-index:10;background:#1F3864;color:#fff;padding:8px 14px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+#barre select,#barre input{font:inherit;padding:4px 6px;border-radius:4px;border:0}
+#barre button{font:inherit;padding:5px 12px;border-radius:4px;border:0;cursor:pointer;background:#fff;color:#1F3864;font-weight:bold}
+#barre button.prim{background:#F4B400;color:#1F3864}
+#barre button:disabled{opacity:.5;cursor:default}
+#barre .pill{padding:3px 9px;border-radius:10px;background:#ffffff22;font-size:12px}
+#msg{flex-basis:100%;font-size:12px;min-height:16px}
+#msg.err{color:#ffb4b4}#msg.ok{color:#c8f7c5}#msg.warn{color:#ffe08a}
+#cfg{background:#fff;max-width:640px;margin:30px auto;padding:20px;border-radius:8px;display:none}
+.page{width:210mm;min-height:297mm;margin:16px auto;background:#fff;padding:12mm 16mm 22mm;position:relative;box-shadow:0 2px 12px #0002}
+.entete{display:flex;justify-content:space-between;border-bottom:1px solid var(--trait);color:var(--gris);font-size:11px;padding-bottom:4px;margin-bottom:8mm}
+.haut{display:flex;justify-content:space-between;align-items:flex-start}
+.haut img{width:24mm}
+.titre{text-align:right}
+.titre h1{margin:0;color:var(--bleu);font-weight:normal;font-size:28px}
+.adr{display:flex;justify-content:space-between;margin-top:4mm}
+.adr .kte{line-height:1.45}
+.cadre{border:1px solid var(--trait);border-radius:3mm;padding:4mm;width:85mm;line-height:1.45}
+table.lignes{width:100%;border-collapse:collapse;margin-top:12mm}
+table.lignes th{color:var(--bleu);text-align:right;padding:6px 4px;border-bottom:1px solid var(--trait)}
+table.lignes th.g{text-align:left}
+table.lignes td{border-bottom:1px solid var(--trait);padding:4px;vertical-align:middle}
+table.lignes td.n{text-align:right;width:28mm}
+table.lignes td.q{text-align:right;width:20mm}
+table.lignes td.v{width:14mm}
+table.lignes td.v img{width:12mm;height:12mm;object-fit:contain}
+table.lignes td.act{width:16mm;text-align:center;white-space:nowrap}
+.ed{border:1px dashed transparent;border-radius:3px;padding:2px 3px;font:inherit;background:transparent;width:100%;color:inherit}
+.ed:hover{border-color:#b9c7dd}.ed:focus{outline:none;border-color:var(--bleu);background:var(--jaune)}
+textarea.ed{resize:none;overflow:hidden;font-weight:bold;min-height:20px}
+input.ed.num{text-align:right}
+.mini{border:0;background:none;cursor:pointer;color:#999;font-size:14px;padding:0 2px}.mini:hover{color:#c00}
+#ajout{margin-top:6px;border:1px dashed var(--bleu);color:var(--bleu);background:#fff;padding:5px 10px;border-radius:4px;cursor:pointer}
+.bas{display:flex;justify-content:space-between;margin-top:12mm;gap:6mm;break-inside:avoid}
+.cond{border:1px solid var(--trait);border-radius:3mm;padding:4mm;width:85mm;font-size:12px}
+.tot{width:78mm}
+.tot table{width:100%;border-collapse:collapse}
+.tot td{padding:7px 4px;border-bottom:1px solid var(--trait);text-align:right}
+.tot tr.ttc td{color:var(--bleu);font-weight:bold}
+.bpa{color:var(--bleu);font-size:17px;text-align:center;margin:6mm 0 2mm}
+.sig{border:1px solid var(--trait);border-radius:3mm;height:26mm;padding:3mm;display:flex;justify-content:space-between}
+.pied{position:absolute;left:16mm;right:16mm;bottom:8mm;border-top:1px solid var(--trait);color:var(--gris);font-size:9.5px;text-align:center;padding-top:3px;line-height:1.5}
+.badge{display:inline-block;padding:1px 7px;border-radius:9px;font-size:11px;background:#eee;color:#333}
+@media print{
+  @page{size:A4;margin:0}
+  body{background:#fff}
+  #barre,#cfg,.mini,#ajout,.act{display:none!important}
+  .page{margin:0;box-shadow:none}
+  .ed{border-color:transparent!important;background:transparent!important}
+  .ed{display:none!important}
+  .po{display:inline!important}
+  .vide{display:none!important}
+}
+.po{display:none}
+</style>
+</head>
+<body>
+<div id="barre">
+  <b>Éditeur de devis KTE</b>
+  <select id="choix"><option value="">— Ouvrir un devis —</option></select>
+  <button id="bNouveau">Nouveau devis</button>
+  <button id="bEnr" disabled>Enregistrer</button>
+  <button id="bValider" class="prim" disabled>Valider l'offre</button>
+  <button id="bPdf" disabled>Imprimer / PDF</button>
+  <span class="pill" id="pStatut"></span>
+  <span class="pill" id="pVersion"></span>
+  <span id="msg"></span>
+</div>
+
+<div id="cfg">
+  <h3>Connexion à Baserow</h3>
+  <p>Collez le jeton de base de données Baserow (fichier <code>_Outils chiffrage/baserow.json</code>, ligne « token »).
+  Il reste enregistré dans ce navigateur uniquement.</p>
+  <input id="jeton" style="width:100%;padding:6px" placeholder="Jeton Baserow">
+  <p><button id="bJeton">Se connecter</button></p>
+</div>
+
+<div class="page" id="page" style="display:none">
+  <div class="entete"><span id="eTitre">KTE - Devis</span><span>Page 1/1</span></div>
+  <div class="haut">
+    <img id="logo" alt="KTE">
+    <div class="titre">
+      <h1>Devis</h1>
+      <div id="tNum"></div>
+      <div>Cholet, le <input class="ed" id="fDate" type="date" style="width:auto"></div>
+    </div>
+  </div>
+  <div class="adr">
+    <div class="kte">KTE<br>6 rue de la gatine<br>49300 Cholet<br>02-41-62-27-71<br>www.kte-fr.com<br>
+      <select class="ed" id="fRef" style="width:auto"></select><br><span id="refMail"></span></div>
+    <div class="cadre">
+      <select class="ed" id="fClient" style="font-weight:bold"></select>
+      <div id="cliAdr"></div>
+    </div>
+  </div>
+  <div style="margin-top:8mm;color:var(--gris)" id="ligneObjet">Objet : <input class="ed" id="fObjet" style="width:150mm;color:#000"></div>
+  <table class="lignes">
+    <thead><tr><th class="g v"></th><th class="g">Description</th><th>Prix unitaire</th><th>Quantité</th><th>Montant HT</th><th class="act"></th></tr></thead>
+    <tbody id="tb"></tbody>
+  </table>
+  <button id="ajout">+ Ajouter une ligne</button>
+  <div class="bas">
+    <div class="cond">
+      Délai: <input class="ed" id="fDelai" style="width:60mm"><br><br>
+      <b>Modalités et conditions de règlement :</b>
+      <textarea class="ed" id="fCond" rows="2" style="font-weight:normal"></textarea><br>
+      Ce devis est valable <input class="ed num" id="fValid" type="number" style="width:12mm"> jours.
+    </div>
+    <div class="tot">
+      <table>
+        <tr><td>Total HT</td><td id="totHT"></td></tr>
+        <tr><td>TVA 20,00%</td><td id="totTVA"></td></tr>
+        <tr class="ttc"><td>Total TTC</td><td id="totTTC"></td></tr>
+      </table>
+      <div style="text-align:center;margin-top:4mm" id="jusqua"></div>
+      <div class="bpa">Bon pour accord<br>et signature</div>
+      <div class="sig"><span>Fait à :</span><span style="margin-right:20mm">Le :</span></div>
+    </div>
+  </div>
+  <div class="pied">KTE - Eurl au capital de 10 000 € / IBAN: FR76.3000.3000.8100.0201.7065.622 - BIC: SOGEFRPP<br>
+  N° Siret : 53865123300016 - R.C.S. Angers 538 651 233 - Code APE : 2573 - TVA intracommunautaire : FR59 538 651 233</div>
+</div>
+
+<script>
+const API='https://api.baserow.io/api/database';
+const T_DEVIS=1261170,T_LIGNES=1261171,T_CLIENTS=1260239,T_REF=1260243,T_AFF=1260240;
+const LOGO='data:image/jpeg;base64,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';
+let JETON=null;try{JETON=localStorage.getItem('kte_baserow_jeton')||null}catch(e){JETON=null}
+let clients=[],refs=[],devisList=[],cur=null,lignes=[],supprimees=[],sale=false;
+const $=id=>document.getElementById(id);
+const eur=x=>(Math.round((+x||0)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+function msg(t,c){$('msg').textContent=t||'';$('msg').className=c||''}
+async function api(path,opt={}){
+  const r=await fetch(API+path,{...opt,headers:{Authorization:'Token '+JETON,'Content-Type':'application/json',...(opt.headers||{})}});
+  if(!r.ok){const t=await r.text();throw new Error(r.status+' '+t.slice(0,200))}
+  return r.status===204?null:r.json();
+}
+async function tout(t,extra=''){let out=[],p=1;for(;;){const j=await api(`/rows/table/${t}/?user_field_names=true&size=200&page=${p}${extra}`);out=out.concat(j.results);if(!j.next)break;p++}return out}
+function marquer(){sale=true;$('bEnr').disabled=false;msg('Modifications non enregistrées','warn')}
+function auto(t){t.style.height='auto';t.style.height=t.scrollHeight+'px'}
+
+async function init(){
+  $('logo').src=LOGO;
+  if(!JETON){$('cfg').style.display='block';return}
+  try{
+    msg('Chargement…');
+    [clients,refs,devisList]=await Promise.all([tout(T_CLIENTS),tout(T_REF),tout(T_DEVIS)]);
+    clients.sort((a,b)=>(a.Entreprise||'').localeCompare(b.Entreprise||''));
+    $('fClient').innerHTML='<option value="">— Client —</option>'+clients.map(c=>`<option value="${c.id}">${c.Entreprise||c['Code client']}</option>`).join('');
+    $('fRef').innerHTML=refs.map(r=>`<option value="${r.id}">${r.Nom}</option>`).join('');
+    remplirChoix();msg('');
+    const q=new URLSearchParams(location.search).get('devis');
+    if(q){const d=devisList.find(x=>x['N° devis']===q);if(d){$('choix').value=d.id;ouvrir(d.id)}}
+  }catch(e){msg('Connexion impossible : '+e.message,'err');$('cfg').style.display='block'}
+}
+function remplirChoix(){
+  const l=[...devisList].sort((a,b)=>(b['N° devis']||'').localeCompare(a['N° devis']||''));
+  $('choix').innerHTML='<option value="">— Ouvrir un devis —</option>'+l.map(d=>`<option value="${d.id}">${d['N° devis']} – ${(d.Client||[]).map(c=>c.value).join(', ')} – v.${d.Version||1}</option>`).join('');
+}
+async function ouvrir(id){
+  if(sale&&!confirm('Des modifications ne sont pas enregistrées. Continuer ?'))return;
+  msg('Chargement du devis…');
+  cur=await api(`/rows/table/${T_DEVIS}/${id}/?user_field_names=true`);
+  const ids=(cur['Lignes de devis']||[]).map(x=>x.id);
+  lignes=[];for(const i of ids){lignes.push(await api(`/rows/table/${T_LIGNES}/${i}/?user_field_names=true`))}
+  lignes.sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id);
+  supprimees=[];afficher();sale=false;$('bEnr').disabled=true;$('bValider').disabled=false;$('bPdf').disabled=false;
+  const c=cur['Contrôle version']||'';msg(c,c.startsWith('⚠')?'warn':'ok');
+}
+function afficher(){
+  $('page').style.display='block';
+  const v=+cur.Version||1;
+  $('tNum').textContent=`${cur['N° devis']} v.${v}`;$('eTitre').textContent=`KTE - Devis ${cur['N° devis']} v.${v}`;
+  document.title=`Devis ${cur['N° devis']} v.${v}`;
+  $('fDate').value=(cur['Date de version']||cur.Date||new Date().toISOString().slice(0,10)).slice(0,10);
+  $('fClient').value=(cur.Client||[])[0]?.id||'';majClient();
+  $('fRef').value=(cur['Référent KTE']||[])[0]?.id||refs[0]?.id;majRef();
+  $('fObjet').value=cur.Objet||'';$('fDelai').value=cur['Délai']||'';
+  $('fCond').value=cur['Conditions de règlement']||"100% à la livraison\nPar virement bancaire à 30 jours nets";auto($('fCond'));
+  $('fValid').value=cur['Validité (jours)']||10;
+  $('pStatut').textContent='Statut : '+(cur.Statut?.value||'Brouillon');$('pVersion').textContent='v.'+v+(cur['Validé le']?' – validé le '+new Date(cur['Validé le']).toLocaleString('fr-FR'):'');
+  dessinerLignes();
+}
+function majClient(){
+  const c=clients.find(x=>x.id==$('fClient').value);
+  $('cliAdr').innerHTML=c?[c['Raison sociale (Axonaut)']&&c['Raison sociale (Axonaut)']!==c.Entreprise?c['Raison sociale (Axonaut)']:'',...(c.Adresse||'').split(', '),`${c['Code postal']||''} ${c.Ville||''}`,c.Pays&&c.Pays!=='France'?c.Pays:'',c['N° TVA']?'N° de TVA : '+c['N° TVA']:'',c.SIREN?'SIREN : '+c.SIREN:''].filter(x=>x&&x.trim()).join('<br>'):'';
+}
+function majRef(){const r=refs.find(x=>x.id==$('fRef').value);$('refMail').textContent=r?.['E-mail']||''}
+function dessinerLignes(){
+  const tb=$('tb');tb.innerHTML='';
+  lignes.forEach((l,i)=>{
+    const tr=document.createElement('tr');
+    const img=(l.Vignette||[])[0];
+    tr.innerHTML=`<td class="v">${img?`<img src="${img.thumbnails?.small?.url||img.url}">`:''}</td>
+      <td><textarea class="ed" rows="1"></textarea></td>
+      <td class="n"><input class="ed num" type="number" step="0.01"></td>
+      <td class="q"><input class="ed num" type="number" step="0.01"></td>
+      <td class="n mt"></td>
+      <td class="act"><button class="mini" title="Monter">↑</button><button class="mini" title="Descendre">↓</button><button class="mini" title="Supprimer la ligne">✕</button></td>`;
+    const [ta]=tr.getElementsByTagName('textarea');const [pu,q]=tr.getElementsByTagName('input');const b=tr.getElementsByTagName('button');
+    ta.value=l.Description||'';pu.value=l['Prix unitaire HT']??'';q.value=l['Quantité']??'';
+    ta.oninput=()=>{l.Description=ta.value;l._m=1;auto(ta);marquer()};
+    pu.oninput=()=>{l['Prix unitaire HT']=pu.value;l._m=1;totaux();marquer()};
+    q.oninput=()=>{l['Quantité']=q.value;l._m=1;totaux();marquer()};
+    b[0].onclick=()=>{if(i>0){[lignes[i-1],lignes[i]]=[lignes[i],lignes[i-1]];lignes.forEach(x=>x._m=1);dessinerLignes();marquer()}};
+    b[1].onclick=()=>{if(i<lignes.length-1){[lignes[i+1],lignes[i]]=[lignes[i],lignes[i+1]];lignes.forEach(x=>x._m=1);dessinerLignes();marquer()}};
+    b[2].onclick=()=>{if(confirm('Supprimer cette ligne ?')){if(l.id)supprimees.push(l.id);lignes.splice(i,1);dessinerLignes();marquer()}};
+    tb.appendChild(tr);setTimeout(()=>auto(ta));
+  });
+  totaux();
+}
+function totaux(){
+  let ht=0;const mts=document.querySelectorAll('#tb .mt');
+  lignes.forEach((l,i)=>{const m=(+l['Prix unitaire HT']||0)*(+l['Quantité']||0);ht+=m;if(mts[i])mts[i].textContent=eur(m)});
+  ht=Math.round(ht*100)/100;$('totHT').textContent=eur(ht);$('totTVA').textContent=eur(ht*0.2);$('totTTC').textContent=eur(ht*1.2);
+  const d=new Date($('fDate').value||Date.now());d.setDate(d.getDate()+(+$('fValid').value||10));
+  $('jusqua').textContent="Offre valable jusqu'au "+d.toLocaleDateString('fr-FR');
+}
+['fDate','fObjet','fDelai','fCond','fValid'].forEach(k=>$(k).addEventListener('input',()=>{if(k==='fCond')auto($(k));totaux();marquer()}));
+$('fClient').onchange=()=>{majClient();marquer()};$('fRef').onchange=()=>{majRef();marquer()};
+$('ajout').onclick=()=>{lignes.push({Description:'',Quantité:'1','Prix unitaire HT':'',_m:1,_new:1});dessinerLignes();marquer();
+  const t=document.querySelectorAll('#tb textarea');t[t.length-1]?.focus()};
+
+async function enregistrer(){
+  msg('Enregistrement…');
+  await api(`/rows/table/${T_DEVIS}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({
+    'Date':$('fDate').value||null,'Client':$('fClient').value?[+$('fClient').value]:[],'Référent KTE':$('fRef').value?[+$('fRef').value]:[],
+    'Objet':$('fObjet').value,'Délai':$('fDelai').value,'Conditions de règlement':$('fCond').value,'Validité (jours)':+$('fValid').value||10})});
+  for(let i=0;i<lignes.length;i++){const l=lignes[i];
+    const corps={'Description':l.Description||'','Quantité':l['Quantité']===''?null:l['Quantité'],'Prix unitaire HT':l['Prix unitaire HT']===''?null:l['Prix unitaire HT'],'Ordre':i+1};
+    if(l._new){const n=await api(`/rows/table/${T_LIGNES}/?user_field_names=true`,{method:'POST',body:JSON.stringify({...corps,'Devis':[cur.id]})});Object.assign(l,n);delete l._new;delete l._m}
+    else if(l._m||+l.Ordre!==i+1){await api(`/rows/table/${T_LIGNES}/${l.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});delete l._m}}
+  for(const id of supprimees){await api(`/rows/table/${T_LIGNES}/${id}/`,{method:'DELETE'})}
+  supprimees=[];sale=false;$('bEnr').disabled=true;
+  cur=await api(`/rows/table/${T_DEVIS}/${cur.id}/?user_field_names=true`);
+  const c=cur['Contrôle version']||'';msg('Enregistré. '+c,c.startsWith('⚠')?'warn':'ok');
+  devisList=await tout(T_DEVIS);remplirChoix();$('choix').value=cur.id;afficher();
+}
+async function valider(){
+  if(lignes.some(l=>l['Prix unitaire HT']===''||l['Prix unitaire HT']==null)){msg('Une ligne n\'a pas de prix : impossible de valider.','err');return}
+  if(sale)await enregistrer();
+  cur=await api(`/rows/table/${T_DEVIS}/${cur.id}/?user_field_names=true`);
+  let v=+cur.Version||1;const deja=!!cur['Validé le'];const modif=(cur['Contrôle version']||'').startsWith('⚠');
+  const aujourd=new Date().toISOString().slice(0,10);
+  const maj={'Statut':'Validé','Validé le':new Date().toISOString()};
+  if(deja&&modif){v+=1;maj.Version=v;maj['Date de version']=aujourd;maj.Date=aujourd}
+  else if(!deja){maj.Version=v;maj['Date de version']=$('fDate').value||aujourd}
+  else{msg(`Aucune modification depuis la validation : le devis reste en v.${v}.`,'ok');return}
+  if(!confirm(deja?`Le devis a été modifié depuis sa validation. Il passe en v.${v}, daté d'aujourd'hui. Continuer ?`:`Valider le devis en v.${v} ?`))return;
+  await api(`/rows/table/${T_DEVIS}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(maj)});
+  cur=await api(`/rows/table/${T_DEVIS}/${cur.id}/?user_field_names=true`);afficher();
+  devisList=await tout(T_DEVIS);remplirChoix();$('choix').value=cur.id;
+  msg(`Devis validé en v.${v}. Utilisez « Imprimer / PDF » pour enregistrer le PDF dans 04_Offre.`,'ok');
+}
+async function nouveau(){
+  const n=prompt('Numéro du devis (= numéro d\'affaire, ex. D265005) :');if(!n)return;
+  if(devisList.some(d=>d['N° devis']===n.trim())){alert('Ce devis existe déjà : ouvrez-le dans la liste.');return}
+  const aff=(await tout(T_AFF,`&filter__field__N° affaire__equal=${encodeURIComponent(n.trim())}`))[0];
+  const corps={'N° devis':n.trim(),'Statut':'Brouillon','Version':1,'Date':new Date().toISOString().slice(0,10),'Validité (jours)':10,
+    'Conditions de règlement':"100% à la livraison\nPar virement bancaire à 30 jours nets"};
+  if(aff){corps.Affaire=[aff.id];corps.Client=(aff.Client||[]).map(x=>x.id);corps['Référent KTE']=(aff['Référent KTE']||[]).map(x=>x.id);corps.Objet=aff.Objet||''}
+  const d=await api(`/rows/table/${T_DEVIS}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
+  devisList=await tout(T_DEVIS);remplirChoix();$('choix').value=d.id;sale=false;await ouvrir(d.id);
+  msg(aff?`Devis créé et relié à l'affaire ${n}.`:`Devis créé (aucune affaire ${n} trouvée : choisissez le client).`,'ok');
+}
+$('choix').onchange=e=>{if(e.target.value)ouvrir(e.target.value)};
+$('bEnr').onclick=()=>enregistrer().catch(e=>msg('Erreur : '+e.message,'err'));
+$('bValider').onclick=()=>valider().catch(e=>msg('Erreur : '+e.message,'err'));
+$('bNouveau').onclick=()=>nouveau().catch(e=>msg('Erreur : '+e.message,'err'));
+$('bPdf').onclick=()=>{if(sale&&!confirm('Des modifications ne sont pas enregistrées. Imprimer quand même ?'))return;window.print()};
+$('bJeton').onclick=()=>{JETON=$('jeton').value.trim();try{localStorage.setItem('kte_baserow_jeton',JETON)}catch(e){}$('cfg').style.display='none';init()};
+window.addEventListener('beforeunload',e=>{if(sale){e.preventDefault();e.returnValue=''}});
+function fmtNum(v){const n=+v;return isNaN(n)?v:n.toLocaleString('fr-FR',{maximumFractionDigits:2})}
+window.addEventListener('beforeprint',()=>{
+  document.querySelectorAll('.po').forEach(x=>x.remove());
+  document.querySelectorAll('.page .ed').forEach(el=>{
+    let t=el.value;
+    if(el.tagName==='SELECT')t=el.options[el.selectedIndex]?.text||'';
+    else if(el.type==='date'&&t)t=new Date(t).toLocaleDateString('fr-FR');
+    else if(el.classList.contains('num')&&el.closest('td.n'))t=eur(t);
+    else if(el.classList.contains('num'))t=fmtNum(t);
+    const sp=document.createElement('span');sp.className='po';
+    if(el.tagName==='TEXTAREA'){sp.innerHTML=(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');if(el.id!=='fCond')sp.style.fontWeight='bold'}
+    else sp.textContent=t;
+    if(el.id==='fClient')sp.style.fontWeight='bold';
+    el.after(sp);
+  });
+  document.querySelector('#fObjet').parentElement.classList.toggle('vide',!$('fObjet').value.trim());
+});
+window.addEventListener('afterprint',()=>document.querySelectorAll('.po').forEach(x=>x.remove()));
+init();
+</script>
+</body>
+</html>
