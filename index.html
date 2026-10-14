@@ -381,7 +381,7 @@ async function valider(){
   const dos=TYPE==='devis'?'04_Offre':TYPE==='arc'?'05_Commande':'06_Livraison';
   msg(`Validé en v.${v}. Utilisez « Imprimer / PDF » pour enregistrer le PDF dans ${dos}.`,'ok');
 }
-async function affaireDe(n){return (await tout(T_AFF,`&filter__field__N° affaire__equal=${encodeURIComponent(n)}`))[0]}
+async function affaireDe(n){return (await tout(T_AFF,`&filter__N° affaire__equal=${encodeURIComponent(n)}`))[0]}
 const ids=a=>(a||[]).map(x=>x.id);
 const fic=v=>(v||[]).map(f=>({name:f.name}));
 async function lignesDe(t,lien,row){const out=[];for(const x of row[lien]||[])out.push(await ligne1(t,x.id));return out.sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id)}
@@ -398,7 +398,7 @@ async function nouveau(){
     if(liste.some(d=>d['N° devis']===n)){alert('Ce devis existe déjà : ouvrez-le dans la liste.');msg('');return}
     corps={...base,'N° devis':n,'Source':'KTE','Date réception':aujourd(),'Validité (jours)':10,'Conditions de règlement':COND_DEF,Objet:aff?.Objet||''};
   }else{
-    const devis=(await tout(DOCS.devis.table,`&filter__field__N° devis__equal=${encodeURIComponent(n)}`))[0];
+    const devis=(await tout(DOCS.devis.table,`&filter__N° devis__equal=${encodeURIComponent(n)}`))[0];
     if(TYPE==='arc'){
       if(liste.some(d=>d['N° ARC']==='ARC-'+n)){alert('Cet ARC existe déjà : ouvrez-le dans la liste.');msg('');return}
       corps={...base,'N° ARC':'ARC-'+n,'Conditions de règlement':devis?.['Conditions de règlement']||COND_DEF,'Délai':devis?.['Délai']||'',
@@ -406,7 +406,7 @@ async function nouveau(){
       if(devis){corps.Devis=[devis.id];if(!corps.Client?.length)corps.Client=ids(devis.Client);if(!corps['Référent KTE']?.length)corps['Référent KTE']=ids(devis['Référent KTE']);
         nouvLignes=(await lignesDe(DOCS.devis.lt,'Lignes de devis',devis)).map(l=>({Description:l.Description,'Précisions':l['Précisions']||'','Quantité':l['Quantité'],'Prix unitaire HT':l['Prix unitaire HT'],Rep:l.Rep,Vignette:fic(l.Vignette)}))}
     }else{
-      const arc=(await tout(DOCS.arc.table,`&filter__field__N° ARC__equal=${encodeURIComponent('ARC-'+n)}`))[0];
+      const arc=(await tout(DOCS.arc.table,`&filter__N° ARC__equal=${encodeURIComponent('ARC-'+n)}`))[0];
       const precedents=liste.filter(b=>(b['N° BL']||'').startsWith('BL-'+n+'-'));
       const num=`BL-${n}-${String(precedents.length+1).padStart(2,'0')}`;
       const deja={};for(const b of precedents)for(const l of await lignesDe(DOCS.bl.lt,'Lignes BL',b))deja[l.Description]=(deja[l.Description]||0)+(+l['Quantité livrée']||0);
@@ -434,7 +434,7 @@ async function ouvrirCommande(){
   msg('Chargement…');
   CATALOGUE=CATALOGUE||await tout(T_TACHES);
   const n=cur['N° devis'];CDE=await affaireDe(n);
-  let deja=[];if(CDE)deja=await tout(T_TC,`&filter__field__N° affaire__contains=${encodeURIComponent(n)}`);
+  let deja=[];if(CDE)deja=await tout(T_TC,`&filter__N° affaire__contains=${encodeURIComponent(n)}`);
   $('mTitre').textContent=(CDE?'Commande ':'Commande reçue – devis ')+n;
   $('mCde').value=CDE?.['N° Cde Client']||'';$('mDateCde').value=(CDE?.['Date cde client']||aujourd()).slice(0,10);
   $('mDateLiv').value=(CDE?.['Date Livraison']||'').slice(0,10);$('mDelai').value=CDE?.['Délai']||cur['Délai']||'';
