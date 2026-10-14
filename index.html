@@ -70,6 +70,17 @@ input.ed.num{text-align:right}
   table.complet .partiel{display:none!important}
 }
 .po{display:none}
+#modal{position:fixed;inset:0;background:#0006;z-index:50;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 10px}
+#modal .box{background:#fff;border-radius:8px;max-width:760px;width:100%;padding:18px 22px;font-size:13px}
+#modal h3{margin:0 0 10px;color:#1F3864}
+#modal .g{display:grid;grid-template-columns:180px 1fr;gap:6px 10px;align-items:center}
+#modal input,#modal textarea{font:inherit;padding:4px 6px;border:1px solid #ccc;border-radius:4px;width:100%}
+#modal table{width:100%;border-collapse:collapse;margin-top:6px}
+#modal td,#modal th{border-bottom:1px solid #eee;padding:4px;text-align:left}
+#modal .btns{text-align:right;margin-top:14px}
+#modal .btns button{font:inherit;padding:6px 14px;border-radius:4px;border:0;cursor:pointer;margin-left:6px}
+#modal .ok{background:#F4B400;color:#1F3864;font-weight:bold}
+@media print{#modal{display:none!important}}
 </style>
 </head>
 <body>
@@ -80,6 +91,7 @@ input.ed.num{text-align:right}
   <button id="bNouveau">Nouveau</button>
   <button id="bEnr" disabled>Enregistrer</button>
   <button id="bValider" class="prim" disabled>Valider</button>
+  <button id="bCde" class="prim" style="display:none">Commande reçue</button>
   <button id="bPdf" disabled>Imprimer / PDF</button>
   <span class="pill" id="pStatut"></span>
   <span class="pill" id="pVersion"></span>
@@ -94,6 +106,22 @@ input.ed.num{text-align:right}
   <p><button id="bJeton">Se connecter</button></p>
 </div>
 
+<div id="modal"><div class="box">
+  <h3 id="mTitre">Commande reçue</h3>
+  <div class="g">
+    <label>N° de commande client</label><input id="mCde">
+    <label>Date de la commande</label><input id="mDateCde" type="date">
+    <label>Date de livraison prévue</label><input id="mDateLiv" type="date">
+    <label>Délai (texte)</label><input id="mDelai" placeholder="ex. 4 semaines">
+    <label>Adresse de livraison</label><textarea id="mAdr" rows="2" placeholder="si différente de l'adresse du client"></textarea>
+    <label>Conditions de livraison</label><input id="mCondLiv" placeholder="ex. franco, DAP…">
+    <label>Observations</label><textarea id="mObs" rows="2"></textarea>
+  </div>
+  <h3 style="margin-top:14px">Tâches à suivre</h3>
+  <div style="color:#666">Cochez les tâches de cette commande et donnez une échéance à chacune.</div>
+  <table><thead><tr><th style="width:30px"></th><th>Tâche</th><th style="width:150px">Échéance</th><th>Note</th></tr></thead><tbody id="mTaches"></tbody></table>
+  <div class="btns"><button id="mAnnul">Annuler</button><button id="mOk" class="ok">Enregistrer la commande</button></div>
+</div></div>
 <div class="page" id="page" style="display:none">
   <div class="entete"><span id="eTitre"></span><span>Page 1/1</span></div>
   <div class="haut">
@@ -177,7 +205,7 @@ input.ed.num{text-align:right}
 
 <script>
 const API='https://api.baserow.io/api/database';
-const T_CLIENTS=1260239,T_REF=1260243,T_AFF=1260240;
+const T_CLIENTS=1260239,T_REF=1260243,T_AFF=1260240,T_TACHES=1261119,T_TC=1261600;
 const COND_DEF="100% à la livraison\nPar virement bancaire à 30 jours nets";
 const DOCS={
   devis:{table:1261170,lt:1261171,num:'N° devis',lien:'Lignes de devis',retour:'Devis',titre:'Devis',court:'Devis',valider:"Valider l'offre",prix:true},
@@ -226,7 +254,7 @@ async function chargerListe(){
   const l=[...liste].sort((a,b)=>(b[D().num]||'').localeCompare(a[D().num]||''));
   $('choix').innerHTML=`<option value="">— Ouvrir ${TYPE==='devis'?'un devis':TYPE==='arc'?'un ARC':'un BL'} —</option>`+l.map(d=>`<option value="${d.id}">${d[D().num]} – ${(d.Client||[]).map(c=>c.value).join(', ')} – v.${d.Version||1}</option>`).join('');
   $('bNouveau').textContent=TYPE==='devis'?'Nouveau devis':TYPE==='arc'?'Nouvel ARC':'Nouveau BL';
-  $('bValider').textContent=D().valider;
+  $('bValider').textContent=D().valider;$('bCde').style.display='none';
   document.querySelectorAll('[data-docs]').forEach(e=>e.style.display=e.dataset.docs.split(' ').includes(TYPE)?'':'none');
 }
 async function changerType(t){
@@ -243,6 +271,7 @@ async function ouvrir(id){
   lignes=[];for(const i of ids){lignes.push(await ligne1(D().lt,i))}
   lignes.sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id);
   supprimees=[];afficher();sale=false;$('bEnr').disabled=true;$('bValider').disabled=false;$('bPdf').disabled=false;
+  $('bCde').style.display=TYPE==='devis'?'':'none';$('bCde').textContent=(cur.Commande||[]).length?'Commande : '+cur.Commande[0].value:'Commande reçue';
   history.replaceState(null,'',`?${TYPE}=${encodeURIComponent(cur[D().num])}`);
   const c=cur['Contrôle version']||'';msg(c,c.startsWith('⚠')?'warn':'ok');
 }
@@ -358,15 +387,16 @@ const fic=v=>(v||[]).map(f=>({name:f.name}));
 async function lignesDe(t,lien,row){const out=[];for(const x of row[lien]||[])out.push(await ligne1(t,x.id));return out.sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id)}
 async function nouveau(){
   if(sale&&!confirm('Des modifications ne sont pas enregistrées. Continuer ?'))return;
-  const n=(prompt('Numéro d\'affaire (ex. D265005) :')||'').trim().toUpperCase();if(!n)return;
+  let prop=window.__numPropose||'';window.__numPropose=null;if(TYPE==='devis'){const nums=liste.map(d=>d['N° devis']).filter(x=>/^D2\d{5}$/.test(x||'')).map(x=>+x.slice(1)).filter(x=>x>=265000);prop=nums.length?'D'+(Math.max(...nums)+1):'D265001'}
+  const n=(prompt(TYPE==='devis'?'Numéro du nouveau devis (= n° d\'affaire) :':'Numéro d\'affaire (ex. D265005) :',prop)||'').trim().toUpperCase();if(!n)return;
   msg('Création…');
   const aff=await affaireDe(n);
   const base={'Statut':'Brouillon','Version':1,'Date':aujourd()};
-  if(aff){base.Affaire=[aff.id];base.Client=ids(aff.Client);base['Référent KTE']=ids(aff['Référent KTE'])}
+  if(aff){base[TYPE==='devis'?'Commande':'Affaire']=[aff.id];base.Client=ids(aff.Client);base['Référent KTE']=ids(aff['Référent KTE'])}
   let corps,nouvLignes=[];
   if(TYPE==='devis'){
     if(liste.some(d=>d['N° devis']===n)){alert('Ce devis existe déjà : ouvrez-le dans la liste.');msg('');return}
-    corps={...base,'N° devis':n,'Validité (jours)':10,'Conditions de règlement':COND_DEF,Objet:aff?.Objet||''};
+    corps={...base,'N° devis':n,'Source':'KTE','Date réception':aujourd(),'Validité (jours)':10,'Conditions de règlement':COND_DEF,Objet:aff?.Objet||''};
   }else{
     const devis=(await tout(DOCS.devis.table,`&filter__field__N° devis__equal=${encodeURIComponent(n)}`))[0];
     if(TYPE==='arc'){
@@ -398,6 +428,47 @@ $('choix').onchange=e=>{if(e.target.value)ouvrir(e.target.value).catch(x=>msg('E
 $('bEnr').onclick=()=>enregistrer().catch(e=>msg('Erreur : '+e.message,'err'));
 $('bValider').onclick=()=>valider().catch(e=>msg('Erreur : '+e.message,'err'));
 $('bNouveau').onclick=()=>nouveau().catch(e=>msg('Erreur : '+e.message,'err'));
+let CATALOGUE=null,CDE=null;
+async function ouvrirCommande(){
+  if(sale){msg('Enregistrez d\'abord le devis.','warn');return}
+  msg('Chargement…');
+  CATALOGUE=CATALOGUE||await tout(T_TACHES);
+  const n=cur['N° devis'];CDE=await affaireDe(n);
+  let deja=[];if(CDE)deja=await tout(T_TC,`&filter__field__N° affaire__contains=${encodeURIComponent(n)}`);
+  $('mTitre').textContent=(CDE?'Commande ':'Commande reçue – devis ')+n;
+  $('mCde').value=CDE?.['N° Cde Client']||'';$('mDateCde').value=(CDE?.['Date cde client']||aujourd()).slice(0,10);
+  $('mDateLiv').value=(CDE?.['Date Livraison']||'').slice(0,10);$('mDelai').value=CDE?.['Délai']||cur['Délai']||'';
+  $('mAdr').value=CDE?.['Adresse de livraison']||'';$('mCondLiv').value=CDE?.['Conditions de livraison']||'';$('mObs').value=CDE?.Observations||'';
+  $('mTaches').innerHTML=CATALOGUE.map(t=>{const d=deja.find(x=>(x['Type de tâche']||[]).some(y=>y.id===t.id));
+    return `<tr data-id="${t.id}" data-tc="${d?.id||''}"><td><input type="checkbox" ${d?'checked':''} style="width:auto"></td><td>${t.Nom||''}</td><td><input type="date" value="${(d?.['Échéance']||'').slice(0,10)}"></td><td><input value="${(d?.Notes||'').replace(/"/g,'&quot;')}"></td></tr>`}).join('');
+  $('mTaches').querySelectorAll('tr').forEach(tr=>{const [cb,dt]=tr.querySelectorAll('input');dt.addEventListener('input',()=>{if(dt.value)cb.checked=true})});
+  $('modal').style.display='flex';msg('');
+}
+async function enregistrerCommande(){
+  const n=cur['N° devis'];
+  const corps={'N° affaire':n,'Statut':'Commandé','N° Cde Client':$('mCde').value,'Date cde client':$('mDateCde').value||null,'Date Livraison':$('mDateLiv').value||null,
+    'Délai':$('mDelai').value,'Adresse de livraison':$('mAdr').value,'Conditions de livraison':$('mCondLiv').value,'Observations':$('mObs').value,
+    'Client':ids(cur.Client),'Référent KTE':ids(cur['Référent KTE']),'Objet':cur.Objet||'','Montant HT (€)':cur['Total HT']||null,
+    'Date réception':(cur['Date réception']||cur.Date||'').slice(0,10),'Date envoi devis':(cur['Date de version']||cur.Date||null),'Client (code)':(clients.find(c=>c.id==ids(cur.Client)[0])||{})['Code client']||'',
+    'Dossier SharePoint':cur['Dossier SharePoint']||''};
+  msg('Enregistrement de la commande…');
+  CDE=CDE?await api(`/rows/table/${T_AFF}/${CDE.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)})
+         :await api(`/rows/table/${T_AFF}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
+  await api(`/rows/table/${DOCS.devis.table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Statut':'Accepté','Commande':[CDE.id]})});
+  let nb=0;
+  for(const tr of $('mTaches').querySelectorAll('tr')){const [cb,dt,no]=tr.querySelectorAll('input');const tc=tr.dataset.tc;const t=CATALOGUE.find(x=>x.id==tr.dataset.id);
+    const c={'Libellé':`${n} – ${t.Nom}`,'Commande':[CDE.id],'Type de tâche':[t.id],'Échéance':dt.value||null,'Notes':no.value};
+    if(cb.checked){if(tc)await api(`/rows/table/${T_TC}/${tc}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)});else await api(`/rows/table/${T_TC}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});nb++}
+    else if(tc)await api(`/rows/table/${T_TC}/${tc}/`,{method:'DELETE'})}
+  $('modal').style.display='none';
+  cur=await ligne1(DOCS.devis.table,cur.id);await chargerListe();$('choix').value=cur.id;afficher();$('bCde').style.display='';$('bCde').textContent='Commande : '+n;
+  msg(`Commande ${n} enregistrée – ${nb} tâche(s). Devis passé « Accepté ».`,'ok');
+  if(confirm('Créer maintenant l\'accusé de réception de commande (ARC) ?')){
+    $('type').value='arc';await changerType('arc');window.__numPropose=n;await nouveau();}
+}
+$('bCde').onclick=()=>ouvrirCommande().catch(e=>msg('Erreur : '+e.message,'err'));
+$('mAnnul').onclick=()=>{$('modal').style.display='none'};
+$('mOk').onclick=()=>enregistrerCommande().catch(e=>msg('Erreur : '+e.message,'err'));
 $('bPdf').onclick=()=>{if(sale&&!confirm('Des modifications ne sont pas enregistrées. Imprimer quand même ?'))return;window.print()};
 $('bJeton').onclick=()=>{JETON=$('jeton').value.trim();try{localStorage.setItem('kte_baserow_jeton',JETON)}catch(e){}$('cfg').style.display='none';init()};
 window.addEventListener('beforeunload',e=>{if(sale){e.preventDefault();e.returnValue=''}});
