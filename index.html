@@ -71,7 +71,7 @@ input.ed.num{text-align:right}
 }
 .po{display:none}
 #modal{position:fixed;inset:0;background:#0006;z-index:50;display:none;align-items:flex-start;justify-content:center;overflow:auto;padding:30px 10px}
-#modal .box{background:#fff;border-radius:8px;max-width:760px;width:100%;padding:18px 22px;font-size:13px}
+#modal .box{background:#fff;border-radius:8px;max-width:920px;width:100%;padding:18px 22px;font-size:13px}
 #modal h3{margin:0 0 10px;color:#1F3864}
 #modal .g{display:grid;grid-template-columns:180px 1fr;gap:6px 10px;align-items:center}
 #modal input,#modal textarea{font:inherit;padding:4px 6px;border:1px solid #ccc;border-radius:4px;width:100%}
@@ -118,8 +118,10 @@ input.ed.num{text-align:right}
     <label>Observations</label><textarea id="mObs" rows="2"></textarea>
   </div>
   <h3 style="margin-top:14px">Tâches à suivre</h3>
-  <div style="color:#666">Cochez les tâches de cette commande et donnez une échéance à chacune.</div>
-  <table><thead><tr><th style="width:30px"></th><th>Tâche</th><th style="width:140px">Échéance</th><th style="width:160px">Référent</th><th>Note</th></tr></thead><tbody id="mTaches"></tbody></table>
+  <div style="color:#666">Cochez les tâches de cette commande ; chacune a une échéance, un référent et un statut.</div>
+  <table><thead><tr><th style="width:30px"></th><th>Tâche</th><th style="width:130px">Échéance</th><th style="width:140px">Référent</th><th style="width:150px">Statut</th><th>Note</th></tr></thead><tbody id="mTaches"></tbody></table>
+  <button id="mAjout" style="margin-top:6px;border:1px dashed #2B4C7E;color:#2B4C7E;background:#fff;padding:4px 10px;border-radius:4px;cursor:pointer">+ Ajouter une tâche</button>
+  <div style="color:#666;margin-top:4px;font-size:12px">Décocher une tâche (ou la mettre « Annulée ») l'annule. Seul le statut « Fait » clôture une tâche.</div>
   <div class="btns"><button id="mAnnul">Annuler</button><button id="mOk" class="ok">Enregistrer la commande</button></div>
 </div></div>
 <div class="page" id="page" style="display:none">
@@ -440,19 +442,39 @@ async function ouvrirCommande(){
   $('mCde').value=CDE?.['N° Cde Client']||'';$('mDateCde').value=(CDE?.['Date cde client']||aujourd()).slice(0,10);
   $('mDateLiv').value=(CDE?.['Date Livraison']||'').slice(0,10);$('mDelai').value=CDE?.['Délai']||cur['Délai']||'';
   $('mAdr').value=CDE?.['Adresse de livraison']||'';$('mCondLiv').value=CDE?.['Conditions de livraison']||'';$('mObs').value=CDE?.Observations||'';
-  const refAff=ids(cur['Référent KTE'])[0];
+  REFAFF=ids(cur['Référent KTE'])[0];
   CATALOGUE.sort((a,b)=>(+a.Ordre||a.id)-(+b.Ordre||b.id));
-  $('mTaches').innerHTML=CATALOGUE.map(t=>{const d=deja.find(x=>(x['Type de tâche']||[]).some(y=>y.id===t.id));
-    const rdef=ids(d?.['Référent'])[0]||ids(t['Référent par défaut'])[0]||refAff;
-    const sel=`<select style="width:100%;font:inherit;padding:3px">${refs.map(r=>`<option value="${r.id}" ${r.id==rdef?'selected':''}>${r.Nom}</option>`).join('')}</select>`;
-    return `<tr data-id="${t.id}" data-tc="${d?.id||''}"><td><input type="checkbox" ${d?'checked':''} style="width:auto"></td><td>${t.Nom||''}</td><td><input type="date" value="${(d?.['Échéance']||'').slice(0,10)}"></td><td>${sel}</td><td><input value="${(d?.Notes||'').replace(/"/g,'&quot;')}"></td></tr>`}).join('');
-  $('mTaches').querySelectorAll('tr').forEach(tr=>{const [cb,dt]=tr.querySelectorAll('input');dt.addEventListener('input',()=>{if(dt.value)cb.checked=true})});
+  const lignesT=[];
+  for(const t of CATALOGUE){const d=deja.find(x=>(x['Type de tâche']||[]).some(y=>y.id===t.id));lignesT.push({t,d})}
+  for(const d of deja)if(!(d['Type de tâche']||[]).length)lignesT.push({t:null,d});
+  $('mTaches').innerHTML='';lignesT.forEach(x=>ajouterLigneTache(x.t,x.d));
   $('modal').style.display='flex';msg('');
+}
+let REFAFF=null;
+const STATUTS_T=['Non commencé','En cours','Attente retour client','Attente matière','ARC SST reçu','OK pour expé','Fait','Annulée'];
+const esc=v=>String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+function ajouterLigneTache(t,d){
+  const rdef=ids(d?.['Référent'])[0]||ids(t?.['Référent par défaut'])[0]||REFAFF;
+  const st=d?.Statut?.value||'Non commencé';
+  const tr=document.createElement('tr');tr.dataset.id=t?.id||'';tr.dataset.tc=d?.id||'';tr.dataset.st=d?st:'';
+  const nom=t?esc(t.Nom):`<input class="tnom" placeholder="Nouvelle tâche" value="${esc((d?.['Libellé']||'').replace(/^D\d+ – /,''))}">`;
+  tr.innerHTML=`<td><input type="checkbox" class="tcb" ${d&&st!=='Annulée'?'checked':''} style="width:auto"></td><td>${nom}</td>
+    <td><input type="date" class="tdt" value="${(d?.['Échéance']||'').slice(0,10)}"></td>
+    <td><select class="tref" style="width:100%;font:inherit;padding:3px">${refs.map(r=>`<option value="${r.id}" ${r.id==rdef?'selected':''}>${esc(r.Nom)}</option>`).join('')}</select></td>
+    <td><select class="tst" style="width:100%;font:inherit;padding:3px">${STATUTS_T.map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select></td>
+    <td><input class="tno" value="${esc(d?.Notes)}"></td>`;
+  const cb=tr.querySelector('.tcb'),sel=tr.querySelector('.tst');
+  tr.querySelector('.tdt').addEventListener('input',e=>{if(e.target.value)cb.checked=true});
+  sel.addEventListener('change',()=>{cb.checked=sel.value!=='Annulée'});
+  cb.addEventListener('change',()=>{if(!cb.checked&&tr.dataset.tc)sel.value='Annulée';else if(cb.checked&&sel.value==='Annulée')sel.value='Non commencé'});
+  if(t===null&&!d)cb.checked=true;
+  $('mTaches').appendChild(tr);return tr;
 }
 async function enregistrerCommande(){
   const n=cur['N° devis'];
-  const manque=[...$('mTaches').querySelectorAll('tr')].filter(tr=>{const [cb,dt]=tr.querySelectorAll('input');return cb.checked&&(!dt.value||!tr.querySelector('select').value)});
-  if(manque.length){alert('Chaque tâche cochée doit avoir une échéance et un référent : '+manque.map(tr=>tr.children[1].textContent).join(', '));return}
+  const rowsT=[...$('mTaches').querySelectorAll('tr')];
+  const manque=rowsT.filter(tr=>tr.querySelector('.tcb').checked&&tr.querySelector('.tst').value!=='Annulée'&&(!tr.querySelector('.tdt').value||!tr.querySelector('.tref').value||(tr.querySelector('.tnom')&&!tr.querySelector('.tnom').value.trim())));
+  if(manque.length){alert('Chaque tâche doit avoir un nom, une échéance et un référent : '+manque.map(tr=>tr.querySelector('.tnom')?.value||tr.children[1].textContent||'(sans nom)').join(', '));return}
   const corps={'N° affaire':n,'Statut':'Commandé','N° Cde Client':$('mCde').value,'Date cde client':$('mDateCde').value||null,'Date Livraison':$('mDateLiv').value||null,
     'Délai':$('mDelai').value,'Adresse de livraison':$('mAdr').value,'Conditions de livraison':$('mCondLiv').value,'Observations':$('mObs').value,
     'Client':ids(cur.Client),'Référent KTE':ids(cur['Référent KTE']),'Objet':cur.Objet||'','Montant HT (€)':cur['Total HT']||null,
@@ -463,17 +485,25 @@ async function enregistrerCommande(){
          :await api(`/rows/table/${T_AFF}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
   await api(`/rows/table/${DOCS.devis.table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Statut':'Accepté','Commande':[CDE.id]})});
   let nb=0;
-  for(const tr of $('mTaches').querySelectorAll('tr')){const [cb,dt,no]=tr.querySelectorAll('input');const tc=tr.dataset.tc;const t=CATALOGUE.find(x=>x.id==tr.dataset.id);
-    const c={'Libellé':`${n} – ${t.Nom}`,'Commande':[CDE.id],'Type de tâche':[t.id],'Échéance':dt.value||null,'Référent':tr.querySelector('select').value?[+tr.querySelector('select').value]:[],'Notes':no.value};
-    if(cb.checked){if(tc)await api(`/rows/table/${T_TC}/${tc}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)});else await api(`/rows/table/${T_TC}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});nb++}
-    else if(tc)await api(`/rows/table/${T_TC}/${tc}/`,{method:'DELETE'})}
+  for(const tr of $('mTaches').querySelectorAll('tr')){
+    const cb=tr.querySelector('.tcb').checked,tc=tr.dataset.tc,t=CATALOGUE.find(x=>x.id==tr.dataset.id);let st=tr.querySelector('.tst').value;
+    if(!cb&&!tc)continue;
+    if(!cb)st='Annulée';
+    const nom=t?t.Nom:tr.querySelector('.tnom').value.trim();
+    const c={'Libellé':`${n} – ${nom}`,'Commande':[CDE.id],'Type de tâche':t?[t.id]:[],'Échéance':tr.querySelector('.tdt').value||null,
+      'Référent':tr.querySelector('.tref').value?[+tr.querySelector('.tref').value]:[],'Statut':st,'Notes':tr.querySelector('.tno').value};
+    if(st==='Fait'&&tr.dataset.st!=='Fait')c['Fait le']=aujourd();
+    if(tc)await api(`/rows/table/${T_TC}/${tc}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)});
+    else await api(`/rows/table/${T_TC}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});
+    if(st!=='Annulée')nb++}
   $('modal').style.display='none';
   cur=await ligne1(DOCS.devis.table,cur.id);await chargerListe();$('choix').value=cur.id;afficher();$('bCde').style.display='';$('bCde').textContent='Commande : '+n;
   msg(`Commande ${n} enregistrée – ${nb} tâche(s). Devis passé « Accepté ».`,'ok');
-  if(confirm('Créer maintenant l\'accusé de réception de commande (ARC) ?')){
+  if(!(CDE.ARC||[]).length&&confirm('Créer maintenant l\'accusé de réception de commande (ARC) ?')){
     $('type').value='arc';await changerType('arc');window.__numPropose=n;await nouveau();}
 }
 $('bCde').onclick=()=>ouvrirCommande().catch(e=>msg('Erreur : '+e.message,'err'));
+$('mAjout').onclick=()=>ajouterLigneTache(null,null).querySelector('.tnom').focus();
 $('mAnnul').onclick=()=>{$('modal').style.display='none'};
 $('mOk').onclick=()=>enregistrerCommande().catch(e=>msg('Erreur : '+e.message,'err'));
 $('bPdf').onclick=()=>{if(sale&&!confirm('Des modifications ne sont pas enregistrées. Imprimer quand même ?'))return;window.print()};
