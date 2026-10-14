@@ -33,8 +33,8 @@ table.lignes th.g{text-align:left}
 table.lignes td{border-bottom:1px solid var(--trait);padding:4px;vertical-align:middle}
 table.lignes td.n{text-align:right;width:28mm}
 table.lignes td.q{text-align:right;width:20mm}
-table.lignes td.v{width:14mm}
-table.lignes td.v img{width:12mm;height:12mm;object-fit:contain}
+table.lignes td.v{width:18mm}
+table.lignes td.v img{width:16mm;height:16mm;object-fit:contain}
 table.lignes td.act{width:16mm;text-align:center;white-space:nowrap}
 .ed{border:1px dashed transparent;border-radius:3px;padding:2px 3px;font:inherit;background:transparent;width:100%;color:inherit}
 .ed:hover{border-color:#b9c7dd}.ed:focus{outline:none;border-color:var(--bleu);background:var(--jaune)}
@@ -315,7 +315,7 @@ function dessinerLignes(){
   lignes.forEach((l,i)=>{
     const tr=document.createElement('tr');
     const img=(l.Vignette||[])[0];
-    tr.innerHTML=`<td class="v">${img?`<img src="${img.thumbnails?.small?.url||img.url}">`:''}</td>
+    tr.innerHTML=`<td class="v">${img?`<img src="${img.url||img.thumbnails?.card_cover?.url}">`:''}</td>
       <td><textarea class="ed desig" rows="1" placeholder="Référence + désignation"></textarea><textarea class="ed prec" rows="1" placeholder="Précisions : matière, traitements…"></textarea></td>
       ${cols.map(c=>`<td class="${c[2]}"><input class="ed num" type="number" step="${c[3]}"></td>`).join('')}
       <td class="n mt ${prix?'':'q partiel'}"></td>
