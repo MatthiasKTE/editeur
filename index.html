@@ -31,11 +31,21 @@ table.lignes{width:100%;border-collapse:collapse;margin-top:12mm}
 table.lignes th{color:var(--bleu);text-align:right;padding:6px 4px;border-bottom:1px solid var(--trait)}
 table.lignes th.g{text-align:left}
 table.lignes td{border-bottom:1px solid var(--trait);padding:4px;vertical-align:middle}
-table.lignes td.n{text-align:right;width:28mm}
-table.lignes td.q{text-align:right;width:20mm}
+table.lignes td.n{text-align:right;width:24mm}
+table.lignes td.q{text-align:right;width:16mm}
 table.lignes td.v{width:18mm}
 table.lignes td.v img{width:16mm;height:16mm;object-fit:contain}
-table.lignes td.act{width:16mm;text-align:center;white-space:nowrap}
+table.lignes td.act{width:12mm;text-align:center;white-space:nowrap}
+/* Lisibilité (tous documents) : pas de ligne de 1-2 caractères, ==texte== surligné en jaune */
+textarea.ed,.po,.vue{text-wrap:pretty}
+.vue{padding:2px 3px;border:1px dashed transparent;border-radius:3px;cursor:text;min-height:20px;line-height:1.35}
+.vue:hover{border-color:#b9c7dd}
+#tb .vue.desig{font-weight:bold}
+#tb .vue.prec{font-size:12px;color:#222}
+#tb textarea.ed{display:none}
+#tb textarea.ed.edit{display:block}
+@media print{.vue{display:none!important}}
+mark{background:#FFF200;color:inherit;padding:0 1px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .ed{border:1px dashed transparent;border-radius:3px;padding:2px 3px;font:inherit;background:transparent;width:100%;color:inherit}
 .ed:hover{border-color:#b9c7dd}.ed:focus{outline:none;border-color:var(--bleu);background:var(--jaune)}
 textarea.ed{resize:none;overflow:hidden;min-height:20px}
@@ -231,6 +241,16 @@ async function api(path,opt={}){
 async function tout(t,extra=''){let out=[],p=1;for(;;){const j=await api(`/rows/table/${t}/?user_field_names=true&size=200&page=${p}${extra}`);out=out.concat(j.results);if(!j.next)break;p++}return out}
 const ligne1=(t,id)=>api(`/rows/table/${t}/${id}/?user_field_names=true`);
 function marquer(){sale=true;$('bEnr').disabled=false;msg('Modifications non enregistrées','warn')}
+// Règles de lisibilité communes à tous les documents KTE (même logique que typo_kte.py côté PDF) :
+// dernier mot court collé au précédent, « réf. / rep. / n° / ép. / Ø » collés à ce qui suit, nombre collé à son
+// unité, pas de « – : / » en début de ligne ; ==texte== = surligné jaune.
+const NB='\u00a0';
+function lisible(t){return String(t??'').split('\n').map(l=>{let s=l.replace(/[ \t]+/g,' ').trim();
+  s=s.replace(/(^|\s)(réf\.|Réf\.|rep\.|Rep\.|repère|n°|N°|ép\.|Ø|M|DN|Ra|art\.) (?=\S)/g,'$1$2'+NB);
+  s=s.replace(/(\d) (?=[^\s\d–—-][^\s]{0,8}(\s|$))/g,'$1'+NB);
+  s=s.replace(/ (?=[–—:;!?\/×x]\s)/g,NB);
+  s=s.replace(/ ([^\s\u00a0]{1,6})$/,NB+'$1');return s}).join('\n')}
+function riche(t){return lisible(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/==(.+?)==/g,'<mark>$1</mark>').replace(/\n/g,'<br>')}
 function auto(t){t.style.height='auto';t.style.height=t.scrollHeight+'px'}
 const champs=()=>[...document.querySelectorAll('.page [data-f]')].filter(e=>visible(e));
 function visible(e){for(let x=e;x&&x.id!=='page';x=x.parentElement){if(x.dataset&&x.dataset.docs&&!x.dataset.docs.split(' ').includes(TYPE))return false}return true}
@@ -316,14 +336,18 @@ function dessinerLignes(){
     const tr=document.createElement('tr');
     const img=(l.Vignette||[])[0];
     tr.innerHTML=`<td class="v">${img?`<img src="${img.url||img.thumbnails?.card_cover?.url}">`:''}</td>
-      <td><textarea class="ed desig" rows="1" placeholder="Référence + désignation"></textarea><textarea class="ed prec" rows="1" placeholder="Précisions : matière, traitements…"></textarea></td>
+      <td><textarea class="ed desig" rows="1" placeholder="Référence + désignation"></textarea><textarea class="ed prec" rows="1" placeholder="Précisions : matière, traitements… (==texte== = surligné jaune)"></textarea></td>
       ${cols.map(c=>`<td class="${c[2]}"><input class="ed num" type="number" step="${c[3]}"></td>`).join('')}
       <td class="n mt ${prix?'':'q partiel'}"></td>
       <td class="act"><button class="mini" title="Monter">↑</button><button class="mini" title="Descendre">↓</button><button class="mini" title="Supprimer la ligne">✕</button></td>`;
     const [ta]=tr.getElementsByTagName('textarea');const ins=tr.getElementsByTagName('input');const b=tr.getElementsByTagName('button');
     ta.value=l.Description||'';ta.oninput=()=>{l.Description=ta.value;l._m=1;auto(ta);marquer()};
     const tp=tr.querySelector('textarea.prec');tp.value=l['Précisions']||'';tp.oninput=()=>{l['Précisions']=tp.value;l._m=1;auto(tp);marquer()};setTimeout(()=>auto(tp));
-    cols.forEach((c,k)=>{ins[k].value=l[c[0]]??'';ins[k].oninput=()=>{l[c[0]]=ins[k].value;l._m=1;totaux();marquer()}});
+    [ta,tp].forEach(t=>{const v=document.createElement('div');v.className='vue '+(t===ta?'desig':'prec');t.after(v);
+      const maj=()=>{v.innerHTML=t.value.trim()?riche(t.value):`<span class="aide">${esc(t.placeholder)}</span>`};maj();t.addEventListener('input',maj);
+      v.onclick=()=>{v.style.display='none';t.classList.add('edit');auto(t);t.focus()};
+      t.addEventListener('blur',()=>{t.classList.remove('edit');v.style.display='';maj()})});
+    cols.forEach((c,k)=>{ins[k].value=c[2].includes('q')&&l[c[0]]!=null&&l[c[0]]!==''?String(+l[c[0]]):(l[c[0]]??'');ins[k].oninput=()=>{l[c[0]]=ins[k].value;l._m=1;totaux();marquer()}});
     b[0].onclick=()=>{if(i>0){[lignes[i-1],lignes[i]]=[lignes[i],lignes[i-1]];lignes.forEach(x=>x._m=1);dessinerLignes();marquer()}};
     b[1].onclick=()=>{if(i<lignes.length-1){[lignes[i+1],lignes[i]]=[lignes[i],lignes[i+1]];lignes.forEach(x=>x._m=1);dessinerLignes();marquer()}};
     b[2].onclick=()=>{if(confirm('Supprimer cette ligne ?')){if(l.id)supprimees.push(l.id);lignes.splice(i,1);dessinerLignes();marquer()}};
@@ -348,7 +372,7 @@ function totaux(){
 document.querySelectorAll('.page [data-f], #fDate, #fAdrLivBL').forEach(e=>e.addEventListener('input',()=>{if(e.tagName==='TEXTAREA')auto(e);if(e.id==='fAdrLivBL')majAdrBL();totaux();marquer()}));
 $('fClient').onchange=()=>{majClient();marquer()};$('fRef').onchange=()=>{majRef();marquer()};
 $('ajout').onclick=()=>{const n={Description:'',_m:1,_new:1};if(TYPE==='bl'){n['Quantité commandée']='1';n['Déjà livré']='0';n['Quantité livrée']='1'}else{n['Quantité']='1';n['Prix unitaire HT']=''}
-  lignes.push(n);dessinerLignes();marquer();const t=document.querySelectorAll('#tb textarea.desig');t[t.length-1]?.focus()};
+  lignes.push(n);dessinerLignes();marquer();const t=document.querySelectorAll('#tb .vue.desig');t[t.length-1]?.click()};
 
 const vide=x=>x===''||x==null?null:x;
 async function enregistrer(){
@@ -518,7 +542,7 @@ window.addEventListener('beforeprint',()=>{
     else if(el.classList.contains('num')&&el.closest('td.n'))t=eur(t);
     else if(el.classList.contains('num'))t=nb(t);
     const sp=document.createElement('span');sp.className='po';
-    if(el.tagName==='TEXTAREA')sp.innerHTML=(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/\n/g,'<br>');
+    if(el.tagName==='TEXTAREA')sp.innerHTML=riche(t);
     else sp.textContent=t;
     if(el.closest('#tb')&&el.classList.contains('desig')||el.id==='fClient')sp.style.fontWeight='bold';
     if(el.closest('#tb')&&el.tagName==='TEXTAREA'){sp.classList.add(el.classList.contains('prec')?'prec':'desig');if(!t.trim())sp.classList.add('vide')}
