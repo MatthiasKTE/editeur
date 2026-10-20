@@ -269,20 +269,20 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
    statut : champ de statut (puces + kanban) ; editeur : type de document de l'éditeur ;
    liees : listes affichées en onglets dans la fiche (table + champ lien vers la fiche). */
 const MODS={
- devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
+ devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé']},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
    liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
- arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
+ arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
    liees:[{nom:'Lignes',t:1261373,lien:'ARC',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'}]},
- bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
+ bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut','PDF'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
    liees:[{nom:'Lignes',t:1261381,lien:'BL',cols:['Description','Quantité commandée','Quantité livrée'],ordre:'Ordre'}]},
  clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
    liees:[{nom:'Devis',mod:'devis',lien:'Client'},{nom:'Commandes',mod:'commandes',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
  taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
- cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
+ cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
    liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant'],ordre:'Ordre',ajout:true}],cacheStatuts:['Annulée']},
  fournisseurs:{t:1260241,nom:'Fournisseurs',un:'fournisseur',ico:'fournisseurs',grp:'Achats',cols:['Nom','Type','Pays','Contact','E-mail','Devise','Conditions de paiement'],
    liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'}]},
@@ -753,13 +753,15 @@ function dessinerFiche(){
   if($('bBL'))$('bBL').onclick=()=>fenetreBL(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if($('selSt'))$('selSt').onchange=async e=>{const o=stF.select_options.find(x=>x.id==e.target.value);try{const r=await changerStatut(k,SALE.row,o.id,o.value);SALE.row=r;delete SALE.draft[m.statut];dessinerFiche()}catch(er){toast('Échec : '+er.message,true)}};
   if(!nouveau&&m.liees)dessinerLiees(0);
+  if(!nouveau&&k==='commandes')documentsAffaire(row).catch(e=>{if($('docsAff'))$('docsAff').innerHTML=`<div class="c mut">${esc(e.message)}</div>`});
   barre();
 }
 function cote(k,row,nouveau){
   if(nouveau)return`<div class="card"><h3>Création</h3><div class="c mut">Renseignez les champs puis « Enregistrer ».${MODS[k].requis?'<br><br>Obligatoires : '+MODS[k].requis.join(', ')+'.':''}</div></div>`;
   const liens=[];
-  for(const [n,v] of Object.entries(row)){if(typeof v==='string'&&/^https?:\/\//.test(v)){const lab=/sharepoint|dossier/i.test(n)?['dossier',n]:/pdf/i.test(n)?['pdf',n]:['ext',n];liens.push(`<a class="lien" href="${esc(v)}" target="_blank">${ico(lab[0])}${esc(lab[1])}</a>`)}}
-  let h=liens.length?`<div class="card"><h3>Documents et liens</h3>${liens.join('')}</div>`:'';
+  for(const [n,v] of Object.entries(row)){if(k==='commandes'&&/pdf|excel/i.test(n))continue;if(typeof v==='string'&&/^https?:\/\//.test(v)){const lab=/sharepoint|dossier/i.test(n)?['dossier',n]:/pdf/i.test(n)?['pdf',n]:['ext',n];liens.push(`<a class="lien" href="${esc(v)}" target="_blank">${ico(lab[0])}${esc(lab[1])}</a>`)}}
+  let h=k==='commandes'?`<div class="card"><h3>Documents de l’affaire</h3><div id="docsAff"><div class="c mut">Recherche des documents…</div></div></div>`:'';
+  h+=liens.length?`<div class="card"><h3>${k==='commandes'?'Liens':'Documents et liens'}</h3>${liens.join('')}</div>`:'';
   if(k==='clients'){const D=(S.rows[MODS.devis.t]||[]).filter(r=>ids(r.Client).includes(row.id)),C=(S.rows[MODS.commandes.t]||[]).filter(r=>ids(r.Client).includes(row.id));
     if(montants())h+=`<div class="card"><h3>Synthèse client</h3><div class="c">${D.length} devis · ${C.length} commande(s)<br>Commandé total : <b>${eur(C.filter(r=>txt(r.Statut)!=='Annulée').reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))}</b> HT<br>Devis en cours : <b>${eur(D.filter(devisEnCours).reduce((s,r)=>s+(+r['Total HT']||0),0))}</b> HT</div></div>`;
     charger(MODS.devis.t).then(()=>charger(MODS.commandes.t)).catch(()=>{});}
@@ -932,6 +934,31 @@ async function editerLigne(t,x,r){
     try{const n=r?await api(`/rows/table/${t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)}):await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});
       majRow(t,n);fermerModal();toast('Ligne enregistrée');delete S.prom[SALE.t];
       const p=await api(`/rows/table/${SALE.t}/${SALE.row.id}/?user_field_names=true`);majRow(SALE.t,p);SALE.row=p;dessinerFiche();dessinerLiees(ONG)}catch(e){toast('Échec : '+e.message,true)}};
+}
+
+/* ---------- Documents de l'affaire : PDF des devis, ARC, BL, commandes fournisseurs, synthèse ---------- */
+async function documentsAffaire(cde){
+  const n=txt(cde['N° affaire']);
+  const vis=['devis','arc','bl','cf'].filter(peutVoir);
+  const T=await Promise.all(vis.map(k=>charger(MODS[k].t).catch(()=>[])));const D={};vis.forEach((k,i)=>D[k]=T[i]);
+  if(SALE?.row?.id!==cde.id||!$('docsAff'))return;
+  const lie=(r,champ)=>ids(r[champ]).includes(cde.id);
+  const groupes=[];
+  if(D.devis)groupes.push(['devis','Devis',D.devis.filter(r=>lie(r,'Commande')||ids(cde.Devis).includes(r.id)||txt(r['N° devis'])===n)]);
+  if(D.arc)groupes.push(['arc','ARC',D.arc.filter(r=>lie(r,'Affaire')||txt(r['N° ARC'])==='ARC-'+n)]);
+  if(D.bl)groupes.push(['bl','BL',D.bl.filter(r=>lie(r,'Affaire')||String(txt(r['N° BL'])).startsWith('BL-'+n+'-'))]);
+  if(D.cf)groupes.push(['cf','Commandes fournisseurs',D.cf.filter(r=>lie(r,'Affaire'))]);
+  let h='';
+  for(const [k,nom,L] of groupes){if(!L.length)continue;const m=MODS[k];
+    L.sort((a,b)=>String(txt(a[m.num])).localeCompare(String(txt(b[m.num]))));
+    for(const r of L){const num=txt(r[m.num]),pdf=r.PDF,v=r.Version?' v.'+nb(r.Version):'';
+      h+=`<div class="lien" style="justify-content:space-between"><a href="#/${k}/${r.id}" style="color:var(--txt)">${ico(m.ico)}<b style="margin-left:6px">${esc(num)}</b><span class="mut">${esc(v)}</span></a>
+        ${pdf?`<a class="btn" style="padding:3px 9px" href="${esc(pdf)}" target="_blank" title="Ouvrir le PDF enregistré">${ico('pdf')}PDF</a>`:m.editeur?`<a class="btn" style="padding:3px 9px" href="${EDITEUR}?${m.editeur}=${encodeURIComponent(num)}" target="_blank" title="Pas encore de PDF enregistré : ouvrir dans l’éditeur pour l’imprimer">${ico('ext')}Éditeur</a>`:'<span class="mut" style="font-size:12px">pas de PDF</span>'}</div>`;
+      if(k==='cf'&&r['Devis fournisseur (PDF)'])h+=`<a class="lien" href="${esc(r['Devis fournisseur (PDF)'])}" target="_blank" style="padding-left:38px">${ico('pdf')}Offre fournisseur ${esc(num)}</a>`}}
+  if(peutVoir('devis')&&cde['PDF devis Axonaut'])h+=`<a class="lien" href="${esc(cde['PDF devis Axonaut'])}" target="_blank">${ico('pdf')}Devis Axonaut (PDF)</a>`;
+  if(cde['Synthèse PDF'])h+=`<a class="lien" href="${esc(cde['Synthèse PDF'])}" target="_blank">${ico('pdf')}Synthèse des pièces${cde['Synthèse version']?' v.'+nb(cde['Synthèse version']):''} (PDF)</a>`;
+  if(cde['Synthèse Excel'])h+=`<a class="lien" href="${esc(cde['Synthèse Excel'])}" target="_blank">${ico('dl')}Synthèse des pièces (Excel)</a>`;
+  $('docsAff').innerHTML=h||'<div class="c mut">Aucun document pour cette affaire.</div>';
 }
 
 /* ---------- Bons de livraison : création en un clic depuis une commande ----------
