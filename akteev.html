@@ -116,7 +116,7 @@ table.l tfoot td{font-weight:600;padding:10px 12px;background:#FAFBFC}
 .kpi .lab svg{width:16px;height:16px}
 .kpi .val{font-size:26px;font-weight:700;margin-top:6px;letter-spacing:-.5px}
 .kpi .det{font-size:12.5px;color:var(--mut);margin-top:2px}
-.grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px}
+.grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:16px}
 .bloc h2{font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait);display:flex;align-items:center;gap:8px}
 .bloc h2 a{margin-left:auto;font-size:12.5px;font-weight:500}
 .ligneDb{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #F0F2F6;cursor:pointer}
@@ -154,7 +154,7 @@ details.calc summary{cursor:pointer;padding:12px 20px;color:var(--mut);font-size
 .onglets button{border:0;background:none;padding:11px 12px;color:var(--mut);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
 .onglets button.on{color:var(--accent);border-bottom-color:var(--accent)}
 .onglets button .nb{background:#EEF1F6;border-radius:10px;padding:0 6px;font-size:11px;margin-left:4px}
-#barreEnr{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(120px);background:var(--side);color:#fff;border-radius:10px;padding:10px 12px 10px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .2s;z-index:40}
+#barreEnr{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(200px);background:var(--side);color:#fff;border-radius:10px;padding:10px 12px 10px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .2s;z-index:40}
 #barreEnr.vis{transform:translateX(-50%) translateY(0)}
 #barreEnr .btn{border-color:#3A4B6A;background:transparent;color:#fff}
 #barreEnr .btn.p{background:var(--accent);border-color:var(--accent)}
@@ -307,8 +307,11 @@ const coul=c=>COUL[c]||COUL[String(c||'').replace(/^(light|dark|darker)-/,'')]||
 const badge=o=>{if(!o||o.value==null||o.value==='')return'';const [bg,fg]=coul(o.color);return`<span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span>`};
 
 /* ---------- API Baserow ---------- */
-async function api(path,opt={}){
-  const r=await fetch(API+path,{...opt,headers:{Authorization:'Token '+JETON,'Content-Type':'application/json',...(opt.headers||{})}});
+let ENCOURS=0;const FILE=[];
+async function api(path,opt={},essai=0){
+  if(ENCOURS>=4)await new Promise(r=>FILE.push(r));ENCOURS++;let r;
+  try{r=await fetch(API+path,{...opt,headers:{Authorization:'Token '+JETON,'Content-Type':'application/json',...(opt.headers||{})}})}finally{ENCOURS--;FILE.length&&FILE.shift()()}
+  if((r.status===429||r.status>=500)&&essai<4){await new Promise(x=>setTimeout(x,800*(essai+1)));return api(path,opt,essai+1)}
   if(!r.ok){const t=await r.text();let m=t;try{const j=JSON.parse(t);m=(j.error||'')+' '+(j.detail?JSON.stringify(j.detail):'')}catch(e){}throw new Error(r.status+' '+m.slice(0,300))}
   return r.status===204?null:r.json();
 }
@@ -371,7 +374,7 @@ function rendu(f,v,court){
   if(ty==='link_row'){const m=MOD_DE_TABLE[f.link_row_table_id];return v.map(x=>m?`<a class="chip" href="#/${m}/${x.id}" onclick="event.stopPropagation()">${esc(x.value)}</a>`:`<span class="chip">${esc(x.value)}</span>`).join('')}
   if(ty==='file')return v.map(x=>x.is_image?`<a href="${esc(x.url)}" target="_blank" onclick="event.stopPropagation()"><img src="${esc(x.thumbnails?.tiny?.url||x.url)}" style="height:${court?24:60}px;border-radius:4px;margin-right:4px;vertical-align:middle"></a>`:`<a href="${esc(x.url)}" target="_blank">${esc(x.visible_name)}</a>`).join(' ');
   if(ty==='date'||ty==='created_on'||ty==='last_modified')return f.date_include_time||ty!=='date'?esc(dtfr(v)):esc(dfr(v));
-  if(ty==='number'||ty==='count'||ty==='rating'||(ty==='formula'&&typeof v!=='object'&&/^-?\d+(\.\d+)?$/.test(String(v)))){return estMonnaie(n)?eur(v):nb(v)}
+  if(ty==='number'||ty==='count'||ty==='rating'||((ty==='formula'||ty==='rollup')&&typeof v!=='object'&&/^-?\d+(\.\d+)?$/.test(String(v)))){return estMonnaie(n)?eur(v):nb(v)}
   if(ty==='url'||(typeof v==='string'&&/^https?:\/\/\S+$/.test(v)))return`<a href="${esc(v)}" target="_blank" onclick="event.stopPropagation()">${court?'Ouvrir ↗':esc(v.length>60?v.slice(0,57)+'…':v)}</a>`;
   if(ty==='email')return`<a href="mailto:${esc(v)}" onclick="event.stopPropagation()">${esc(v)}</a>`;
   if(Array.isArray(v))return v.map(x=>typeof x==='object'&&x&&'color' in x?badge(x):`<span class="chip">${esc(txt(x))}</span>`).join('');
@@ -540,10 +543,10 @@ function dessinerListe(k){
   </div>`;
   if(E.vue==='kanban'&&stF){h+=`</div><div style="margin-top:14px">${kanban(k,L,opts)}</div>`}
   else{
-    const tot={};cols.forEach(c=>{const f=sc.par[c];if(f&&(f.type==='number'||f.type==='formula')&&estMonnaie(c))tot[c]=L.reduce((s,r)=>s+(+r[c]||0),0)});
-    h+=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c],num=f&&(f.type==='number'||f.type==='count'||(f.type==='formula'&&estMonnaie(c)));return`<th data-c="${esc(c)}" class="${num?'n':''}">${esc(c)} <span class="fl">${E.tri?.f===c?(E.tri.d>0?'▲':'▼'):''}</span></th>`}).join('')}</tr></thead><tbody>`;
+    const tot={};cols.forEach(c=>{const f=sc.par[c];if(f&&(f.type==='number'||f.type==='formula'||f.type==='rollup')&&estMonnaie(c))tot[c]=L.reduce((s,r)=>s+(+r[c]||0),0)});
+    h+=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c],num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));return`<th data-c="${esc(c)}" class="${num?'n':''}">${esc(c)} <span class="fl">${E.tri?.f===c?(E.tri.d>0?'▲':'▼'):''}</span></th>`}).join('')}</tr></thead><tbody>`;
     const a=auj();
-    h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||(f.type==='formula'&&estMonnaie(c)));
+    h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
       const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
       return`<td class="${c===sc.prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
     h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
@@ -769,7 +772,7 @@ async function dessinerLiees(i){
   const cible=x.mod;
   const a=auj();
   let h=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c];return`<th class="${f?.type==='number'?'n':''}" style="cursor:default">${esc(c)}</th>`}).join('')}</tr></thead><tbody>`;
-  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${c===sc.prim?'prim':''} ${f?.type==='number'||(f?.type==='formula'&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
+  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${c===sc.prim?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
   h+='</tbody></table></div>';
   if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
   if(x.ajout&&cible)h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
