@@ -91,6 +91,10 @@ table.l{width:100%;border-collapse:collapse}
 table.l th{text-align:left;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;padding:9px 12px;border-bottom:1px solid var(--trait);white-space:nowrap;cursor:pointer;user-select:none;background:#FAFBFC;position:sticky;top:0}
 table.l th:hover{color:var(--txt)}
 table.l th .fl{opacity:.6;font-size:10px}
+table.l tr.filtres th{position:static;background:#fff;padding:5px 6px;cursor:default;text-transform:none;letter-spacing:0;font-weight:400}
+table.l tr.filtres input,table.l tr.filtres select{width:100%;min-width:70px;border:1px solid var(--trait);border-radius:6px;padding:4px 7px;font-size:12.5px;background:#fff;outline:none;color:var(--txt)}
+table.l tr.filtres input:focus,table.l tr.filtres select:focus{border-color:var(--accent)}
+table.l tr.filtres .on{border-color:#B8CDF8;background:var(--accentL)}
 table.l td{padding:9px 12px;border-bottom:1px solid #EFF1F5;vertical-align:middle;max-width:340px;overflow:hidden;text-overflow:ellipsis}
 table.l tbody tr{cursor:pointer}
 table.l tbody tr:hover{background:var(--hover)}
@@ -514,8 +518,15 @@ function filtrer(k){
     if(E.encours&&!devisEnCours(r))return false;
     if(E.ref&&m.ref&&!ids(r[m.ref]).includes(+E.ref))return false;
     if(q.length){const s=norm(Object.values(r).map(txt).join(' '));if(!q.every(w=>s.includes(w)))return false}
+    for(const [c,v] of Object.entries(E.cf||{})){if(!v||!sc.par[c])continue;const f=sc.par[c];
+      if(estChoix(f)){if(!valsChoix(f,r[c]).includes(v))return false}
+      else if(!norm(txtFiltre(r[c])).includes(norm(v)))return false}
     return true});
 }
+const estChoix=f=>f&&['single_select','multiple_select','link_row','boolean'].includes(f.type);
+function valsChoix(f,x){if(f.type==='boolean')return[x?'Oui':'Non'];if(x==null||x===''||(Array.isArray(x)&&!x.length))return['(vide)'];return Array.isArray(x)?x.map(o=>txt(o)):[txt(x)]}
+function txtFiltre(x){const t=txt(x);return /^\d{4}-\d{2}-\d{2}/.test(t)?t+' '+dfr(t.slice(0,10)):t}
+const nbCf=E=>Object.values(E.cf||{}).filter(Boolean).length;
 function colonnes(k){const m=MODS[k],sc=sch(m.t);let c=m.cols.filter(n=>sc.par[n]);if(c.length<2)c=sc.fields.slice(0,7).map(f=>f.name);if(!c.includes(sc.prim))c.unshift(sc.prim);return c}
 function trier(k,L){
   const m=MODS[k],E=etat(k),sc=sch(m.t);
@@ -537,6 +548,7 @@ function dessinerListe(k){
     <button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>
   <div class="card"><div class="outils">
     <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
+    ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
     ${m.ref&&sc.par[m.ref]?`<select id="lref"><option value="">Tous les référents</option>${MOI?`<option value="${MOI}">Moi</option>`:''}${refs.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('')}</select>`:''}
     ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout?'Actifs':'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
     ${stF?`<div class="bascule"><button data-v="liste" class="${E.vue==='liste'?'on':''}">${ico('liste')}Liste</button><button data-v="kanban" class="${E.vue==='kanban'?'on':''}">${ico('kanban')}Tableau</button></div>`:''}
@@ -544,7 +556,7 @@ function dessinerListe(k){
   if(E.vue==='kanban'&&stF){h+=`</div><div style="margin-top:14px">${kanban(k,L,opts)}</div>`}
   else{
     const tot={};cols.forEach(c=>{const f=sc.par[c];if(f&&(f.type==='number'||f.type==='formula'||f.type==='rollup')&&estMonnaie(c))tot[c]=L.reduce((s,r)=>s+(+r[c]||0),0)});
-    h+=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c],num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));return`<th data-c="${esc(c)}" class="${num?'n':''}">${esc(c)} <span class="fl">${E.tri?.f===c?(E.tri.d>0?'▲':'▼'):''}</span></th>`}).join('')}</tr></thead><tbody>`;
+    h+=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c],num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));return`<th data-c="${esc(c)}" class="${num?'n':''}">${esc(c)} <span class="fl">${E.tri?.f===c?(E.tri.d>0?'▲':'▼'):''}</span></th>`}).join('')}</tr>${ligneFiltres(k,cols)}</thead><tbody>`;
     const a=auj();
     h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
       const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
@@ -555,15 +567,28 @@ function dessinerListe(k){
     h+='</div>';
   }
   $('main').innerHTML=h;
+  document.querySelectorAll('tr.filtres [data-cf]').forEach(e=>{const c=e.dataset.cf;
+    e[e.tagName==='SELECT'?'onchange':'oninput']=()=>{E.cf=E.cf||{};if(e.value)E.cf[c]=e.value;else delete E.cf[c];E.lim=100;sauverEtat();dessinerListe(k);
+      const n=[...document.querySelectorAll('tr.filtres [data-cf]')].find(x=>x.dataset.cf===c);if(n){n.focus();if(n.tagName==='INPUT')n.setSelectionRange(n.value.length,n.value.length)}}});
+  document.querySelectorAll('[data-cfclear]').forEach(b=>b.onclick=()=>{E.cf={};sauverEtat();dessinerListe(k)});
   const lq=$('lq');lq.oninput=()=>{E.q=lq.value;E.lim=100;dessinerListe(k);const n=$('lq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
   if($('lref')){$('lref').value=E.ref;$('lref').onchange=e=>{E.ref=e.target.value;sauverEtat();dessinerListe(k)}}
   document.querySelectorAll('.puce[data-s]').forEach(b=>b.onclick=()=>{const s=b.dataset.s;E.retard=false;E.encours=false;if(!s)E.st=[];else E.st=E.st.includes(s)?E.st.filter(x=>x!==s):[...E.st,s];if(location.hash.includes('?'))history.replaceState(null,'','#/'+k);sauverEtat();dessinerListe(k)});
   document.querySelectorAll('.puce[data-tout]').forEach(b=>b.onclick=()=>{E.tout=!E.tout;sauverEtat();dessinerListe(k)});
   document.querySelectorAll('.bascule button').forEach(b=>b.onclick=()=>{E.vue=b.dataset.v;sauverEtat();dessinerListe(k)});
-  document.querySelectorAll('table.l th').forEach(th=>th.onclick=()=>{const c=th.dataset.c;E.tri=E.tri?.f===c?{f:c,d:-E.tri.d}:{f:c,d:1};sauverEtat();dessinerListe(k)});
+  document.querySelectorAll('table.l th[data-c]').forEach(th=>th.onclick=()=>{const c=th.dataset.c;E.tri=E.tri?.f===c?{f:c,d:-E.tri.d}:{f:c,d:1};sauverEtat();dessinerListe(k)});
   document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/${k}/${tr.dataset.id}`);
   if($('bPlus'))$('bPlus').onclick=()=>{E.lim+=200;dessinerListe(k)};
   if(E.vue==='kanban')brancherKanban(k);
+}
+function ligneFiltres(k,cols){
+  const m=MODS[k],E=etat(k),sc=sch(m.t),R=S.rows[m.t]||[];
+  return`<tr class="filtres">${cols.map(c=>{const f=sc.par[c],v=(E.cf||{})[c]||'';
+    if(estChoix(f)){const cpt=new Map();R.forEach(r=>valsChoix(f,r[c]).forEach(x=>cpt.set(x,(cpt.get(x)||0)+1)));
+      let vals=[...cpt.keys()];if(f.type==='single_select'&&f.select_options)vals.sort((a,b)=>{const i=f.select_options.findIndex(o=>o.value===a),j=f.select_options.findIndex(o=>o.value===b);return(i<0?999:i)-(j<0?999:j)});else vals.sort((a,b)=>a==='(vide)'?1:b==='(vide)'?-1:a.localeCompare(b,'fr'));
+      if(v&&!cpt.has(v))vals.unshift(v);
+      return`<th><select data-cf="${esc(c)}" class="${v?'on':''}"><option value="">Tous</option>${vals.map(x=>`<option value="${esc(x)}" ${x===v?'selected':''}>${esc(x)} (${cpt.get(x)||0})</option>`).join('')}</select></th>`}
+    return`<th><input data-cf="${esc(c)}" class="${v?'on':''}" placeholder="Contient…" value="${esc(v)}"></th>`}).join('')}</tr>`;
 }
 function kanban(k,L,opts){
   const m=MODS[k],sc=sch(m.t),E=etat(k),a=auj();
