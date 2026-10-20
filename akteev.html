@@ -256,7 +256,7 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
    liees : listes affichées en onglets dans la fiche (table + champ lien vers la fiche). */
 const MODS={
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
-   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:[]},
+   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé']},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
    liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
@@ -265,7 +265,7 @@ const MODS={
    liees:[{nom:'Lignes',t:1261381,lien:'BL',cols:['Description','Quantité commandée','Quantité livrée'],ordre:'Ordre'}]},
  clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
    liees:[{nom:'Devis',mod:'devis',lien:'Client'},{nom:'Commandes',mod:'commandes',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
- taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Référent','Statut','Notes'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
+ taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
@@ -504,13 +504,35 @@ const VIRT={taches(rows,sc){
   const C=S.rows[MODS.commandes.t]||[],parId=new Map(C.map(c=>[c.id,c]));
   const aj=(name,f)=>{if(!sc.par[name]){const x={id:'v_'+name,name,virt:true,read_only:true,...f};sc.fields.push(x);sc.par[name]=x}};
   aj('Affaire',{type:'link_row',link_row_table_id:MODS.commandes.t});aj('Client',{type:'link_row',link_row_table_id:MODS.clients.t});
-  aj('Tâche',{type:'text'});aj('Délai',{type:'date',relatif:true});
+  aj('Tâche',{type:'text'});aj('Délai',{type:'date',relatif:true});aj('Pièces',{type:'text',infobulle:'Notes'});
+  const SY=new Map((S.rows[MODS.synthese.t]||[]).map(x=>[x.id,x])),DV=new Map((S.rows[MODS.devis.t]||[]).map(x=>[x.id,x])),LD=new Map((S.rows[1261171]||[]).map(x=>[x.id,x]));
   for(const r of rows){const cde=(r.Commande||[]).map(x=>parId.get(x.id)).filter(Boolean);
     r['Affaire']=r.Commande||[];
     const cl=new Map();cde.forEach(c=>(c.Client||[]).forEach(x=>cl.set(x.id,x)));r['Client']=[...cl.values()];
     r['Tâche']=txt(r['Type de tâche'])||String(txt(r['Libellé'])).replace(/^\S+\s*[–-]\s*/,'');
-    r['Délai']=r['Échéance']||null}
+    r['Délai']=r['Échéance']||null;
+    r['Pièces']=piecesTache(r,cde,SY,DV,LD)}
 }};
+/* « 3+5+6 pcs » : une quantité par ligne. Source : lignes de synthèse liées à la tâche ;
+   pour une expédition, lignes du devis de la commande ; sinon la quantité en tête des notes. */
+function piecesTache(r,cde,SY,DV,LD){
+  const ord=(a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id;
+  let q=ids(r['Synthèse commande']).map(i=>SY.get(i)).filter(x=>x&&!/annul/i.test(txt(x.Statut))).sort(ord).map(x=>+x['Qté attribuée']||+x['Quantité']||0);
+  if(!q.length&&/exp[ée]di|livr/i.test(txt(r['Type de tâche'])+' '+txt(r['Libellé']))){
+    const dv=cde.flatMap(c=>ids(c.Devis)).map(i=>DV.get(i)).filter(Boolean);
+    q=dv.flatMap(d=>ids(d['Lignes de devis'])).map(i=>LD.get(i)).filter(Boolean).sort(ord).map(x=>+x['Quantité']||0)}
+  if(!q.length){const mt=String(txt(r.Notes)).match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:x|×)?\s*[A-Za-zÀ-ÿ]/);if(mt)q=[+mt[1].replace(',','.')]}
+  q=q.filter(x=>x>0);if(!q.length)return'';
+  const tot=q.reduce((a,b)=>a+b,0),u=tot>1?'pcs':'pc';
+  return q.length>8?`${q.length} lignes · ${nb(tot)} ${u}`:`${q.map(nb).join('+')} ${u}`}
+/* Statut modifiable directement dans les listes. */
+function celluleStatut(k,r){
+  const m=MODS[k],f=sch(m.t).par[m.statut],o=(f?.select_options)||[];if(!o.length)return rendu(f,r[m.statut],true);
+  return`<span class="selStatut" title="Changer le statut">${badge(r[m.statut])||'<span class="badge">—</span>'}<span class="mut" style="font-size:11px"> ▾</span><select data-st="${r.id}" data-k="${k}">${r[m.statut]?'':'<option value="" selected>—</option>'}${o.map(x=>`<option value="${x.id}" ${r[m.statut]?.id===x.id?'selected':''}>${esc(x.value)}</option>`).join('')}</select></span>`}
+function brancherStatuts(box,apres){
+  box.querySelectorAll('select[data-st]').forEach(s=>{s.onclick=e=>e.stopPropagation();s.parentElement.onclick=e=>e.stopPropagation();
+    s.onchange=async()=>{const k=s.dataset.k,m=MODS[k],row=S.rows[m.t].find(x=>x.id==s.dataset.st),o=sch(m.t).par[m.statut].select_options.find(x=>x.id==s.value);if(!row||!o)return;
+      s.disabled=true;try{await changerStatut(k,row,o.id,o.value)}catch(er){toast('Échec : '+er.message,true)}apres()}})}
 function enrichir(k){const m=MODS[k];if(m.virt&&S.rows[m.t])VIRT[m.virt](S.rows[m.t],sch(m.t))}
 function delaiRel(r,v){
   if(!v)return'<span class="mut">—</span>';const d=Math.round((new Date(v.slice(0,10)+'T00:00')-new Date(auj()+'T00:00'))/864e5);
@@ -524,17 +546,19 @@ async function vueListe(k){
   if(p.f==='retard'){E.st=[];E.retard=true;E.tout=false}else if(p.f==='encours'){E.st=[];E.encours=true}
   if(!S.rows[m.t])chargement();
   await charger(m.t);
-  if(m.virt)await charger(MODS.commandes.t).catch(()=>{});
+  if(m.virt)await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));
   if(m.ref)charger(MODS.referents.t).catch(()=>{});
   dessinerListe(k);
 }
 function filtrer(k){
   enrichir(k);
+  // une recherche ou un filtre de colonne retrouve aussi les éléments masqués (ex. devis acceptés / refusés)
+  const recherche=!!(etat(k).q.trim()||nbCf(etat(k)));
   const m=MODS[k],E=etat(k),R=S.rows[m.t]||[],sc=sch(m.t),q=norm(E.q).split(/\s+/).filter(Boolean);
   return R.filter(r=>{
     const st=m.statut?txt(r[m.statut]):'';
     if(E.st.length&&!E.st.includes(st))return false;
-    if(!E.st.length&&!E.tout&&m.cacheStatuts?.includes(st))return false;
+    if(!E.st.length&&!E.tout&&!recherche&&m.cacheStatuts?.includes(st))return false;
     if(E.retard&&!(tacheOuverte(r)&&r[m.date]&&r[m.date]<auj()))return false;
     if(E.encours&&!devisEnCours(r))return false;
     if(E.ref&&m.ref&&!ids(r[m.ref]).includes(+E.ref))return false;
@@ -571,7 +595,7 @@ function dessinerListe(k){
     <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
     ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
     ${m.ref&&sc.par[m.ref]?`<select id="lref"><option value="">Tous les référents</option>${MOI?`<option value="${MOI}">Moi</option>`:''}${refs.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('')}</select>`:''}
-    ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout?'Actifs':'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
+    ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout&&!(E.q.trim()||nbCf(E))?'En cours':'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
     ${stF?`<div class="bascule"><button data-v="liste" class="${E.vue==='liste'?'on':''}">${ico('liste')}Liste</button><button data-v="kanban" class="${E.vue==='kanban'?'on':''}">${ico('kanban')}Tableau</button></div>`:''}
   </div>`;
   if(E.vue==='kanban'&&stF){h+=`</div><div style="margin-top:14px">${kanban(k,L,opts)}</div>`}
@@ -582,7 +606,7 @@ function dessinerListe(k){
     h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
       const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
       const prim=m.sansPrim?c===cols[0]:c===sc.prim;
-      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${f?.relatif?delaiRel(r,v):rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
+      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${c===m.statut&&k==='taches'?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
     h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
     if(!L.length)h+='<div class="vide">Aucun résultat</div>';
     if(L.length>E.lim)h+=`<div class="plus"><button class="btn" id="bPlus">Afficher plus (${L.length-E.lim} restants)</button></div>`;
@@ -602,6 +626,7 @@ function dessinerListe(k){
   document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/${k}/${tr.dataset.id}`);
   if($('bPlus'))$('bPlus').onclick=()=>{E.lim+=200;dessinerListe(k)};
   if(E.vue==='kanban')brancherKanban(k);
+  brancherStatuts($('main'),()=>dessinerListe(k));
 }
 function ligneFiltres(k,cols){
   const m=MODS[k],E=etat(k),sc=sch(m.t),R=S.rows[m.t]||[];
@@ -814,13 +839,14 @@ async function dessinerLiees(i){
   const ordre=x.ordre||(x.mod&&MODS[x.mod].ordre);
   if(ordre&&sc.par[ordre])F.sort((a,b)=>(+a[ordre]||0)-(+b[ordre]||0)||a.id-b.id);
   else if(x.mod&&MODS[x.mod].date)F.sort((a,b)=>String(a[MODS[x.mod].date]||'9').localeCompare(String(b[MODS[x.mod].date]||'9')));
+  if(x.mod&&MODS[x.mod].virt){await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));if(SALE?.row!==row||ONG!==i)return}
   if(x.mod)enrichir(x.mod);
   let cols=(x.cols||(x.mod?MODS[x.mod].cols:[])).filter(c=>sc.par[c]&&c!==x.lien&&!(sc.par[c].virt&&sc.par[c].type==='link_row'));if(cols.length<1)cols=sc.fields.slice(0,5).map(f=>f.name);
   const sansPrim=x.mod&&MODS[x.mod].sansPrim;if(!sansPrim&&!cols.includes(sc.prim))cols.unshift(sc.prim);
   const cible=x.mod;
   const a=auj();
   let h=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c];return`<th class="${f?.type==='number'?'n':''}" style="cursor:default">${esc(c)}</th>`}).join('')}</tr></thead><tbody>`;
-  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${f?.relatif?delaiRel(r,r[c]):rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
+  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='taches'&&c===MODS[cible].statut?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
   h+='</tbody></table></div>';
   if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
   if(x.ajout&&cible)h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
@@ -828,6 +854,7 @@ async function dessinerLiees(i){
   if(m.editeur&&x.t)h+=`<div class="plus mut" style="font-size:12.5px">Les lignes se modifient dans l’éditeur (mise en page, vignettes, versions).</div>`;
   $('lCorps').innerHTML=h;
   $('lCorps').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{if(cible)location.hash=`#/${cible}/${tr.dataset.id}`;else if(!m.editeur)editerLigne(t,x,R.find(r=>r.id==tr.dataset.id))});
+  brancherStatuts($('lCorps'),()=>dessinerLiees(ONG));
   if($('bAjL'))$('bAjL').onclick=()=>editerLigne(t,x,null);
 }
 /* Petite fenêtre d'édition pour les lignes sans module propre (ex. lignes de commande fournisseur). */
