@@ -140,6 +140,13 @@ table.l tfoot td{font-weight:600;padding:10px 12px;background:#FAFBFC}
 .ed:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accentL)}
 textarea.ed{resize:vertical;min-height:60px}
 .ed.modif{background:#FFF8E6;border-color:#F5D58A}
+.dtw{display:flex;align-items:center;gap:2px;position:relative}
+.dtw .ed{flex:1;min-width:0}
+.dtw .cal{border:0;background:none;color:var(--mut);padding:4px;display:flex}
+.dtw .cal:hover{color:var(--accent)}
+.dtw .cal svg{width:17px;height:17px}
+.dtw .dtn{position:absolute;right:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0;pointer-events:none}
+.ed.invalide{border-color:var(--err)!important;background:#FEF2F2}
 .lienEd{display:flex;flex-wrap:wrap;align-items:center;gap:3px;min-height:32px;padding:4px 0}
 .lienEd .chip .x{margin-left:5px;color:var(--mut);cursor:pointer}
 .lienEd .chip .x:hover{color:var(--err)}
@@ -694,7 +701,8 @@ async function changerStatut(k,row,oid,val){
 function exporter(k){
   const m=MODS[k],cols=colonnes(k),L=trier(k,filtrer(k));
   const c=v=>'"'+String(v).replace(/"/g,'""')+'"';
-  const csv='﻿'+[cols.map(c).join(';'),...L.map(r=>cols.map(n=>{const v=r[n];return c(typeof v==='string'&&/^-?\d+\.\d+$/.test(v)?v.replace('.',','):txt(v))}).join(';'))].join('\r\n');
+  const sc=sch(m.t);
+  const csv='﻿'+[cols.map(c).join(';'),...L.map(r=>cols.map(n=>{const v=r[n],f=sc.par[n];if(v&&(f?.type==='date'||f?.type==='created_on'||f?.type==='last_modified'))return c(f.date_include_time||f.type!=='date'?frDateHeure(v):frDate(v));return c(typeof v==='string'&&/^-?\d+\.\d+$/.test(v)?v.replace('.',','):txt(v))}).join(';'))].join('\r\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`${m.nom}_${auj()}.csv`;a.click();
 }
 
@@ -771,18 +779,39 @@ function champ(f){
     case 'long_text':inp=`<textarea class="ed ${mod}" data-f="${esc(n)}" rows="3">${esc(v??'')}</textarea>`;break;
     case 'number':case 'rating':case 'duration':inp=`<input class="ed ${mod}" type="number" step="${f.number_decimal_places?Math.pow(10,-f.number_decimal_places):1}" data-f="${esc(n)}" value="${esc(v??'')}">`;break;
     case 'boolean':inp=`<div style="padding:5px 0"><input type="checkbox" data-f="${esc(n)}" ${v?'checked':''} style="width:18px;height:18px"></div>`;break;
-    case 'date':inp=f.date_include_time?`<input class="ed ${mod}" type="datetime-local" data-f="${esc(n)}" value="${v?esc(locIso(v)):''}">`:`<input class="ed ${mod}" type="date" data-f="${esc(n)}" value="${esc((v||'').slice(0,10))}">`;break;
+    case 'date':inp=champDate(`data-f="${esc(n)}"`,v,!!f.date_include_time,mod);break;
     case 'single_select':inp=`<select class="ed ${mod}" data-f="${esc(n)}"><option value="">—</option>${(f.select_options||[]).map(o=>`<option value="${o.id}" ${v?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select>`;break;
     case 'multiple_select':inp=`<div class="lienEd ${mod}" data-ms="${esc(n)}">${(v||[]).map(o=>`<span class="chip">${esc(o.value)}<span class="x" data-x="${o.id}">×</span></span>`).join('')}<select class="ed" style="width:auto;min-height:24px;padding:1px 4px" data-msadd="${esc(n)}"><option value="">+ ajouter</option>${(f.select_options||[]).filter(o=>!(v||[]).some(x=>x.id===o.id)).map(o=>`<option value="${o.id}">${esc(o.value)}</option>`).join('')}</select></div>`;break;
     case 'link_row':{const mm=MOD_DE_TABLE[f.link_row_table_id];
       inp=`<div class="lienEd ${mod}" data-lien="${esc(n)}">${(v||[]).map(x=>`<span class="chip">${mm?`<a href="#/${mm}/${x.id}">${esc(x.value)}</a>`:esc(x.value)}<span class="x" data-x="${x.id}" title="Retirer">×</span></span>`).join('')}<button data-ajout="${esc(n)}">+ ${v&&v.length?'':'choisir'}</button></div>`;break}
     case 'email':inp=`<input class="ed ${mod}" type="email" data-f="${esc(n)}" value="${esc(v??'')}">`;break;
     case 'url':inp=`<div style="display:flex;gap:6px;align-items:center"><input class="ed ${mod}" type="url" data-f="${esc(n)}" value="${esc(v??'')}">${v?`<a href="${esc(v)}" target="_blank" title="Ouvrir">${ico('ext','width=16')}</a>`:''}</div>`;break;
-    default:inp=`<input class="ed ${mod}" data-f="${esc(n)}" value="${esc(txt(v))}">`;
+    default:inp=f.type==='text'&&(/^date\b/i.test(n)||/^\d{4}-\d{2}-\d{2}$/.test(txt(v)))?champDate(`data-f="${esc(n)}" data-txtdate="1"`,txt(v),false,mod):`<input class="ed ${mod}" data-f="${esc(n)}" value="${esc(txt(v))}">`;
   }
   return`<div class="ch ${plein?'plein':''}">${lab}${inp}</div>`;
 }
 function locIso(v){const d=new Date(v);return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16)}
+/* Dates : toujours saisies et affichées en jj/mm/aaaa (indépendamment de la langue du navigateur),
+   enregistrées en ISO dans Baserow. Bouton calendrier = sélecteur natif caché. */
+const p2=n=>String(n).padStart(2,'0');
+function frDate(v){if(!v)return'';const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v)}
+function frDateHeure(v){if(!v)return'';const d=new Date(v);return isNaN(d)?String(v):`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`}
+function lireDateFr(t,heure){t=String(t||'').trim();if(!t)return'';
+  let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2}))?$/),j,mo,a,h=0,mi=0;
+  if(m){a=+m[1];mo=+m[2];j=+m[3];h=+(m[4]||0);mi=+(m[5]||0)}
+  else{m=t.match(/^(\d{1,2})[\/.\- ](\d{1,2})[\/.\- ](\d{2}|\d{4})(?:\s+(\d{1,2})[:h](\d{2}))?$/)||t.match(/^(\d{2})(\d{2})(\d{4}|\d{2})$/);if(!m)return undefined;
+    j=+m[1];mo=+m[2];a=+m[3];if(a<100)a+=2000;h=+(m[4]||0);mi=+(m[5]||0)}
+  const d=new Date(a,mo-1,j,h,mi);if(d.getFullYear()!==a||d.getMonth()!==mo-1||d.getDate()!==j||h>23||mi>59)return undefined;
+  return heure?d.toISOString():`${a}-${p2(mo)}-${p2(j)}`}
+function champDate(attrs,v,heure,cls){
+  return`<span class="dtw"><input class="ed ${cls||''}" ${attrs} data-date="${heure?2:1}" value="${esc(heure?frDateHeure(v):frDate(v))}" placeholder="${heure?'jj/mm/aaaa hh:mm':'jj/mm/aaaa'}" autocomplete="off"><button type="button" class="cal" tabindex="-1" title="Calendrier">${ico('cal')}</button><input type="${heure?'datetime-local':'date'}" class="dtn" tabindex="-1" aria-hidden="true"></span>`}
+document.addEventListener('click',e=>{const b=e.target.closest('.dtw .cal');if(!b)return;e.preventDefault();e.stopPropagation();
+  const w=b.parentElement,t=w.querySelector('[data-date]'),n=w.querySelector('.dtn'),iso=lireDateFr(t.value,t.dataset.date==='2');
+  n.value=iso?(t.dataset.date==='2'?locIso(iso):iso):'';try{n.showPicker()}catch(er){n.style.pointerEvents='auto';n.focus();n.click()}});
+document.addEventListener('change',e=>{if(!e.target.classList?.contains('dtn'))return;const n=e.target,t=n.parentElement.querySelector('[data-date]');
+  t.value=t.dataset.date==='2'?(n.value?frDateHeure(new Date(n.value).toISOString()):''):frDate(n.value);t.dispatchEvent(new Event('change',{bubbles:true}))});
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset?.date)return;const ok=lireDateFr(t.value,t.dataset.date==='2')!==undefined;t.classList.toggle('invalide',!ok);
+  if(!ok)toast('Date invalide : utilisez le format jj/mm/aaaa',true);else if(t.value&&t.dataset.date==='1'){const iso=lireDateFr(t.value);t.value=frDate(iso)}},true);
 function brancherChamps(){
   const sc=sch(SALE.t);
   document.querySelectorAll('.form [data-f]').forEach(e=>{
@@ -790,13 +819,13 @@ function brancherChamps(){
     const lire=()=>{let x;
       if(f.type==='boolean')x=e.checked;
       else if(f.type==='single_select'){const o=(f.select_options||[]).find(o=>o.id==e.value);x=o||null}
-      else if(f.type==='date'&&f.date_include_time)x=e.value?new Date(e.value).toISOString():null;
+      else if(e.dataset.date){const d=lireDateFr(e.value,e.dataset.date==='2');if(d===undefined)return;x=e.dataset.txtdate?d:(d||null)}
       else x=e.value;
       const orig=SALE.row[f.name];
       const same=f.type==='single_select'?(orig?.id??null)===(x?.id??null):f.type==='number'?(orig==null||orig===''?'':+orig)===(x===''?'':+x):f.type==='date'&&!f.date_include_time?((orig||'').slice(0,10)===(x||'')):String(orig??'')===String(x??'');
       if(same)delete SALE.draft[f.name];else SALE.draft[f.name]=x;
       e.classList.toggle('modif',!same);barre()};
-    e.addEventListener(e.tagName==='SELECT'||e.type==='checkbox'||e.type==='date'?'change':'input',lire);
+    e.addEventListener(e.tagName==='SELECT'||e.type==='checkbox'||e.dataset.date?'change':'input',lire);
   });
   document.querySelectorAll('[data-lien]').forEach(box=>{const n=box.dataset.lien;
     box.querySelectorAll('[data-x]').forEach(x=>x.onclick=()=>{SALE.draft[n]=(val(n)||[]).filter(o=>o.id!=x.dataset.x);dessinerFiche()});
@@ -895,9 +924,9 @@ async function dessinerLiees(i){
 /* Petite fenêtre d'édition pour les lignes sans module propre (ex. lignes de commande fournisseur). */
 async function editerLigne(t,x,r){
   const sc=sch(t),fs=sc.fields.filter(f=>!RO_TYPES.has(f.type)&&!f.read_only&&f.name!==x.lien);
-  ouvrirModal(r?'Modifier la ligne':'Nouvelle ligne',`<div class="form" style="padding:0">${fs.map(f=>`<div class="ch ${f.type==='long_text'?'plein':''}"><label>${esc(f.name)}</label>${f.type==='long_text'?`<textarea class="ed" data-l="${esc(f.name)}">${esc(r?.[f.name]??'')}</textarea>`:f.type==='single_select'?`<select class="ed" data-l="${esc(f.name)}"><option value="">—</option>${(f.select_options||[]).map(o=>`<option value="${o.id}" ${r?.[f.name]?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select>`:f.type==='link_row'?`<div class="ro mut" style="padding:6px 0">${esc(txt(r?.[f.name]))||'—'}</div>`:`<input class="ed" data-l="${esc(f.name)}" type="${f.type==='number'?'number':f.type==='date'?'date':'text'}" step="any" value="${esc(r?.[f.name]??'')}">`}</div>`).join('')}</div>`,
+  ouvrirModal(r?'Modifier la ligne':'Nouvelle ligne',`<div class="form" style="padding:0">${fs.map(f=>`<div class="ch ${f.type==='long_text'?'plein':''}"><label>${esc(f.name)}</label>${f.type==='long_text'?`<textarea class="ed" data-l="${esc(f.name)}">${esc(r?.[f.name]??'')}</textarea>`:f.type==='single_select'?`<select class="ed" data-l="${esc(f.name)}"><option value="">—</option>${(f.select_options||[]).map(o=>`<option value="${o.id}" ${r?.[f.name]?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select>`:f.type==='link_row'?`<div class="ro mut" style="padding:6px 0">${esc(txt(r?.[f.name]))||'—'}</div>`:f.type==='date'?champDate(`data-l="${esc(f.name)}"`,r?.[f.name],!!f.date_include_time):`<input class="ed" data-l="${esc(f.name)}" type="${f.type==='number'?'number':'text'}" step="any" value="${esc(r?.[f.name]??'')}">`}</div>`).join('')}</div>`,
    `<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="mOk">Enregistrer</button>`);
-  $('mOk').onclick=async()=>{const c={};$('mCorps').querySelectorAll('[data-l]').forEach(e=>{const f=sc.par[e.dataset.l];const v=f.type==='number'?(e.value===''?null:+e.value):f.type==='single_select'?(e.value?+e.value:null):f.type==='date'?(e.value||null):e.value;
+  $('mOk').onclick=async()=>{const c={};$('mCorps').querySelectorAll('[data-l]').forEach(e=>{const f=sc.par[e.dataset.l];const v=f.type==='number'?(e.value===''?null:+e.value):f.type==='single_select'?(e.value?+e.value:null):f.type==='date'?(lireDateFr(e.value,!!f.date_include_time)||null):e.value;
       if(!r||String(versApi(f,r[f.name])??'')!==String(v??''))c[f.name]=v});
     if(!r){c[x.lien]=[SALE.row.id];if(sc.par.Ordre&&c.Ordre==null){const L=(S.rows[t]||[]).filter(z=>ids(z[x.lien]).includes(SALE.row.id));c.Ordre=L.length+1}}
     try{const n=r?await api(`/rows/table/${t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)}):await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});
