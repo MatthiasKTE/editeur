@@ -498,6 +498,7 @@ function graphe(C,dateCde){
 /* ---------- Liste ---------- */
 const ETAT=ls.get('etat',{});
 function etat(k){const E=ETAT[k]||(ETAT[k]={q:'',st:[],tri:null,vue:MODS[k].vue||'liste',ref:'',lim:100,tout:false});
+  if(typeof E.q!=='string')E.q='';if(!E.lim)E.lim=100;if(!Array.isArray(E.st))E.st=[];if(!E.cf)E.cf={};
   if(k==='taches'&&!E.v2){E.vue='liste';E.tri=null;E.cf={};E.v2=true}return E}
 /* Colonnes calculées (affichage seulement, jamais envoyées à Baserow). */
 const VIRT={taches(rows,sc){
