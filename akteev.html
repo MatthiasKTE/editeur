@@ -184,6 +184,13 @@ details.calc summary{cursor:pointer;padding:12px 20px;color:var(--mut);font-size
 .graph{padding:14px 16px 8px}
 .graph svg{width:100%;height:auto;display:block}
 #cfg{max-width:480px;margin:10vh auto;padding:28px}
+body.deconnecte #side,body.deconnecte #top{display:none}
+#cfg label{display:block;font-size:12.5px;color:var(--mut);margin-top:10px}
+#cfg input,#cfg select{width:100%;border:1px solid var(--trait);border-radius:8px;padding:9px 11px;margin:4px 0 0}
+.formU{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 16px;padding:16px}
+.formU label{font-size:12px;color:var(--mut);font-weight:500}
+.formU input,.formU select{width:100%;border:1px solid var(--trait);border-radius:7px;padding:7px 9px;margin-top:3px}
+.droits td{font-size:12.5px}
 #cfg input{width:100%;border:1px solid var(--trait);border-radius:8px;padding:9px 11px;margin:12px 0}
 /* ---------- Écrans étroits ---------- */
 @media (max-width:900px){
@@ -395,16 +402,35 @@ function triVal(f,v){
   return norm(txt(v));
 }
 
+/* ---------- Accès : profils et session ----------
+   La vraie protection = les droits du jeton Baserow de chaque profil (créé par l'administrateur).
+   Les profils ci-dessous adaptent seulement l'affichage (menus, boutons, montants). */
+const PROFILS={
+ admin:{nom:'Direction / Admin',voir:'*',ecrire:'*',montants:true,admin:true},
+ commercial:{nom:'Commercial / ADV',voir:['devis','commandes','arc','bl','clients','taches','synthese','referents'],ecrire:['devis','commandes','arc','bl','clients','taches'],montants:true},
+ atelier:{nom:'Atelier',voir:['taches','synthese','commandes','referents'],ecrire:['taches','synthese'],montants:false},
+ achats:{nom:'Achats',voir:['commandes','taches','synthese','cf','fournisseurs','referents'],ecrire:['cf','fournisseurs','synthese','taches'],montants:true}
+};
+let SESSION=null;try{SESSION=JSON.parse(localStorage.getItem('akteev_session')||'null')}catch(e){}
+const PR=()=>PROFILS[SESSION?.profil]||PROFILS.admin;
+const peutVoir=k=>PR().voir==='*'||PR().voir.includes(k);
+const peutEcrire=k=>PR().ecrire==='*'||PR().ecrire.includes(k);
+const montants=()=>PR().montants!==false;
+const estAdmin=()=>!!PR().admin;
+const masque=n=>!montants()&&estMonnaie(n);
+
 /* ---------- Menu ---------- */
 let MOI=ls.get('moi',null);
 function dessinerMenu(){
   let h=`<div class="marque"><span class="k">A</span><div>Akteev<small>KTE · gestion</small></div></div>`;
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
   let g='';
-  for(const k in MODS){const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`}
-  h+=`<div class="bas">Je suis :<select id="moi"><option value="">— choisir —</option></select><a href="${EDITEUR}" target="_blank">${'Éditeur devis / ARC / BL ↗'}</a><a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a><a href="#" id="bJeton">Changer de jeton</a></div>`;
+  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`}
+  if(estAdmin()){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
+  h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
   $('side').innerHTML=h;
-  $('bJeton').onclick=e=>{e.preventDefault();config(true)};
+  if($('bJeton'))$('bJeton').onclick=e=>{e.preventDefault();config(true)};
+  $('bSortir').onclick=e=>{e.preventDefault();deconnecter()};
   $('moi').onchange=e=>{MOI=+e.target.value||null;ls.set('moi',MOI);route()};
 }
 function majMoi(){const R=S.rows[MODS.referents.t];if(!R)return;const s=$('moi');s.innerHTML='<option value="">— choisir —</option>'+R.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('');s.value=MOI||''}
@@ -429,7 +455,8 @@ async function route(){
   actif(k);$('main').scrollTop=0;
   try{
     if(k==='accueil')return await vueAccueil();
-    if(!MODS[k]){location.hash='#/accueil';return}
+    if(k==='utilisateurs'&&estAdmin())return await vueUtilisateurs();
+    if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
     if(id)return await vueFiche(k,id);
     return await vueListe(k);
   }catch(e){$('main').innerHTML=`<div class="card vide">Erreur de chargement : ${esc(e.message)}<br><br><button class="btn" onclick="route()">Réessayer</button></div>`;console.error(e)}
@@ -440,7 +467,9 @@ const chargement=()=>$('main').innerHTML='<div class="charge">Chargement depuis 
 async function vueAccueil(){
   document.title='Akteev – Tableau de bord';
   if(!S.rows[MODS.devis.t])chargement();
-  const [D,C,T]=await Promise.all([charger(MODS.devis.t),charger(MODS.commandes.t),charger(MODS.taches.t)]);
+  const ch=k=>peutVoir(k)?charger(MODS[k].t).catch(()=>[]):Promise.resolve([]);
+  const [D,C,T]=await Promise.all([ch('devis'),ch('commandes'),ch('taches')]);
+  const vD=peutVoir('devis')&&montants(),vC=peutVoir('commandes'),vM=montants();
   const a=auj(),an=a.slice(0,4),mois=a.slice(0,7);
   const dEC=D.filter(devisEnCours),cEC=C.filter(r=>txt(r.Statut)==='Commandé');
   const mesT=T.filter(r=>tacheOuverte(r)&&(!MOI||ids(r['Référent']).includes(MOI)));
@@ -451,19 +480,19 @@ async function vueAccueil(){
   const dAn=D.filter(r=>(r.Date||'').startsWith(an)),dAcc=dAn.filter(r=>/accept/i.test(txt(r.Statut))).length;
   const nomMoi=MOI?txt((S.rows[MODS.referents.t]||[]).find(r=>r.id===MOI)?.[sch(MODS.referents.t).prim]):'';
   let h=`<div class="entete"><h1>Bonjour${nomMoi?' '+esc(nomMoi.split(' ')[0]):''}</h1><span class="sous">${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</span>
-    <div class="act"><a class="btn p" href="${EDITEUR}" target="_blank">${ico('plus')}Nouveau devis</a><a class="btn" href="#/taches/nouveau">${ico('plus')}Nouvelle tâche</a></div></div>
+    <div class="act">${peutEcrire('devis')?`<a class="btn p" href="${EDITEUR}" target="_blank">${ico('plus')}Nouveau devis</a>`:''}${peutEcrire('taches')?`<a class="btn" href="#/taches/nouveau">${ico('plus')}Nouvelle tâche</a>`:''}</div></div>
   <div class="kpis">
-   <div class="card kpi" onclick="location.hash='#/devis?f=encours'"><div class="lab">${ico('devis')}Devis en cours</div><div class="val">${dEC.length}</div><div class="det">${keur(dEC.reduce((s,r)=>s+(+r['Total HT']||0),0))} HT</div></div>
-   <div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('commandes')}Commandes en cours</div><div class="val">${cEC.length}</div><div class="det">${keur(cEC.reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))} HT à livrer</div></div>
-   <div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('euro')}Commandé ce mois</div><div class="val">${keur(caMois)}</div><div class="det">${keur(caAn)} depuis le 1<sup>er</sup> janvier</div></div>
+   ${vD?`<div class="card kpi" onclick="location.hash='#/devis?f=encours'"><div class="lab">${ico('devis')}Devis en cours</div><div class="val">${dEC.length}</div><div class="det">${keur(dEC.reduce((s,r)=>s+(+r['Total HT']||0),0))} HT</div></div>`:''}
+   ${vC?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('commandes')}Commandes en cours</div><div class="val">${cEC.length}</div><div class="det">${vM?keur(cEC.reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))+' HT à livrer':'à livrer'}</div></div>`:''}
+   ${vC&&vM?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('euro')}Commandé ce mois</div><div class="val">${keur(caMois)}</div><div class="det">${keur(caAn)} depuis le 1<sup>er</sup> janvier</div></div>`:''}
    <div class="card kpi" onclick="location.hash='#/taches?f=retard'"><div class="lab" style="${tRet.length?'color:var(--err)':''}">${ico('alerte')}Tâches en retard${MOI?' (moi)':''}</div><div class="val" style="${tRet.length?'color:var(--err)':''}">${tRet.length}</div><div class="det">${mesT.length} tâche(s) ouverte(s)</div></div>
-   <div class="card kpi" onclick="location.hash='#/devis'"><div class="lab">${ico('arc')}Transformation ${an}</div><div class="val">${dAn.length?Math.round(dAcc/dAn.length*100):0} %</div><div class="det">${dAcc} accepté(s) / ${dAn.length} devis</div></div>
+   ${vD?`<div class="card kpi" onclick="location.hash='#/devis'"><div class="lab">${ico('arc')}Transformation ${an}</div><div class="val">${dAn.length?Math.round(dAcc/dAn.length*100):0} %</div><div class="det">${dAcc} accepté(s) / ${dAn.length} devis</div></div>`:''}
   </div>
   <div class="grille">
    <div class="card bloc"><h2>${ico('taches','width=17')}${MOI?'Mes tâches':'Tâches'} à traiter<a href="#/taches">Tout voir</a></h2>${listeTaches(mesT)}</div>
-   <div class="card bloc"><h2>${ico('bl','width=17')}Livraisons à venir<a href="#/commandes">Tout voir</a></h2>${listeLivraisons(cEC)}</div>
-   <div class="card bloc"><h2>${ico('euro','width=17')}Commandes reçues – 12 derniers mois</h2><div class="graph">${graphe(C,dateCde)}</div></div>
-   <div class="card bloc"><h2>${ico('devis','width=17')}Derniers devis<a href="#/devis">Tout voir</a></h2>${derniersDevis(D)}</div>
+   ${vC?`<div class="card bloc"><h2>${ico('bl','width=17')}Livraisons à venir<a href="#/commandes">Tout voir</a></h2>${listeLivraisons(cEC)}</div>`:''}
+   ${vC&&vM?`<div class="card bloc"><h2>${ico('euro','width=17')}Commandes reçues – 12 derniers mois</h2><div class="graph">${graphe(C,dateCde)}</div></div>`:''}
+   ${vD?`<div class="card bloc"><h2>${ico('devis','width=17')}Derniers devis<a href="#/devis">Tout voir</a></h2>${derniersDevis(D)}</div>`:''}
   </div>`;
   $('main').innerHTML=h;
   charger(MODS.referents.t).catch(()=>{});
@@ -476,7 +505,7 @@ function listeTaches(T){
 function listeLivraisons(C){
   const a=auj(),L=[...C].filter(r=>r['Date Livraison']).sort((x,y)=>x['Date Livraison'].localeCompare(y['Date Livraison'])).slice(0,9);
   if(!L.length)return'<div class="vide">Aucune commande en cours</div>';
-  return L.map(r=>`<div class="ligneDb" onclick="location.hash='#/commandes/${r.id}'"><div class="x"><b style="color:var(--kte)">${esc(txt(r['N° affaire']))}</b> ${esc(txt(r.Client))}<small>${esc(txt(r.Objet))}</small></div><span class="mut">${keur(r['Montant HT (€)'])}</span><span class="${r['Date Livraison']<a?'retard':''}" style="width:78px;text-align:right">${dfr(r['Date Livraison'])}</span></div>`).join('');
+  return L.map(r=>`<div class="ligneDb" onclick="location.hash='#/commandes/${r.id}'"><div class="x"><b style="color:var(--kte)">${esc(txt(r['N° affaire']))}</b> ${esc(txt(r.Client))}<small>${esc(txt(r.Objet))}</small></div>${montants()?`<span class="mut">${keur(r['Montant HT (€)'])}</span>`:''}<span class="${r['Date Livraison']<a?'retard':''}" style="width:78px;text-align:right">${dfr(r['Date Livraison'])}</span></div>`).join('');
 }
 function derniersDevis(D){
   const L=[...D].sort((x,y)=>String(y['N° devis']||'').localeCompare(String(x['N° devis']||''))).slice(0,9);
@@ -573,7 +602,7 @@ const estChoix=f=>f&&['single_select','multiple_select','link_row','boolean'].in
 function valsChoix(f,x){if(f.type==='boolean')return[x?'Oui':'Non'];if(x==null||x===''||(Array.isArray(x)&&!x.length))return['(vide)'];return Array.isArray(x)?x.map(o=>txt(o)):[txt(x)]}
 function txtFiltre(x){const t=txt(x);return /^\d{4}-\d{2}-\d{2}/.test(t)?t+' '+dfr(t.slice(0,10)):t}
 const nbCf=E=>Object.values(E.cf||{}).filter(Boolean).length;
-function colonnes(k){enrichir(k);const m=MODS[k],sc=sch(m.t);let c=m.cols.filter(n=>sc.par[n]);if(c.length<2)c=sc.fields.slice(0,7).map(f=>f.name);if(!m.sansPrim&&!c.includes(sc.prim))c.unshift(sc.prim);return c}
+function colonnes(k){enrichir(k);const m=MODS[k],sc=sch(m.t);let c=m.cols.filter(n=>sc.par[n]&&!masque(n));if(c.length<2)c=sc.fields.slice(0,7).map(f=>f.name);if(!m.sansPrim&&!c.includes(sc.prim))c.unshift(sc.prim);return c.filter(n=>!masque(n))}
 function trier(k,L){
   const m=MODS[k],E=etat(k),sc=sch(m.t);
   let f=E.tri?.f,dir=E.tri?.d||1;
@@ -588,7 +617,7 @@ function dessinerListe(k){
   const stF=m.statut&&sc.par[m.statut];
   const opts=stF?(stF.select_options?.length?stF.select_options:optsVues(R.map(r=>r[m.statut]).filter(Boolean))):[];
   const cpt={};R.forEach(r=>{const s=txt(r[m.statut]);cpt[s]=(cpt[s]||0)+1});
-  const neuf=m.editeur||k==='commandes'?`<a class="btn p" href="${EDITEUR}" target="_blank" title="${k==='commandes'?'Une commande se crée depuis le devis (bouton « Commande reçue » de l’éditeur)':'Numérotation et mise en page dans l’éditeur'}">${ico('plus')}${k==='commandes'?'Commande reçue (éditeur)':nouv(m)}</a>`:`<a class="btn p" href="#/${k}/nouveau">${ico('plus')}${nouv(m)}</a>`;
+  const neuf=!peutEcrire(k)?'':k==='bl'?`<button class="btn p" onclick="nouveauBL()">${ico('plus')}Nouveau BL</button>`:m.editeur||k==='commandes'?`<a class="btn p" href="${EDITEUR}" target="_blank" title="${k==='commandes'?'Une commande se crée depuis le devis (bouton « Commande reçue » de l’éditeur)':'Numérotation et mise en page dans l’éditeur'}">${ico('plus')}${k==='commandes'?'Commande reçue (éditeur)':nouv(m)}</a>`:`<a class="btn p" href="#/${k}/nouveau">${ico('plus')}${nouv(m)}</a>`;
   const refs=S.rows[MODS.referents.t]||[];
   let h=`<div class="entete"><h1>${m.nom}</h1><span class="sous">${L.length} sur ${R.length}</span><div class="act">
     <button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>
@@ -607,7 +636,7 @@ function dessinerListe(k){
     h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
       const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
       const prim=m.sansPrim?c===cols[0]:c===sc.prim;
-      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${c===m.statut&&k==='taches'?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
+      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${c===m.statut&&k==='taches'&&peutEcrire(k)?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
     h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
     if(!L.length)h+='<div class="vide">Aucun résultat</div>';
     if(L.length>E.lim)h+=`<div class="plus"><button class="btn" id="bPlus">Afficher plus (${L.length-E.lim} restants)</button></div>`;
@@ -626,7 +655,8 @@ function dessinerListe(k){
   document.querySelectorAll('table.l th[data-c]').forEach(th=>th.onclick=()=>{const c=th.dataset.c;E.tri=E.tri?.f===c?{f:c,d:-E.tri.d}:{f:c,d:1};sauverEtat();dessinerListe(k)});
   document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/${k}/${tr.dataset.id}`);
   if($('bPlus'))$('bPlus').onclick=()=>{E.lim+=200;dessinerListe(k)};
-  if(E.vue==='kanban')brancherKanban(k);
+  if(E.vue==='kanban'&&peutEcrire(k))brancherKanban(k);
+  if(E.vue==='kanban'&&!peutEcrire(k))document.querySelectorAll('.kcard').forEach(c=>{c.draggable=false;c.onclick=()=>location.hash=`#/${k}/${c.dataset.id}`});
   brancherStatuts($('main'),()=>dessinerListe(k));
 }
 function ligneFiltres(k,cols){
@@ -690,26 +720,29 @@ function dessinerFiche(){
   const {k,t}=SALE,m=MODS[k],sc=sch(t),row=SALE.row,nouveau=!SALE.id;
   const nom=nouveau?nouv(m):titre(t,row);
   document.title='Akteev – '+nom;
-  const ed=sc.fields.filter(f=>!f.virt&&!RO_TYPES.has(f.type)&&!f.read_only);
-  const ro=sc.fields.filter(f=>!f.virt&&(RO_TYPES.has(f.type)||f.read_only));
+  const ecr=peutEcrire(k);
+  const ed=ecr?sc.fields.filter(f=>!f.virt&&!masque(f.name)&&!RO_TYPES.has(f.type)&&!f.read_only):[];
+  const ro=sc.fields.filter(f=>!f.virt&&!masque(f.name)&&(!ecr||RO_TYPES.has(f.type)||f.read_only));
   const stF=m.statut&&sc.par[m.statut];
   const lienEditeur=m.editeur&&!nouveau&&row[m.num]?`${EDITEUR}?${m.editeur}=${encodeURIComponent(txt(row[m.num]))}`:null;
   const devisCde=k==='commandes'&&!nouveau?(row['Devis']?.[0]?.value||txt(row['N° affaire'])):null;
   let h=`<div class="entete"><a class="btn" href="#/${k}" title="Retour à la liste">${ico('retour')}</a><h1>${esc(nom)}</h1>
-    ${stF&&!nouveau?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
+    ${stF&&!nouveau&&!ecr?badge(val(m.statut)):''}${stF&&!nouveau&&ecr?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
     <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
     <div class="act">${lienEditeur?`<a class="btn p" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
-    ${devisCde?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
+    ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
+    ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
     ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
-    ${!nouveau?`<a class="btn" href="https://baserow.io/database/592007/table/${t}/row/${row.id}" target="_blank" title="Ouvrir la ligne dans Baserow">Baserow ↗</a>`:''}</div></div>
+    ${!nouveau&&estAdmin()?`<a class="btn" href="https://baserow.io/database/592007/table/${t}/row/${row.id}" target="_blank" title="Ouvrir la ligne dans Baserow">Baserow ↗</a>`:''}</div></div>
   <div class="fiche"><div>
-   <div class="card"><div class="form">${ed.map(f=>champ(f)).join('')}</div>
-   ${ro.length&&!nouveau?`<details class="calc"><summary>Champs calculés et pièces jointes (${ro.length})</summary><div class="form">${ro.map(f=>`<div class="ch ${f.type==='file'||String(txt(row[f.name])).length>60?'plein':''}"><label>${esc(f.name)}</label><div class="ro">${rendu(f,row[f.name])}</div></div>`).join('')}</div></details>`:''}
+   <div class="card">${ecr?`<div class="form">${ed.map(f=>champ(f)).join('')}</div>`:''}
+   ${ro.length&&!nouveau?(()=>{const bloc=`<div class="form">${ro.map(f=>`<div class="ch ${f.type==='file'||f.type==='long_text'||String(txt(row[f.name])).length>60?'plein':''}"><label>${esc(f.name)}</label><div class="ro">${rendu(f,row[f.name])}</div></div>`).join('')}</div>`;return ecr?`<details class="calc"><summary>Champs calculés et pièces jointes (${ro.length})</summary>${bloc}</details>`:bloc})():''}
    </div>
    ${!nouveau&&m.liees?`<div class="card" style="margin-top:16px" id="liees"></div>`:''}
   </div><div class="cote">${cote(k,row,nouveau)}</div></div>`;
   $('main').innerHTML=h;
   brancherChamps();
+  if($('bBL'))$('bBL').onclick=()=>fenetreBL(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if($('selSt'))$('selSt').onchange=async e=>{const o=stF.select_options.find(x=>x.id==e.target.value);try{const r=await changerStatut(k,SALE.row,o.id,o.value);SALE.row=r;delete SALE.draft[m.statut];dessinerFiche()}catch(er){toast('Échec : '+er.message,true)}};
   if(!nouveau&&m.liees)dessinerLiees(0);
   barre();
@@ -720,7 +753,7 @@ function cote(k,row,nouveau){
   for(const [n,v] of Object.entries(row)){if(typeof v==='string'&&/^https?:\/\//.test(v)){const lab=/sharepoint|dossier/i.test(n)?['dossier',n]:/pdf/i.test(n)?['pdf',n]:['ext',n];liens.push(`<a class="lien" href="${esc(v)}" target="_blank">${ico(lab[0])}${esc(lab[1])}</a>`)}}
   let h=liens.length?`<div class="card"><h3>Documents et liens</h3>${liens.join('')}</div>`:'';
   if(k==='clients'){const D=(S.rows[MODS.devis.t]||[]).filter(r=>ids(r.Client).includes(row.id)),C=(S.rows[MODS.commandes.t]||[]).filter(r=>ids(r.Client).includes(row.id));
-    h+=`<div class="card"><h3>Synthèse client</h3><div class="c">${D.length} devis · ${C.length} commande(s)<br>Commandé total : <b>${eur(C.filter(r=>txt(r.Statut)!=='Annulée').reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))}</b> HT<br>Devis en cours : <b>${eur(D.filter(devisEnCours).reduce((s,r)=>s+(+r['Total HT']||0),0))}</b> HT</div></div>`;
+    if(montants())h+=`<div class="card"><h3>Synthèse client</h3><div class="c">${D.length} devis · ${C.length} commande(s)<br>Commandé total : <b>${eur(C.filter(r=>txt(r.Statut)!=='Annulée').reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))}</b> HT<br>Devis en cours : <b>${eur(D.filter(devisEnCours).reduce((s,r)=>s+(+r['Total HT']||0),0))}</b> HT</div></div>`;
     charger(MODS.devis.t).then(()=>charger(MODS.commandes.t)).catch(()=>{});}
   if(k==='commandes'){const T=(S.rows[MODS.taches.t]||[]).filter(r=>ids(r.Commande).includes(row.id)&&!/annul/i.test(txt(r.Statut)));
     const f=T.filter(r=>/^fait/i.test(txt(r.Statut))).length;const p=T.length?Math.round(f/T.length*100):0;
@@ -791,7 +824,7 @@ async function choisirLien(f){
     const orig=ids(SALE.row[f.name]).sort().join(),nv=v.map(x=>x.id).sort().join();
     if(orig===nv)delete SALE.draft[f.name];else SALE.draft[f.name]=v;fermerModal();dessinerFiche()};
 }
-function barre(){const n=SALE?Object.keys(SALE.draft).length:0;const nouveau=SALE&&!SALE.id;$('barreEnr').classList.toggle('vis',!!(n||nouveau&&SALE));$('beTxt').textContent=nouveau?'Nouvel enregistrement':`${n} modification(s) non enregistrée(s)`}
+function barre(){const n=SALE&&peutEcrire(SALE.k)?Object.keys(SALE.draft).length:0;if(SALE&&!peutEcrire(SALE.k)){$('barreEnr').classList.remove('vis');return}const nouveau=SALE&&!SALE.id;$('barreEnr').classList.toggle('vis',!!(n||nouveau&&SALE));$('beTxt').textContent=nouveau?'Nouvel enregistrement':`${n} modification(s) non enregistrée(s)`}
 $('beAnn').onclick=()=>{if(!SALE)return;if(!SALE.id){SALE.draft={};location.hash='#/'+SALE.k;return}SALE.draft={};dessinerFiche()};
 $('beEnr').onclick=()=>enregistrer().catch(e=>toast('Échec de l’enregistrement : '+e.message,true));
 function versApi(f,v){
@@ -827,7 +860,8 @@ async function enregistrer(){
 let ONG=0;
 async function dessinerLiees(i){
   const {k,row}=SALE,m=MODS[k],box=$('liees');if(!box)return;ONG=i;
-  const L=m.liees;
+  const L=m.liees.filter(x=>x.mod?peutVoir(x.mod):montants()||!/devis|arc/i.test(x.lien));
+  if(!L.length){box.style.display='none';return}if(i>=L.length)i=0;
   box.innerHTML=`<div class="onglets">${L.map((x,j)=>`<button class="${j===i?'on':''}" data-o="${j}">${esc(x.nom)}<span class="nb" id="on_${j}"></span></button>`).join('')}</div><div id="lCorps"><div class="charge">Chargement…</div></div>`;
   box.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>dessinerLiees(+b.dataset.o));
   // compteurs de tous les onglets (en arrière-plan)
@@ -842,19 +876,19 @@ async function dessinerLiees(i){
   else if(x.mod&&MODS[x.mod].date)F.sort((a,b)=>String(a[MODS[x.mod].date]||'9').localeCompare(String(b[MODS[x.mod].date]||'9')));
   if(x.mod&&MODS[x.mod].virt){await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));if(SALE?.row!==row||ONG!==i)return}
   if(x.mod)enrichir(x.mod);
-  let cols=(x.cols||(x.mod?MODS[x.mod].cols:[])).filter(c=>sc.par[c]&&c!==x.lien&&!(sc.par[c].virt&&sc.par[c].type==='link_row'));if(cols.length<1)cols=sc.fields.slice(0,5).map(f=>f.name);
+  let cols=(x.cols||(x.mod?MODS[x.mod].cols:[])).filter(c=>sc.par[c]&&!masque(c)&&c!==x.lien&&!(sc.par[c].virt&&sc.par[c].type==='link_row'));if(cols.length<1)cols=sc.fields.slice(0,5).map(f=>f.name);
   const sansPrim=x.mod&&MODS[x.mod].sansPrim;if(!sansPrim&&!cols.includes(sc.prim))cols.unshift(sc.prim);
   const cible=x.mod;
   const a=auj();
   let h=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c];return`<th class="${f?.type==='number'?'n':''}" style="cursor:default">${esc(c)}</th>`}).join('')}</tr></thead><tbody>`;
-  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='taches'&&c===MODS[cible].statut?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
+  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='taches'&&c===MODS[cible].statut&&peutEcrire(cible)?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
   h+='</tbody></table></div>';
   if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
-  if(x.ajout&&cible)h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
-  else if(x.ajout&&!cible)h+=`<div class="plus"><button class="btn" id="bAjL">${ico('plus')}Ajouter une ligne</button></div>`;
+  if(x.ajout&&cible&&peutEcrire(cible))h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
+  else if(x.ajout&&!cible&&peutEcrire(k))h+=`<div class="plus"><button class="btn" id="bAjL">${ico('plus')}Ajouter une ligne</button></div>`;
   if(m.editeur&&x.t)h+=`<div class="plus mut" style="font-size:12.5px">Les lignes se modifient dans l’éditeur (mise en page, vignettes, versions).</div>`;
   $('lCorps').innerHTML=h;
-  $('lCorps').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{if(cible)location.hash=`#/${cible}/${tr.dataset.id}`;else if(!m.editeur)editerLigne(t,x,R.find(r=>r.id==tr.dataset.id))});
+  $('lCorps').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{if(cible)location.hash=`#/${cible}/${tr.dataset.id}`;else if(!m.editeur&&peutEcrire(k))editerLigne(t,x,R.find(r=>r.id==tr.dataset.id))});
   brancherStatuts($('lCorps'),()=>dessinerLiees(ONG));
   if($('bAjL'))$('bAjL').onclick=()=>editerLigne(t,x,null);
 }
@@ -871,13 +905,81 @@ async function editerLigne(t,x,r){
       const p=await api(`/rows/table/${SALE.t}/${SALE.row.id}/?user_field_names=true`);majRow(SALE.t,p);SALE.row=p;dessinerFiche();dessinerLiees(ONG)}catch(e){toast('Échec : '+e.message,true)}};
 }
 
+/* ---------- Bons de livraison : création en un clic depuis une commande ----------
+   Même logique que l'éditeur : n° BL-<affaire>-NN, lignes reprises de l'ARC (sinon du devis), « Déjà livré » =
+   somme des BL précédents de l'affaire ; « Livré » = reste par défaut (BL complet) ou quantités saisies (partiel).
+   Le BL est créé en Brouillon ; la mise en page / validation / PDF se fait dans l'éditeur (?bl=…). */
+const T_LBL=1261381,T_LARC=1261373,T_LDV=1261171;
+async function nouveauBL(){
+  ouvrirModal('Nouveau BL : choisir la commande','<div class="charge">Chargement…</div>','');
+  const C=await charger(MODS.commandes.t);const sc=sch(MODS.commandes.t);
+  const dessiner=q=>{const w=norm(q).split(/\s+/).filter(Boolean);
+    const L=C.filter(r=>/command/i.test(txt(r.Statut))||w.length).filter(r=>{const s=norm(Object.values(r).map(txt).join(' '));return w.every(x=>s.includes(x))}).sort((a,b)=>String(txt(b['N° affaire'])).localeCompare(String(txt(a['N° affaire'])))).slice(0,100);
+    $('mListe').innerHTML=L.map(r=>`<div class="choixL" data-id="${r.id}"><span><b>${esc(txt(r['N° affaire']))}</b> ${esc(txt(r.Client))} <small>${esc(txt(r.Objet)).slice(0,70)}</small></span></div>`).join('')||'<div class="vide">Aucune commande</div>';
+    $('mListe').querySelectorAll('[data-id]').forEach(d=>d.onclick=()=>fenetreBL(C.find(r=>r.id==d.dataset.id)).catch(e=>toast('Erreur : '+e.message,true)))};
+  $('mCorps').innerHTML=`<input id="mQ" class="ed" style="border-color:var(--trait);margin:0 0 10px;width:100%" placeholder="Rechercher une affaire, un client…"><div id="mListe"></div>`;
+  $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Annuler</button>`;
+  dessiner('');$('mQ').oninput=e=>dessiner(e.target.value);$('mQ').focus();
+}
+async function fenetreBL(cde){
+  const n=txt(cde['N° affaire']);
+  ouvrirModal('Créer un BL – '+n,'<div class="charge">Préparation des lignes…</div>','');
+  const [BL,ARC,LBL,LARC,DV,LDV]=await Promise.all([MODS.bl.t,MODS.arc.t,T_LBL,T_LARC,MODS.devis.t,T_LDV].map(t=>charger(t).catch(()=>[])));
+  const arc=ARC.find(a=>ids(a.Affaire).includes(cde.id))||ARC.find(a=>txt(a['N° ARC'])==='ARC-'+n);
+  const dv=DV.find(d=>ids(d.Commande).includes(cde.id))||DV.find(d=>txt(d['N° devis'])===n);
+  const ord=(a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id;
+  const src=arc?LARC.filter(l=>ids(l.ARC).includes(arc.id)):dv?LDV.filter(l=>ids(l.Devis).includes(dv.id)):[];
+  src.sort(ord);
+  const prec=BL.filter(b=>String(txt(b['N° BL'])).startsWith('BL-'+n+'-')&&!/annul/i.test(txt(b.Statut)));
+  const deja={};for(const b of prec)for(const l of LBL.filter(x=>ids(x.BL).includes(b.id)))deja[l.Description]=(deja[l.Description]||0)+(+l['Quantité livrée']||0);
+  const lignes=src.map(l=>{const c=+l['Quantité']||0,d=deja[l.Description]||0;return{l,c,d,reste:Math.max(0,c-d)}}).filter(x=>x.reste>0||!prec.length);
+  const suf=Math.max(0,...BL.map(b=>String(txt(b['N° BL']))).filter(x=>x.startsWith('BL-'+n+'-')).map(x=>+x.split('-').pop()||0))+1;
+  const num=`BL-${n}-${String(suf).padStart(2,'0')}`;
+  if(!src.length){$('mCorps').innerHTML=`<div class="vide">Aucune ligne trouvée : ni ARC (ARC-${esc(n)}) ni devis ${esc(n)} avec des lignes.<br>Créez le BL dans l’éditeur.</div>`;$('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Fermer</button><a class="btn p" href="${EDITEUR}?bl=" target="_blank">Ouvrir l’éditeur</a>`;return}
+  if(!lignes.length){$('mCorps').innerHTML=`<div class="vide">Tout est déjà livré pour ${esc(n)} (${prec.length} BL).</div>`;$('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Fermer</button>`;return}
+  $('mCorps').innerHTML=`<div class="mut" style="margin-bottom:8px">${esc(num)} · ${esc(txt(cde.Client))} · lignes reprises ${arc?'de l’'+esc(txt(arc['N° ARC'])):'du devis '+esc(n)}${prec.length?` · ${prec.length} BL précédent(s)`:''}</div>
+   <table class="l"><thead><tr><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Commandé</th><th class="n" style="cursor:default">Déjà livré</th><th class="n" style="cursor:default">À livrer</th></tr></thead><tbody>
+   ${lignes.map((x,i)=>`<tr style="cursor:default"><td style="white-space:normal">${esc(txt(x.l.Description))}${x.l['Précisions']?`<div class="mut" style="font-size:12px">${esc(String(txt(x.l['Précisions'])).split('\n')[0]).slice(0,80)}</div>`:''}</td><td class="n">${nb(x.c)}</td><td class="n">${nb(x.d)}</td><td class="n"><input type="number" min="0" step="any" data-i="${i}" value="${x.reste}" style="width:80px;text-align:right;border:1px solid var(--trait);border-radius:6px;padding:4px 6px"></td></tr>`).join('')}
+   </tbody></table>
+   <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px"><input type="checkbox" id="blLiv"> Passer la commande à « Livrée » (si tout est livré avec ce BL)</label>`;
+  $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn" id="blTout">Tout le reste</button><button class="btn p" id="blOk">Créer le BL</button>`;
+  const ins=[...$('mCorps').querySelectorAll('input[data-i]')];
+  const complet=()=>lignes.every((x,i)=>(+ins[i].value||0)>=x.reste);
+  const maj=()=>{$('blLiv').checked=complet();$('blOk').textContent=complet()?'Créer le BL complet':'Créer le BL partiel'};
+  ins.forEach(i=>i.oninput=maj);maj();
+  $('blTout').onclick=()=>{ins.forEach((e,i)=>e.value=lignes[i].reste);maj()};
+  $('blOk').onclick=async()=>{
+    const q=ins.map(e=>Math.max(0,+e.value||0));if(!q.some(x=>x>0))return toast('Aucune quantité à livrer',true);
+    $('blOk').disabled=true;$('blOk').textContent='Création…';
+    try{
+      const ex=await api(`/rows/table/${MODS.bl.t}/?user_field_names=true&size=1&filter__N° BL__equal=${encodeURIComponent(num)}`);
+      if(ex.count)throw new Error(num+' existe déjà (créé entre-temps ?) – rechargez');
+      const corps={'N° BL':num,'Statut':'Brouillon','Version':1,'Date':auj(),Affaire:[cde.id],Client:ids(cde.Client),'Référent KTE':ids(cde['Référent KTE']),
+        'N° commande client':txt(arc?.['N° commande client'])||txt(cde['N° Cde Client'])||'','Adresse de livraison':txt(arc?.['Adresse de livraison'])||txt(cde['Adresse de livraison'])||''};
+      if(arc)corps.ARC=[arc.id];
+      const bl=await api(`/rows/table/${MODS.bl.t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
+      const items=lignes.map((x,i)=>({Description:x.l.Description,'Précisions':x.l['Précisions']||'',Rep:x.l.Rep??'',Vignette:(x.l.Vignette||[]).map(f=>({name:f.name})),
+        'Quantité commandée':x.c,'Déjà livré':x.d,'Quantité livrée':q[i],Ordre:i+1,BL:[bl.id]}));
+      const scL=sch(T_LBL);for(const it of items)for(const k of Object.keys(it))if(scL.fields.length&&!scL.par[k])delete it[k];
+      await api(`/rows/table/${T_LBL}/batch/?user_field_names=true`,{method:'POST',body:JSON.stringify({items})});
+      if($('blLiv').checked){const o=sch(MODS.commandes.t).par.Statut?.select_options?.find(x=>/^livr/i.test(x.value));if(o){const r=await api(`/rows/table/${MODS.commandes.t}/${cde.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({Statut:o.id})});majRow(MODS.commandes.t,r);if(SALE?.row?.id===cde.id)SALE.row=r}}
+      [MODS.bl.t,T_LBL,MODS.commandes.t].forEach(t=>delete S.prom[t]);
+      $('mTitre').textContent=num+' créé';
+      $('mCorps').innerHTML=`<div style="padding:10px 0">Le BL <b>${esc(num)}</b> est créé en brouillon (${items.length} ligne(s), ${q.reduce((a,b)=>a+b,0)} pièce(s)).<br>Ouvrez-le dans l’éditeur pour le vérifier, le valider et faire le PDF.</div>`;
+      $('mPied').innerHTML=`<button class="btn" onclick="fermerModal();route()">Fermer</button><a class="btn p" href="${EDITEUR}?bl=${encodeURIComponent(num)}" target="_blank" onclick="setTimeout(()=>{fermerModal();route()},300)">${ico('ext')}Ouvrir le BL dans l’éditeur</a>`;
+      toast(num+' créé');
+    }catch(e){toast('Échec : '+e.message,true);$('blOk').disabled=false;maj()}
+  };
+}
+
 /* ---------- Fenêtre modale ---------- */
 function ouvrirModal(t,c,p){$('mTitre').textContent=t;$('mCorps').innerHTML=c;$('mPied').innerHTML=p;$('modal').style.display='flex'}
 function fermerModal(){$('modal').style.display='none'}
 $('modal').onclick=e=>{if(e.target.id==='modal')fermerModal()};
 
 /* ---------- Recherche globale ---------- */
-const GMODS=['devis','commandes','clients','taches','cf','fournisseurs','arc','bl'];
+const GMODS0=['devis','commandes','clients','taches','cf','fournisseurs','arc','bl'];
+let GMODS=GMODS0;
 let gsel=0;
 $('gq').oninput=async()=>{
   const q=norm($('gq').value).split(/\s+/).filter(Boolean),box=$('gres');
@@ -903,19 +1005,117 @@ document.addEventListener('keydown',e=>{if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/
 window.addEventListener('beforeunload',e=>{if(SALE&&Object.keys(SALE.draft).length){e.preventDefault();e.returnValue=''}});
 $('bRafr').onclick=async()=>{for(const t in S.prom)delete S.prom[t];toast('Données rechargées');await route()};
 
+/* ---------- Comptes : fichier akteev-acces.json (jetons chiffrés, publiable) ----------
+   Chaque utilisateur : {login, nom, profil, referent, iter, sel, iv, jeton} ; jeton = jeton Baserow du profil chiffré
+   AES-GCM avec une clé PBKDF2-SHA256 (600 000 itérations) tirée de son mot de passe. Aucun secret en clair. */
+let ACCES=null;
+const FICHIER_ACCES='akteev-acces.json';
+async function lireAcces(){try{const r=await fetch(FICHIER_ACCES+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)return null;return await r.json()}catch(e){return null}}
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
+const deb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const normLogin=s=>norm(s).trim().replace(/\s+/g,'.');
+async function cle(mdp,sel,iter){const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(mdp),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:sel,iterations:iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function chiffrer(jeton,mdp){const sel=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),iter=600000;
+  const c=await crypto.subtle.encrypt({name:'AES-GCM',iv},await cle(mdp,sel,iter),new TextEncoder().encode(jeton));return{iter,sel:b64(sel),iv:b64(iv),jeton:b64(c)}}
+async function dechiffrer(u,mdp){const c=await crypto.subtle.decrypt({name:'AES-GCM',iv:deb64(u.iv)},await cle(mdp,deb64(u.sel),u.iter||600000),deb64(u.jeton));return new TextDecoder().decode(c)}
+async function testerJeton(j){const r=await fetch(API+`/rows/table/${MODS.taches.t}/?user_field_names=true&size=1`,{headers:{Authorization:'Token '+j}});if(!r.ok)throw new Error('jeton refusé par Baserow ('+r.status+')')}
+function ecranConnexion(){
+  document.body.classList.add('deconnecte');
+  $('main').innerHTML=`<div class="card" id="cfg"><div class="marque" style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--accent);color:#fff;font-weight:700">A</span><h1>Akteev</h1></div>
+   <p class="mut">Connexion à l’interface de gestion KTE.</p>
+   <label>Identifiant</label><input id="cxL" autocomplete="username" autocapitalize="none">
+   <label>Mot de passe</label><input id="cxM" type="password" autocomplete="current-password">
+   <button class="btn p" id="cxOk" style="margin-top:16px;width:100%;justify-content:center">Se connecter</button>
+   <p style="margin-top:18px;font-size:12px"><a href="#" id="cxJ">Connexion avec un jeton Baserow (administrateur)</a></p></div>`;
+  const go=async()=>{const l=normLogin($('cxL').value),m=$('cxM').value;if(!l||!m)return;
+    const u=(ACCES?.utilisateurs||[]).find(x=>x.login===l);$('cxOk').disabled=true;$('cxOk').textContent='Vérification…';
+    try{if(!u)throw new Error('x');let j;try{j=await dechiffrer(u,m)}catch(e){throw new Error('x')}
+      await testerJeton(j);
+      JETON=j;SESSION={login:u.login,nom:u.nom,profil:u.profil,referent:u.referent||null};
+      try{localStorage.setItem(CLE,j);localStorage.setItem('akteev_session',JSON.stringify(SESSION))}catch(e){}
+      MOI=SESSION.referent||MOI;ls.set('moi',MOI);$('toast').innerHTML='';for(const t in S.prom)delete S.prom[t];location.hash='#/accueil';lancer()}
+    catch(e){toast(e.message==='x'?'Identifiant ou mot de passe incorrect':'Connexion impossible : '+e.message,true);$('cxOk').disabled=false;$('cxOk').textContent='Se connecter'}};
+  $('cxOk').onclick=go;$('cxM').onkeydown=e=>{if(e.key==='Enter')go()};$('cxL').focus();
+  $('cxJ').onclick=e=>{e.preventDefault();config()};
+}
+function deconnecter(){
+  if(SALE&&Object.keys(SALE.draft).length&&!confirm('Des modifications ne sont pas enregistrées. Se déconnecter quand même ?'))return;
+  try{localStorage.removeItem(CLE);localStorage.removeItem('akteev_session')}catch(e){}
+  location.href=location.pathname;
+}
+/* ---------- Page Utilisateurs (administrateur) ---------- */
+let BROUILLON_ACCES=null;
+const DROITS=[
+ ['Direction / Admin','Votre jeton actuel : tout (lecture, création, modification).'],
+ ['Commercial / ADV','Lecture : toutes les tables. Création + modification : Devis, Lignes de devis, Commandes, ARC, Lignes ARC, BL, Lignes BL, Clients, Tâches commande. Suppression : Lignes de devis, Lignes ARC, Lignes BL (l’éditeur supprime des lignes).'],
+ ['Atelier','Lecture : Tâches commande, Synthèse commande, Commandes, Clients, Référents, Tâches (catalogue). Modification : Tâches commande, Synthèse commande. Rien d’autre (pas Devis : les prix restent invisibles).'],
+ ['Achats','Lecture : Commandes, Clients, Tâches commande, Synthèse commande, Référents, Fournisseurs, Commandes fournisseurs, Lignes commande fournisseur, Tâches (catalogue). Création + modification : Commandes fournisseurs, Lignes commande fournisseur, Fournisseurs, Synthèse commande ; modification : Tâches commande.']];
+async function vueUtilisateurs(){
+  document.title='Akteev – Utilisateurs';
+  if(!BROUILLON_ACCES)BROUILLON_ACCES=JSON.parse(JSON.stringify(ACCES||{version:1,utilisateurs:[]}));
+  const A=BROUILLON_ACCES,modif=JSON.stringify(A)!==JSON.stringify(ACCES||{version:1,utilisateurs:[]});
+  const refs=await charger(MODS.referents.t).catch(()=>[]);
+  const nomRef=id=>txt(refs.find(r=>r.id===id)?.[sch(MODS.referents.t).prim])||'';
+  $('main').innerHTML=`<div class="entete"><h1>Utilisateurs</h1><span class="sous">${A.utilisateurs.length} compte(s)</span></div>
+  ${modif?`<div class="card" style="border-color:#F5D58A;background:#FFFBEB;margin-bottom:16px"><div style="padding:14px 16px"><b>Modifications à publier.</b> Elles ne prennent effet qu’une fois le fichier <code>${FICHIER_ACCES}</code> publié dans le dépôt GitHub de l’éditeur (ou demandez à Claude de le publier).
+   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn p" id="uCopie">Copier le fichier</button><button class="btn" id="uDl">${ico('dl')}Télécharger</button><a class="btn" target="_blank" href="https://github.com/MatthiasKTE/editeur/${ACCES?'edit':'new'}/main${ACCES?'/'+FICHIER_ACCES:'?filename='+FICHIER_ACCES}">${ico('ext')}Ouvrir sur GitHub</a><button class="btn d" id="uAnn">Annuler les modifications</button></div></div></div>`:''}
+  <div class="card"><div class="tw"><table class="l"><thead><tr><th>Identifiant</th><th>Nom</th><th>Profil</th><th>Référent</th><th></th></tr></thead><tbody>
+  ${A.utilisateurs.map((u,i)=>`<tr style="cursor:default"><td class="prim">${esc(u.login)}</td><td>${esc(u.nom)}</td><td>${esc(PROFILS[u.profil]?.nom||u.profil)}</td><td>${esc(nomRef(u.referent))||'<span class="mut">—</span>'}</td><td style="text-align:right;white-space:nowrap"><button class="btn" data-mdp="${i}">Nouveau mot de passe</button> <button class="btn d" data-ret="${i}">Retirer</button></td></tr>`).join('')||'<tr><td colspan="5" class="vide">Aucun compte. Créez d’abord le vôtre (profil Direction / Admin).</td></tr>'}
+  </tbody></table></div></div>
+  <div class="card" style="margin-top:16px"><h2 style="font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait)" id="uTitre">Ajouter un utilisateur</h2>
+   <div class="formU"><div><label>Identifiant</label><input id="uL" placeholder="ex. elodie" autocapitalize="none"></div><div><label>Nom affiché</label><input id="uN" placeholder="Elodie Xiang"></div>
+    <div><label>Profil</label><select id="uP">${Object.entries(PROFILS).map(([k,p])=>`<option value="${k}">${p.nom}</option>`).join('')}</select></div>
+    <div><label>Référent (pour « Mes tâches »)</label><select id="uR"><option value="">—</option>${refs.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('')}</select></div>
+    <div><label>Mot de passe (10 caractères min.)</label><input id="uM" type="password" autocomplete="new-password"></div><div><label>Confirmation</label><input id="uM2" type="password" autocomplete="new-password"></div>
+    <div style="grid-column:1/-1"><label>Jeton Baserow du profil (créé dans Baserow › Paramètres › Jetons de base de données, droits ci-dessous)</label><input id="uJ" type="password" autocomplete="off" placeholder="Il sera chiffré avec le mot de passe ; il n’est jamais affiché ni enregistré en clair"></div>
+    <div style="grid-column:1/-1;display:flex;gap:8px"><button class="btn p" id="uOk">Ajouter</button><button class="btn" id="uRaz" style="display:none">Annuler</button></div></div></div>
+  <div class="card droits" style="margin-top:16px"><h2 style="font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait)">Droits à donner au jeton Baserow de chaque profil</h2>
+   <table class="l"><tbody>${DROITS.map(d=>`<tr style="cursor:default"><td class="prim" style="width:170px">${d[0]}</td><td style="white-space:normal;max-width:none">${d[1]}</td></tr>`).join('')}</tbody></table>
+   <div class="c mut" style="padding:12px 16px;font-size:12.5px">Un jeton par profil suffit (tous les utilisateurs d’un profil partagent le même jeton, chiffré avec le mot de passe de chacun). Pour couper l’accès à quelqu’un : le retirer ici, publier, puis régénérer le jeton de son profil dans Baserow et redonner un mot de passe aux autres membres du profil.</div></div>`;
+  let edite=null;
+  const raz=()=>{edite=null;['uL','uN','uM','uM2','uJ'].forEach(i=>$(i).value='');$('uR').value='';$('uL').disabled=false;$('uTitre').textContent='Ajouter un utilisateur';$('uOk').textContent='Ajouter';$('uRaz').style.display='none'};
+  $('uRaz').onclick=raz;
+  document.querySelectorAll('[data-mdp]').forEach(b=>b.onclick=()=>{const u=A.utilisateurs[+b.dataset.mdp];edite=u.login;$('uL').value=u.login;$('uL').disabled=true;$('uN').value=u.nom;$('uP').value=u.profil;$('uR').value=u.referent||'';$('uTitre').textContent='Nouveau mot de passe pour '+u.login;$('uOk').textContent='Enregistrer';$('uRaz').style.display='';$('uM').focus()});
+  document.querySelectorAll('[data-ret]').forEach(b=>b.onclick=()=>{const u=A.utilisateurs[+b.dataset.ret];if(confirm(`Retirer ${u.nom} (${u.login}) ?`)){A.utilisateurs.splice(+b.dataset.ret,1);vueUtilisateurs()}});
+  $('uOk').onclick=async()=>{const l=normLogin($('uL').value),n=$('uN').value.trim(),p=$('uP').value,ref=+$('uR').value||null,m=$('uM').value,j=$('uJ').value.trim();
+    if(!l||!n)return toast('Identifiant et nom obligatoires',true);
+    if(!edite&&A.utilisateurs.some(u=>u.login===l))return toast('Cet identifiant existe déjà',true);
+    if(m.length<10)return toast('Mot de passe : 10 caractères minimum',true);if(m!==$('uM2').value)return toast('Les deux mots de passe sont différents',true);
+    if(!j)return toast('Collez le jeton Baserow du profil',true);
+    $('uOk').disabled=true;$('uOk').textContent='Chiffrement…';
+    try{await testerJeton(j);const c=await chiffrer(j,m);const u={login:l,nom:n,profil:p,referent:ref,...c};
+      const i=A.utilisateurs.findIndex(x=>x.login===l);if(i>=0)A.utilisateurs[i]=u;else A.utilisateurs.push(u);
+      A.maj=auj();toast(edite?'Mot de passe changé (à publier)':'Utilisateur ajouté (à publier)');vueUtilisateurs()}
+    catch(e){toast('Échec : '+e.message,true);$('uOk').disabled=false;$('uOk').textContent=edite?'Enregistrer':'Ajouter'}};
+  const contenu=()=>JSON.stringify(A,null,1)+'\n';
+  if($('uCopie'))$('uCopie').onclick=async()=>{try{await navigator.clipboard.writeText(contenu());toast('Fichier copié : collez-le sur GitHub puis « Commit changes »')}catch(e){toast('Copie impossible : utilisez Télécharger',true)}};
+  if($('uDl'))$('uDl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([contenu()],{type:'application/json'}));a.download=FICHIER_ACCES;a.click()};
+  if($('uAnn'))$('uAnn').onclick=()=>{BROUILLON_ACCES=null;vueUtilisateurs()};
+}
+
 /* ---------- Jeton ---------- */
 function config(change){
   $('main').innerHTML=`<div class="card" id="cfg"><h1>Connexion à Baserow</h1><p class="mut">Collez le jeton Baserow (le même que celui de l’éditeur). Il reste enregistré dans ce navigateur uniquement.</p>
    <input id="cfgJ" type="password" placeholder="Jeton de base de données" value="${change&&JETON?esc(JETON):''}"><button class="btn p" id="cfgOk">Se connecter</button></div>`;
   $('cfgOk').onclick=async()=>{const j=$('cfgJ').value.trim();if(!j)return;JETON=j;
-    try{await api(`/rows/table/${MODS.referents.t}/?user_field_names=true&size=1`);try{localStorage.setItem(CLE,j)}catch(e){}for(const t in S.prom)delete S.prom[t];location.hash='#/accueil';route()}
+    try{await api(`/rows/table/${MODS.referents.t}/?user_field_names=true&size=1`);try{localStorage.setItem(CLE,j);localStorage.removeItem('akteev_session')}catch(e){}SESSION=null;for(const t in S.prom)delete S.prom[t];location.hash='#/accueil';lancer()}
     catch(e){toast('Jeton refusé : '+e.message,true)}};
 }
 
 /* ---------- Démarrage ---------- */
-dessinerMenu();
-if(!JETON)config();
-else{route();charger(MODS.referents.t).catch(()=>{});setTimeout(()=>['devis','commandes','taches'].forEach(k=>charger(MODS[k].t).catch(()=>{})),300)}
+function lancer(){
+  document.body.classList.remove('deconnecte');GMODS=GMODS0.filter(peutVoir);
+  if(SESSION?.referent&&!MOI){MOI=SESSION.referent;ls.set('moi',MOI)}
+  dessinerMenu();route();charger(MODS.referents.t).catch(()=>{});
+  setTimeout(()=>['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{})),300)}
+(async()=>{
+  ACCES=await lireAcces();
+  const avecComptes=!!(ACCES&&ACCES.utilisateurs?.length);
+  if(JETON&&(SESSION||!avecComptes))return lancer(); // session ouverte, ou jeton administrateur saisi directement
+  if(avecComptes)return ecranConnexion();
+  document.body.classList.add('deconnecte');config();
+})();
 </script>
 </body>
 </html>
