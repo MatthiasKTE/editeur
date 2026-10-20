@@ -265,7 +265,7 @@ const MODS={
    liees:[{nom:'Lignes',t:1261381,lien:'BL',cols:['Description','Quantité commandée','Quantité livrée'],ordre:'Ordre'}]},
  clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
    liees:[{nom:'Devis',mod:'devis',lien:'Client'},{nom:'Commandes',mod:'commandes',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
- taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Libellé','Commande','Type de tâche','Échéance','Référent','Statut','Notes'],statut:'Statut',date:'Échéance',ref:'Référent',vue:'kanban',
+ taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Référent','Statut','Notes'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
@@ -497,7 +497,26 @@ function graphe(C,dateCde){
 
 /* ---------- Liste ---------- */
 const ETAT=ls.get('etat',{});
-function etat(k){return ETAT[k]||(ETAT[k]={q:'',st:[],tri:null,vue:MODS[k].vue||'liste',ref:'',lim:100,tout:false})}
+function etat(k){const E=ETAT[k]||(ETAT[k]={q:'',st:[],tri:null,vue:MODS[k].vue||'liste',ref:'',lim:100,tout:false});
+  if(k==='taches'&&!E.v2){E.vue='liste';E.tri=null;E.cf={};E.v2=true}return E}
+/* Colonnes calculées (affichage seulement, jamais envoyées à Baserow). */
+const VIRT={taches(rows,sc){
+  const C=S.rows[MODS.commandes.t]||[],parId=new Map(C.map(c=>[c.id,c]));
+  const aj=(name,f)=>{if(!sc.par[name]){const x={id:'v_'+name,name,virt:true,read_only:true,...f};sc.fields.push(x);sc.par[name]=x}};
+  aj('Affaire',{type:'link_row',link_row_table_id:MODS.commandes.t});aj('Client',{type:'link_row',link_row_table_id:MODS.clients.t});
+  aj('Tâche',{type:'text'});aj('Délai',{type:'date',relatif:true});
+  for(const r of rows){const cde=(r.Commande||[]).map(x=>parId.get(x.id)).filter(Boolean);
+    r['Affaire']=r.Commande||[];
+    const cl=new Map();cde.forEach(c=>(c.Client||[]).forEach(x=>cl.set(x.id,x)));r['Client']=[...cl.values()];
+    r['Tâche']=txt(r['Type de tâche'])||String(txt(r['Libellé'])).replace(/^\S+\s*[–-]\s*/,'');
+    r['Délai']=r['Échéance']||null}
+}};
+function enrichir(k){const m=MODS[k];if(m.virt&&S.rows[m.t])VIRT[m.virt](S.rows[m.t],sch(m.t))}
+function delaiRel(r,v){
+  if(!v)return'<span class="mut">—</span>';const d=Math.round((new Date(v.slice(0,10)+'T00:00')-new Date(auj()+'T00:00'))/864e5);
+  let b='';if(tacheOuverte(r)){b=d<0?`<span class="badge" style="background:#FEE2E2;color:#B91C1C">retard ${-d} j</span>`:d===0?`<span class="badge" style="background:#FFEDD5;color:#C2410C">aujourd’hui</span>`:d<=7?`<span class="badge" style="background:#FEF9C3;color:#A16207">J-${d}</span>`:`<span class="badge" style="background:#EEF0F4;color:#4B5563">J-${d}</span>`}
+  else if(/^fait/i.test(txt(r.Statut)))b=`<span class="mut" style="font-size:12px">fait${r['Fait le']?' le '+dfr(r['Fait le']):''}</span>`;
+  return`<span style="white-space:nowrap">${dfr(v)} ${b}</span>`}
 function sauverEtat(){const c={};for(const k in ETAT){const{q,lim,...r}=ETAT[k];c[k]=r}ls.set('etat',c)}
 async function vueListe(k){
   const m=MODS[k],E=etat(k),p=params();
@@ -505,10 +524,12 @@ async function vueListe(k){
   if(p.f==='retard'){E.st=[];E.retard=true;E.tout=false}else if(p.f==='encours'){E.st=[];E.encours=true}
   if(!S.rows[m.t])chargement();
   await charger(m.t);
+  if(m.virt)await charger(MODS.commandes.t).catch(()=>{});
   if(m.ref)charger(MODS.referents.t).catch(()=>{});
   dessinerListe(k);
 }
 function filtrer(k){
+  enrichir(k);
   const m=MODS[k],E=etat(k),R=S.rows[m.t]||[],sc=sch(m.t),q=norm(E.q).split(/\s+/).filter(Boolean);
   return R.filter(r=>{
     const st=m.statut?txt(r[m.statut]):'';
@@ -527,7 +548,7 @@ const estChoix=f=>f&&['single_select','multiple_select','link_row','boolean'].in
 function valsChoix(f,x){if(f.type==='boolean')return[x?'Oui':'Non'];if(x==null||x===''||(Array.isArray(x)&&!x.length))return['(vide)'];return Array.isArray(x)?x.map(o=>txt(o)):[txt(x)]}
 function txtFiltre(x){const t=txt(x);return /^\d{4}-\d{2}-\d{2}/.test(t)?t+' '+dfr(t.slice(0,10)):t}
 const nbCf=E=>Object.values(E.cf||{}).filter(Boolean).length;
-function colonnes(k){const m=MODS[k],sc=sch(m.t);let c=m.cols.filter(n=>sc.par[n]);if(c.length<2)c=sc.fields.slice(0,7).map(f=>f.name);if(!c.includes(sc.prim))c.unshift(sc.prim);return c}
+function colonnes(k){enrichir(k);const m=MODS[k],sc=sch(m.t);let c=m.cols.filter(n=>sc.par[n]);if(c.length<2)c=sc.fields.slice(0,7).map(f=>f.name);if(!m.sansPrim&&!c.includes(sc.prim))c.unshift(sc.prim);return c}
 function trier(k,L){
   const m=MODS[k],E=etat(k),sc=sch(m.t);
   let f=E.tri?.f,dir=E.tri?.d||1;
@@ -560,7 +581,8 @@ function dessinerListe(k){
     const a=auj();
     h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
       const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
-      return`<td class="${c===sc.prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
+      const prim=m.sansPrim?c===cols[0]:c===sc.prim;
+      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${f?.relatif?delaiRel(r,v):rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
     h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
     if(!L.length)h+='<div class="vide">Aucun résultat</div>';
     if(L.length>E.lim)h+=`<div class="plus"><button class="btn" id="bPlus">Afficher plus (${L.length-E.lim} restants)</button></div>`;
@@ -642,8 +664,8 @@ function dessinerFiche(){
   const {k,t}=SALE,m=MODS[k],sc=sch(t),row=SALE.row,nouveau=!SALE.id;
   const nom=nouveau?nouv(m):titre(t,row);
   document.title='Akteev – '+nom;
-  const ed=sc.fields.filter(f=>!RO_TYPES.has(f.type)&&!f.read_only);
-  const ro=sc.fields.filter(f=>RO_TYPES.has(f.type)||f.read_only);
+  const ed=sc.fields.filter(f=>!f.virt&&!RO_TYPES.has(f.type)&&!f.read_only);
+  const ro=sc.fields.filter(f=>!f.virt&&(RO_TYPES.has(f.type)||f.read_only));
   const stF=m.statut&&sc.par[m.statut];
   const lienEditeur=m.editeur&&!nouveau&&row[m.num]?`${EDITEUR}?${m.editeur}=${encodeURIComponent(txt(row[m.num]))}`:null;
   const devisCde=k==='commandes'&&!nouveau?(row['Devis']?.[0]?.value||txt(row['N° affaire'])):null;
@@ -792,12 +814,13 @@ async function dessinerLiees(i){
   const ordre=x.ordre||(x.mod&&MODS[x.mod].ordre);
   if(ordre&&sc.par[ordre])F.sort((a,b)=>(+a[ordre]||0)-(+b[ordre]||0)||a.id-b.id);
   else if(x.mod&&MODS[x.mod].date)F.sort((a,b)=>String(a[MODS[x.mod].date]||'9').localeCompare(String(b[MODS[x.mod].date]||'9')));
-  let cols=(x.cols||(x.mod?MODS[x.mod].cols:[])).filter(c=>sc.par[c]&&c!==x.lien);if(cols.length<1)cols=sc.fields.slice(0,5).map(f=>f.name);
-  if(!cols.includes(sc.prim))cols.unshift(sc.prim);
+  if(x.mod)enrichir(x.mod);
+  let cols=(x.cols||(x.mod?MODS[x.mod].cols:[])).filter(c=>sc.par[c]&&c!==x.lien&&!(sc.par[c].virt&&sc.par[c].type==='link_row'));if(cols.length<1)cols=sc.fields.slice(0,5).map(f=>f.name);
+  const sansPrim=x.mod&&MODS[x.mod].sansPrim;if(!sansPrim&&!cols.includes(sc.prim))cols.unshift(sc.prim);
   const cible=x.mod;
   const a=auj();
   let h=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c];return`<th class="${f?.type==='number'?'n':''}" style="cursor:default">${esc(c)}</th>`}).join('')}</tr></thead><tbody>`;
-  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${c===sc.prim?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
+  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${f?.relatif?delaiRel(r,r[c]):rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
   h+='</tbody></table></div>';
   if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
   if(x.ajout&&cible)h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
