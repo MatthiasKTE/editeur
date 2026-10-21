@@ -24,6 +24,7 @@ body{margin:0;background:var(--fond);font-family:Carlito,Calibri,"Source Sans Pr
 .titre{text-align:right;line-height:1.5}
 .titre h1{margin:0;color:var(--bleu);font-weight:normal;font-size:28px;line-height:1.2}
 .titre h1.long{font-size:22px}
+#tNum{font-size:20px;font-weight:bold;color:var(--bleu);margin:1mm 0 2mm}
 .adr{display:flex;justify-content:space-between;margin-top:4mm}
 .adr .kte{line-height:1.45}
 .cadre{border:1px solid var(--trait);border-radius:3mm;padding:4mm;width:85mm;line-height:1.45}
@@ -321,7 +322,7 @@ function afficher(){
 }
 function majClient(){
   const c=clients.find(x=>x.id==$('fClient').value);
-  $('cliAdr').innerHTML=c?[c['Raison sociale (Axonaut)']&&c['Raison sociale (Axonaut)']!==c.Entreprise?c['Raison sociale (Axonaut)']:'',...(c.Adresse||'').split(', '),`${c['Code postal']||''} ${c.Ville||''}`,c.Pays&&c.Pays!=='France'?c.Pays:'',TYPE!=='bl'&&c['N° TVA']?'N° de TVA : '+c['N° TVA']:'',TYPE!=='bl'&&c.SIREN?'SIREN : '+c.SIREN:''].filter(x=>x&&x.trim()).join('<br>'):'';
+  $('cliAdr').innerHTML=c?[c['Raison sociale (Axonaut)']&&c['Raison sociale (Axonaut)']!==c.Entreprise?c['Raison sociale (Axonaut)']:'',...(c.Adresse||'').split(', '),`${c['Code postal']||''} ${c.Ville||''}`,c.Pays&&c.Pays!=='France'?c.Pays:''].filter(x=>x&&x.trim()).join('<br>'):'';
   if(TYPE==='bl')majAdrBL();
 }
 function majAdrBL(){const autre=$('fAdrLivBL').value.trim();$('cliAdr').style.display=autre?'none':'';$('fClient').classList.toggle('masque-print',!!autre)}
