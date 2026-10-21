@@ -250,6 +250,7 @@ const I={
  clients:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.5c2.4.2 4 1.8 4.5 4.5"/>',
  taches:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 10l2 2 4-4M8 16h8"/>',
  synthese:'<path d="M4 5h16M4 10h16M4 15h10M4 20h6"/>',
+ ddp:'<path d="M4 13h4l2 3h4l2-3h4"/><path d="M5.5 6.5 4 13v6h16v-6l-1.5-6.5a1 1 0 0 0-1-.8H6.5a1 1 0 0 0-1 .8z"/>',
  cf:'<path d="M20 7 12 3 4 7v10l8 4 8-4z"/><path d="m4 7 8 4 8-4M12 11v10"/>',
  fournisseurs:'<path d="M3 21V9l6-4v4l6-4v4l6-4v16z"/><path d="M7 17h2M11 17h2M15 17h2"/>',
  referents:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
@@ -269,8 +270,8 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
    statut : champ de statut (puces + kanban) ; editeur : type de document de l'éditeur ;
    liees : listes affichées en onglets dans la fiche (table + champ lien vers la fiche). */
 const MODS={
- devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
-   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé']},
+ devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
+   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé']},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
    liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
@@ -284,8 +285,9 @@ const MODS={
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
    liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant'],ordre:'Ordre',ajout:true}],cacheStatuts:['Annulée']},
+ consult:{t:1274941,nom:'Consultations SST',un:'consultation',fem:true,ico:'ddp',grp:'Achats',cols:['Réf','Devis','Fournisseur','Envoyée le','Réponse','Réponse le','Montant','Délai','Archivage','Dossier réponses'],statut:'Réponse',cacheStatuts:['Annulée']},
  fournisseurs:{t:1260241,nom:'Fournisseurs',un:'fournisseur',ico:'fournisseurs',grp:'Achats',cols:['Nom','Type','Pays','Contact','E-mail','Devise','Conditions de paiement'],
-   liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'}]},
+   liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'}]},
  referents:{t:1260243,nom:'Référents',un:'référent',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Téléphone',"Référent d'affaire"],
    liees:[{nom:'Tâches',mod:'taches',lien:'Référent'},{nom:'Commandes',mod:'commandes',lien:'Référent KTE'}]},
  catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']}
@@ -295,7 +297,7 @@ const MOD_DE_TABLE={};for(const k in MODS)MOD_DE_TABLE[MODS[k].t]=k;
 /* Cibles des liens si l'API des champs n'est pas lisible avec le jeton (secours). */
 const LIENS_SECOURS={'Client':1260239,'Référent KTE':1260243,'Référent':1260243,'Demandeur':1260243,'Référent par défaut':1260243,'Commande':1260240,'Affaire':1260240,
  'Fournisseur':1260241,'Intervenant':1260241,'Type de tâche':1261119,'Devis':1261170,'ARC':1261374,'BL':1261382,'Commande fournisseur':1263348,'Tâche':1261600,
- 'Lignes de devis':1261171,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349};
+ 'Lignes de devis':1261171,'Consultations SST':1274941,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349};
 const RO_TYPES=new Set(['formula','lookup','rollup','count','created_on','last_modified','created_by','last_modified_by','autonumber','uuid','file','multiple_collaborators','ai','password']);
 
 /* ---------- Utilitaires ---------- */
@@ -414,9 +416,9 @@ function triVal(f,v){
    Les profils ci-dessous adaptent seulement l'affichage (menus, boutons, montants). */
 const PROFILS={
  admin:{nom:'Direction / Admin',voir:'*',ecrire:'*',montants:true,admin:true},
- commercial:{nom:'Commercial / ADV',voir:['devis','commandes','arc','bl','clients','taches','synthese','referents'],ecrire:['devis','commandes','arc','bl','clients','taches'],montants:true},
+ commercial:{nom:'Commercial / ADV',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','referents'],ecrire:['devis','commandes','arc','bl','clients','taches','consult'],montants:true},
  atelier:{nom:'Atelier',voir:['taches','synthese','commandes','referents'],ecrire:['taches','synthese'],montants:false},
- achats:{nom:'Achats',voir:['commandes','taches','synthese','cf','fournisseurs','referents'],ecrire:['cf','fournisseurs','synthese','taches'],montants:true}
+ achats:{nom:'Achats',voir:['devis','consult','commandes','taches','synthese','cf','fournisseurs','referents'],ecrire:['cf','fournisseurs','synthese','taches','consult'],montants:true}
 };
 let SESSION=null;try{SESSION=JSON.parse(localStorage.getItem('akteev_session')||'null')}catch(e){}
 const PR=()=>PROFILS[SESSION?.profil]||PROFILS.admin;
@@ -432,7 +434,7 @@ function dessinerMenu(){
   let h=`<div class="marque"><span class="k">A</span><div>Akteev<small>KTE · gestion</small></div></div>`;
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
   let g='';
-  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`}
+  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`}
   if(estAdmin()){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
   h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
   $('side').innerHTML=h;
@@ -445,6 +447,8 @@ function majCompteurs(){
   for(const k of ['devis','commandes','taches']){const m=MODS[k],R=S.rows[m.t],e=$('nb_'+k);if(!R||!e)continue;
     const n=k==='taches'?R.filter(r=>tacheOuverte(r)&&r['Échéance']&&r['Échéance']<auj()).length:k==='devis'?R.filter(devisEnCours).length:R.filter(r=>txt(r.Statut)==='Commandé').length;
     e.textContent=n||'';e.title=k==='taches'?'tâches en retard':'en cours'}
+  const eD=$('nb_ddp'),RD=S.rows[MODS.devis.t],RC=S.rows[MODS.consult.t];
+  if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
   majMoi();
 }
 const devisEnCours=r=>!/accept|refus|perdu|annul|sans suite|class/i.test(txt(r.Statut));
@@ -463,6 +467,7 @@ async function route(){
   try{
     if(k==='accueil')return await vueAccueil();
     if(k==='utilisateurs'&&estAdmin())return await vueUtilisateurs();
+    if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
     if(id)return await vueFiche(k,id);
     return await vueListe(k);
@@ -475,7 +480,8 @@ async function vueAccueil(){
   document.title='Akteev – Tableau de bord';
   if(!S.rows[MODS.devis.t])chargement();
   const ch=k=>peutVoir(k)?charger(MODS[k].t).catch(()=>[]):Promise.resolve([]);
-  const [D,C,T]=await Promise.all([ch('devis'),ch('commandes'),ch('taches')]);
+  const [D,C,T,CS]=await Promise.all([ch('devis'),ch('commandes'),ch('taches'),ch('consult')]);
+  const DDP=peutVoir('consult')?ddpListe(D,CS):[],dPr=DDP.filter(x=>x.etat==='complet').length,dPa=DDP.filter(x=>x.etat==='partiel').length;
   const vD=peutVoir('devis')&&montants(),vC=peutVoir('commandes'),vM=montants();
   const a=auj(),an=a.slice(0,4),mois=a.slice(0,7);
   const dEC=D.filter(devisEnCours),cEC=C.filter(r=>txt(r.Statut)==='Commandé');
@@ -492,6 +498,7 @@ async function vueAccueil(){
    ${vD?`<div class="card kpi" onclick="location.hash='#/devis?f=encours'"><div class="lab">${ico('devis')}Devis en cours</div><div class="val">${dEC.length}</div><div class="det">${keur(dEC.reduce((s,r)=>s+(+r['Total HT']||0),0))} HT</div></div>`:''}
    ${vC?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('commandes')}Commandes en cours</div><div class="val">${cEC.length}</div><div class="det">${vM?keur(cEC.reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))+' HT à livrer':'à livrer'}</div></div>`:''}
    ${vC&&vM?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('euro')}Commandé ce mois</div><div class="val">${keur(caMois)}</div><div class="det">${keur(caAn)} depuis le 1<sup>er</sup> janvier</div></div>`:''}
+   ${peutVoir('consult')?`<div class="card kpi" onclick="location.hash='#/ddp'"><div class="lab">${ico('ddp')}DDP en cours</div><div class="val">${DDP.length}</div><div class="det">${dPr?`<b style="color:#15803D">${dPr} complète(s)</b>`:'0 complète'} · ${dPa} partielle(s)</div></div>`:''}
    <div class="card kpi" onclick="location.hash='#/taches?f=retard'"><div class="lab" style="${tRet.length?'color:var(--err)':''}">${ico('alerte')}Tâches en retard${MOI?' (moi)':''}</div><div class="val" style="${tRet.length?'color:var(--err)':''}">${tRet.length}</div><div class="det">${mesT.length} tâche(s) ouverte(s)</div></div>
    ${vD?`<div class="card kpi" onclick="location.hash='#/devis'"><div class="lab">${ico('arc')}Transformation ${an}</div><div class="val">${dAn.length?Math.round(dAcc/dAn.length*100):0} %</div><div class="det">${dAcc} accepté(s) / ${dAn.length} devis</div></div>`:''}
   </div>
@@ -529,6 +536,67 @@ function graphe(C,dateCde){
     if(x)s+=`<text x="${X+w/2}" y="${H-h-5}" text-anchor="middle" font-size="10" fill="#6B7385">${x>=1000?Math.round(x/1000)+'k':Math.round(x)}</text>`;
     s+=`<text x="${X+w/2}" y="${H+16}" text-anchor="middle" font-size="11" fill="#6B7385">${new Date(ms[i]+'-01T00:00').toLocaleDateString('fr-FR',{month:'short'}).replace('.','')}</text>`});
   return s+'</svg>';
+}
+
+/* ---------- DDP en cours (demandes de prix en consultation chez les sous-traitants) ----------
+   Une DDP = un devis au statut Brouillon ou Consultation SST. Ses consultations viennent de la table
+   « Consultations SST » (une ligne par sous-traitant consulté). Réponses = offres reçues + refus. */
+const DDP_STATUTS=['Brouillon','Consultation SST'];
+const DDP_ETATS=[['complet','Toutes les réponses'],['partiel','Réponses partielles'],['aucune','Aucune réponse'],['sans','Pas encore consulté']];
+function delaiRelance(iso){const j=new Date(iso).getDay();return(j>=4&&j<=6?96:48)*36e5} // jeudi, vendredi, samedi : 96 h
+function ddpConsult(c){
+  const rep=txt(c['Réponse'])||'En attente',base=c['Dernière relance']||c['Envoyée le'];
+  const relance=rep==='En attente'&&base&&Date.now()-new Date(base)>delaiRelance(base);
+  return{c,rep,relance,four:txt(c.Fournisseur)||txt(c['Réf']).replace(/^\S+\s*[–-]\s*/,'')||'?'}}
+function ddpListe(D,CS){
+  const par=new Map();(CS||[]).forEach(c=>{if(txt(c['Réponse'])==='Annulée')return;ids(c.Devis).forEach(i=>{if(!par.has(i))par.set(i,[]);par.get(i).push(c)})});
+  return(D||[]).filter(d=>DDP_STATUTS.includes(txt(d.Statut))).map(d=>{
+    const C=(par.get(d.id)||[]).map(ddpConsult).sort((a,b)=>String(a.c['Envoyée le']||'').localeCompare(String(b.c['Envoyée le']||''))||a.four.localeCompare(b.four,'fr'));
+    const tot=C.length,off=C.filter(x=>x.rep==='Offre reçue'),ref=C.filter(x=>x.rep==='Refus').length,rep=off.length+ref;
+    const etat=!tot?'sans':rep===tot?'complet':rep?'partiel':'aucune';
+    const prix=off.filter(x=>x.c.Montant!=null&&x.c.Montant!==''&&(!x.c.Devise||/^(eur|€)$/i.test(x.c.Devise))).sort((a,b)=>+a.c.Montant-+b.c.Montant)[0];
+    return{d,C,tot,rep,ref,etat,prix,relances:C.filter(x=>x.relance).length}});
+}
+function badgeReponses(x){
+  if(!x.tot)return'<span class="badge" style="background:#F3F4F6;color:#6B7280">—</span>';
+  const [bg,fg]={complet:['#DCFCE7','#15803D'],partiel:['#FFEDD5','#C2410C'],aucune:['#FEE2E2','#B91C1C']}[x.etat];
+  return`<span class="badge" style="background:${bg};color:${fg};font-size:13.5px;font-weight:700;padding:3px 11px" title="${x.rep} réponse(s) sur ${x.tot} sous-traitant(s) consulté(s)">${x.rep}/${x.tot}</span>${x.ref?`<div class="mut" style="font-size:11.5px;margin-top:2px">dont ${x.ref} refus</div>`:''}`}
+function puceSST(x){
+  const c=x.c,[ic,bg,fg]={'Offre reçue':['✔','#DCFCE7','#15803D'],'Refus':['✕','#FEE2E2','#B91C1C'],'Question':['?','#FFEDD5','#C2410C']}[x.rep]||['⏳','#EEF0F4','#4B5563'];
+  const det=[x.four+' : '+x.rep,c['Envoyée le']?'consulté le '+dtfr(c['Envoyée le']):'',c['Réponse le']?'réponse le '+dtfr(c['Réponse le']):'',
+    c.Montant!=null&&c.Montant!==''?'montant '+(c.Devise&&!/^(eur|€)$/i.test(c.Devise)?nb(c.Montant)+' '+c.Devise:eur(c.Montant)):'',c['Délai']?'délai '+c['Délai']:'',
+    c['Dernière relance']?'relancé le '+dtfr(c['Dernière relance']):'',x.relance?'⚠ relance à faire':'',txt(c.Commentaire)].filter(Boolean).join('\n');
+  return`<a class="chip" href="#/consult/${c.id}" onclick="event.stopPropagation()" title="${esc(det)}" style="background:${bg};color:${fg};${x.relance?'box-shadow:inset 0 0 0 1.5px #DC2626;':''}">${ic} ${esc(x.four)}${x.relance?' · relance':''}</a>`}
+let DDPF=ls.get('ddpf','');
+async function vueDDP(){
+  document.title='Akteev – DDP en cours';
+  if(!S.rows[MODS.devis.t]||!S.rows[MODS.consult.t])chargement();
+  await Promise.all([charger(MODS.devis.t),charger(MODS.consult.t)]);
+  charger(MODS.referents.t).catch(()=>{});
+  dessinerDDP();
+}
+function dessinerDDP(){
+  const T=ddpListe(S.rows[MODS.devis.t],S.rows[MODS.consult.t]),cpt={};T.forEach(x=>cpt[x.etat]=(cpt[x.etat]||0)+1);
+  const q=norm($('dq')?.value||'').split(/\s+/).filter(Boolean),ordre={complet:0,partiel:1,aucune:2,sans:3};
+  const L=T.filter(x=>(!DDPF||x.etat===DDPF)&&(!q.length||q.every(w=>norm([x.d['N° devis'],txt(x.d.Client),x.d.Objet,txt(x.d['Référent KTE']),...x.C.map(y=>y.four)].join(' ')).includes(w))))
+    .sort((a,b)=>ordre[a.etat]-ordre[b.etat]||String(a.d['Date réception']||a.d.Date||'').localeCompare(String(b.d['Date réception']||b.d.Date||'')));
+  const nbRel=T.reduce((s,x)=>s+x.relances,0);
+  let h=`<div class="entete"><h1>DDP en cours</h1><span class="sous">${T.length} demande(s) · ${cpt.complet||0} avec toutes les réponses${nbRel?` · <span style="color:#DC2626">${nbRel} relance(s) à faire</span>`:''}</span><div class="act">
+    <button class="btn" id="dMaj">${ico('cal')}Actualiser</button><a class="btn" href="#/consult">${ico('ddp')}Toutes les consultations</a></div></div>
+  <div class="card"><div class="outils">
+    <div class="rech">${ico('loupe')}<input id="dq" placeholder="Filtrer (n°, client, sous-traitant…)" value="${esc($('dq')?.value||'')}"></div>
+    <div class="puces"><button class="puce ${!DDPF?'on':''}" data-e="">Toutes<b>${T.length}</b></button>${DDP_ETATS.map(([e,n])=>`<button class="puce ${DDPF===e?'on':''}" data-e="${e}">${n}<b>${cpt[e]||0}</b></button>`).join('')}</div>
+  </div><div class="tw"><table class="l"><thead><tr><th style="cursor:default">Réponses</th><th style="cursor:default">N° devis</th><th style="cursor:default">Client</th><th style="cursor:default">Objet</th><th style="cursor:default">Sous-traitants consultés</th>${montants()?'<th class="n" style="cursor:default">Meilleure offre</th>':''}<th style="cursor:default">Reçue le</th><th style="cursor:default">Référent</th><th style="cursor:default">Statut</th></tr></thead><tbody>`;
+  h+=L.map(x=>{const d=x.d;return`<tr data-id="${d.id}"><td>${badgeReponses(x)}</td><td class="prim">${esc(txt(d['N° devis']))}</td><td>${esc(txt(d.Client))}</td><td title="${esc(txt(d.Objet))}">${esc(String(txt(d.Objet)).slice(0,70))}${String(txt(d.Objet)).length>70?'…':''}</td>
+    <td>${x.C.map(puceSST).join('')||'<span class="mut">Aucune consultation enregistrée</span>'}</td>${montants()?`<td class="n">${x.prix?`${eur(x.prix.c.Montant)}<div class="mut" style="font-size:11.5px">${esc(x.prix.four)}</div>`:'<span class="mut">—</span>'}</td>`:''}
+    <td>${dfr(d['Date réception']||d.Date)||'<span class="mut">—</span>'}</td><td>${esc(txt(d['Référent KTE']))||'<span class="mut">—</span>'}</td><td>${badge(d.Statut)}</td></tr>`}).join('');
+  h+=`</tbody></table></div>${L.length?'':'<div class="vide">Aucune DDP dans ce filtre</div>'}
+  <div class="plus mut" style="font-size:12.5px;text-align:left">✔ offre reçue · ✕ refus · ? question du sous-traitant · ⏳ en attente (encadré rouge : relance due, 48 h après l’envoi, 96 h si envoyé un jeudi, vendredi ou samedi). Mise à jour automatique toutes les heures (8 h – 19 h) à partir des boîtes kte@ et de Matthias.</div></div>`;
+  $('main').innerHTML=h;
+  const dq=$('dq');dq.oninput=()=>{dessinerDDP();const n=$('dq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
+  document.querySelectorAll('.puce[data-e]').forEach(b=>b.onclick=()=>{DDPF=b.dataset.e;ls.set('ddpf',DDPF);dessinerDDP()});
+  document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/devis/${tr.dataset.id}`);
+  $('dMaj').onclick=async()=>{$('dMaj').disabled=true;try{await Promise.all([charger(MODS.devis.t,true),charger(MODS.consult.t,true)]);dessinerDDP();toast('DDP actualisées')}catch(e){toast('Échec : '+e.message,true);$('dMaj').disabled=false}};
 }
 
 /* ---------- Liste ---------- */
