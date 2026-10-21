@@ -573,7 +573,7 @@ function plusJoursOuvres(iso,n){const d=new Date(iso.slice(0,10)+'T12:00');while
   for(let i=0;i<n;){d.setDate(d.getDate()+1);if(d.getDay()!==0&&d.getDay()!==6)i++}return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)}
 function dateReception(d){const v=d['Date réception']||d.Date;if(!v)return'<span class="mut">—</span>';
   const lim=plusJoursOuvres(v,2),ret=auj()>=lim;
-  return`<span style="white-space:nowrap;${ret?'color:#DC2626;font-weight:600':''}" title="${ret?'Pas de réponse au client sous 48 h ouvrées (échéance le '+dfr(lim)+')':'Réponse attendue avant le '+dfr(lim)}">${dfr(v)}</span>`}
+  return`<span ${ret?'class="badge" style="background:#FEE2E2;color:#B91C1C;font-size:13px;font-weight:700;padding:3px 10px"':'style="white-space:nowrap"'} title="${ret?'Pas de réponse au client sous 48 h ouvrées (échéance le '+dfr(lim)+')':'Réponse attendue avant le '+dfr(lim)}">${dfr(v)}</span>`}
 let DDPF=ls.get('ddpf','');
 async function vueDDP(){
   document.title='Akteev – DDP en cours';
