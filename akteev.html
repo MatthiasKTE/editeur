@@ -567,6 +567,13 @@ function puceSST(x){
     c.Montant!=null&&c.Montant!==''?'montant '+(c.Devise&&!/^(eur|€)$/i.test(c.Devise)?nb(c.Montant)+' '+c.Devise:eur(c.Montant)):'',c['Délai']?'délai '+c['Délai']:'',
     c['Dernière relance']?'relancé le '+dtfr(c['Dernière relance']):'',x.relance?'⚠ relance à faire':'',txt(c.Commentaire)].filter(Boolean).join('\n');
   return`<a class="chip" href="#/consult/${c.id}" onclick="event.stopPropagation()" title="${esc(det)}" style="background:${bg};color:${fg};${x.relance?'box-shadow:inset 0 0 0 1.5px #DC2626;':''}">${ic} ${esc(x.four)}${x.relance?' · relance':''}</a>`}
+/* Date de réception en rouge si le devis n'est pas répondu sous 48 h ouvrées (samedi et dimanche exclus) :
+   le compte part du jour de réception (ou du lundi si reçue le week-end) ; rouge à partir du 2e jour ouvré suivant. */
+function plusJoursOuvres(iso,n){const d=new Date(iso.slice(0,10)+'T12:00');while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);
+  for(let i=0;i<n;){d.setDate(d.getDate()+1);if(d.getDay()!==0&&d.getDay()!==6)i++}return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)}
+function dateReception(d){const v=d['Date réception']||d.Date;if(!v)return'<span class="mut">—</span>';
+  const lim=plusJoursOuvres(v,2),ret=auj()>=lim;
+  return`<span style="white-space:nowrap;${ret?'color:#DC2626;font-weight:600':''}" title="${ret?'Pas de réponse au client sous 48 h ouvrées (échéance le '+dfr(lim)+')':'Réponse attendue avant le '+dfr(lim)}">${dfr(v)}</span>`}
 let DDPF=ls.get('ddpf','');
 async function vueDDP(){
   document.title='Akteev – DDP en cours';
@@ -589,9 +596,9 @@ function dessinerDDP(){
   </div><div class="tw"><table class="l"><thead><tr><th style="cursor:default">Réponses</th><th style="cursor:default">N° devis</th><th style="cursor:default">Client</th><th style="cursor:default">Objet</th><th style="cursor:default">Sous-traitants consultés</th>${montants()?'<th class="n" style="cursor:default">Meilleure offre</th>':''}<th style="cursor:default">Reçue le</th><th style="cursor:default">Référent</th><th style="cursor:default">Statut</th></tr></thead><tbody>`;
   h+=L.map(x=>{const d=x.d;return`<tr data-id="${d.id}"><td>${badgeReponses(x)}</td><td class="prim">${esc(txt(d['N° devis']))}</td><td>${esc(txt(d.Client))}</td><td title="${esc(txt(d.Objet))}">${esc(String(txt(d.Objet)).slice(0,70))}${String(txt(d.Objet)).length>70?'…':''}</td>
     <td>${x.C.map(puceSST).join('')||'<span class="mut">Aucune consultation enregistrée</span>'}</td>${montants()?`<td class="n">${x.prix?`${eur(x.prix.c.Montant)}<div class="mut" style="font-size:11.5px">${esc(x.prix.four)}</div>`:'<span class="mut">—</span>'}</td>`:''}
-    <td>${dfr(d['Date réception']||d.Date)||'<span class="mut">—</span>'}</td><td>${esc(txt(d['Référent KTE']))||'<span class="mut">—</span>'}</td><td>${badge(d.Statut)}</td></tr>`}).join('');
+    <td>${dateReception(d)}</td><td>${esc(txt(d['Référent KTE']))||'<span class="mut">—</span>'}</td><td>${badge(d.Statut)}</td></tr>`}).join('');
   h+=`</tbody></table></div>${L.length?'':'<div class="vide">Aucune DDP dans ce filtre</div>'}
-  <div class="plus mut" style="font-size:12.5px;text-align:left">✔ offre reçue · ✕ refus · ? question du sous-traitant · ⏳ en attente (encadré rouge : relance due, 48 h après l’envoi, 96 h si envoyé un jeudi, vendredi ou samedi). Mise à jour automatique toutes les heures (8 h – 19 h) à partir des boîtes kte@ et de Matthias.</div></div>`;
+  <div class="plus mut" style="font-size:12.5px;text-align:left">✔ offre reçue · ✕ refus · ? question du sous-traitant · ⏳ en attente (encadré rouge : relance due, 48 h après l’envoi, 96 h si envoyé un jeudi, vendredi ou samedi). Date de réception en rouge : pas de réponse au client sous 48 h (hors samedi et dimanche). Mise à jour automatique toutes les heures (8 h – 19 h) à partir des boîtes kte@ et de Matthias.</div></div>`;
   $('main').innerHTML=h;
   const dq=$('dq');dq.oninput=()=>{dessinerDDP();const n=$('dq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
   document.querySelectorAll('.puce[data-e]').forEach(b=>b.onclick=()=>{DDPF=b.dataset.e;ls.set('ddpf',DDPF);dessinerDDP()});
