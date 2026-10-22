@@ -434,7 +434,7 @@ let MOI=ls.get('moi',null);
 function dessinerMenu(){
   let h=`<div class="marque"><span class="k">A</span><div>Akteev<small>KTE · gestion</small></div></div>`;
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
-  if(peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
+  if(STATS_ACTIF&&peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   let g='';
   for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`}
   if(estAdmin()){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
@@ -470,7 +470,7 @@ async function route(){
     if(k==='accueil')return await vueAccueil();
     if(k==='utilisateurs'&&estAdmin())return await vueUtilisateurs();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
-    if(k==='stats'&&peutVoir('stats')&&montants())return await vueStats();
+    if(k==='stats'&&STATS_ACTIF&&peutVoir('stats')&&montants())return await vueStats();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
     if(id)return await vueFiche(k,id);
     return await vueListe(k);
@@ -620,6 +620,7 @@ function dessinerDDP(){
    Marge sur achats d'une affaire = CA facturé − commandes fournisseurs de l'affaire ; pour une période, les achats
    sont imputés au prorata du facturé (taux d'achat = achats / max(commandé, facturé total)). */
 const T_STATS=1277595;
+const STATS_ACTIF=false; // onglet en attente : à réactiver quand les identifiants / mots de passe seront en place
 const STATS_COUL={ca:'#2F6FED',cde:'#9DBBF7',marge:'#16A34A',achats:'#F59E0B',dep:'#DC2626'};
 const MOIS_COURT=m=>new Date(m+'-01T00:00').toLocaleDateString('fr-FR',{month:'short'}).replace('.','');
 const MOIS_LONG=m=>new Date(m+'-01T00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
