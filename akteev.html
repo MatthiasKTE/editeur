@@ -64,6 +64,7 @@ h1{font-size:21px;margin:0;font-weight:700}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);border:1px solid #EAEDF2}
 .badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:500;white-space:nowrap;line-height:18px}
 .badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.chip svg{width:13px;height:13px;vertical-align:-2px;margin-right:3px;color:var(--accent)}
 .chip{display:inline-block;background:#EEF1F6;border-radius:5px;padding:1px 7px;margin:1px 3px 1px 0;font-size:12.5px;color:var(--txt);white-space:nowrap}
 a.chip:hover{background:var(--accentL);color:var(--accent)}
 .mut{color:var(--mut)}
@@ -281,7 +282,7 @@ const MODS={
    liees:[{nom:'Lignes',t:1261381,lien:'BL',cols:['Description','Quantité commandée','Quantité livrée'],ordre:'Ordre'}]},
  clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
    liees:[{nom:'Devis',mod:'devis',lien:'Client'},{nom:'Commandes',mod:'commandes',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
- taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
+ taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Fiche','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
@@ -389,6 +390,7 @@ function majRow(t,row){const L=S.rows[t];if(!L)return;const i=L.findIndex(r=>r.i
 function rendu(f,v,court){
   if(v==null||v===''||(Array.isArray(v)&&!v.length))return'<span class="mut">—</span>';
   const ty=f?.type,n=f?.name||'';
+  if(ty==='fiches')return v.map(x=>`<a class="chip" href="${esc(x.url)}" target="_blank" onclick="event.stopPropagation()" title="Ouvrir ${esc(x.fichier)}">${ico('pdf')}${esc(x.value)}</a>`).join('');
   if(ty==='single_select')return badge(v);
   if(ty==='multiple_select')return v.map(badge).join(' ');
   if(ty==='boolean')return v?'<span style="color:var(--ok)">✔</span>':'<span class="mut">—</span>';
@@ -842,15 +844,28 @@ const VIRT={taches(rows,sc){
   const C=S.rows[MODS.commandes.t]||[],parId=new Map(C.map(c=>[c.id,c]));
   const aj=(name,f)=>{if(!sc.par[name]){const x={id:'v_'+name,name,virt:true,read_only:true,...f};sc.fields.push(x);sc.par[name]=x}};
   aj('Affaire',{type:'link_row',link_row_table_id:MODS.commandes.t});aj('Client',{type:'link_row',link_row_table_id:MODS.clients.t});
-  aj('Tâche',{type:'text'});aj('Délai',{type:'date',relatif:true});aj('Pièces',{type:'text',infobulle:'Notes'});
+  aj('Tâche',{type:'text'});aj('Délai',{type:'date',relatif:true});aj('Pièces',{type:'text',infobulle:'Notes'});aj('Fiche',{type:'fiches'});
   const SY=new Map((S.rows[MODS.synthese.t]||[]).map(x=>[x.id,x])),DV=new Map((S.rows[MODS.devis.t]||[]).map(x=>[x.id,x])),LD=new Map((S.rows[1261171]||[]).map(x=>[x.id,x]));
   for(const r of rows){const cde=(r.Commande||[]).map(x=>parId.get(x.id)).filter(Boolean);
     r['Affaire']=r.Commande||[];
     const cl=new Map();cde.forEach(c=>(c.Client||[]).forEach(x=>cl.set(x.id,x)));r['Client']=[...cl.values()];
     r['Tâche']=txt(r['Type de tâche'])||String(txt(r['Libellé'])).replace(/^\S+\s*[–-]\s*/,'');
     r['Délai']=r['Échéance']||null;
-    r['Pièces']=piecesTache(r,cde,SY,DV,LD)}
+    r['Pièces']=piecesTache(r,cde,SY,DV,LD);
+    r['Fiche']=fichesNotes(r.Notes)}
 }};
+/* Fiches atelier d'une tâche : liens SharePoint écrits dans les Notes par la compétence « fiches atelier »
+   (FA_<affaire>_<Métier>.pdf, RC_…, PC_…). Renvoie [{value:libellé court, url, fichier}]. */
+function fichesNotes(notes){
+  const vus=new Set(),out=[];
+  for(const m of String(notes||'').matchAll(/https?:\/\/[^\s<>"]+/g)){const url=m[0].replace(/[).,;]+$/,'');if(vus.has(url))continue;vus.add(url);
+    let f=url.split(/[?#]/)[0].split('/').pop();try{f=decodeURIComponent(f)}catch(e){}
+    if(!/\.(pdf|xlsx?|docx?)$/i.test(f))continue;
+    const b=f.replace(/\.[^.]+$/,'');let lab;
+    if(/^FA_/i.test(b)){lab=b.replace(/^FA_[^_]+_?/i,'').replace(/_/g,' ')||'Fiche';if(/^achats/i.test(lab))lab='Achats'}
+    else if(/^RC_/i.test(b))lab='RC';else if(/^PC_/i.test(b))lab='Plan contrôle';else lab=b.length>24?b.slice(0,22)+'…':b;
+    out.push({value:lab,url,fichier:f})}
+  return out}
 /* « 3+5+6 pcs » : une quantité par ligne. Source : lignes de synthèse liées à la tâche ;
    pour une expédition, lignes du devis de la commande ; sinon la quantité en tête des notes. */
 function piecesTache(r,cde,SY,DV,LD){
@@ -1039,6 +1054,7 @@ function dessinerFiche(){
     ${stF&&!nouveau&&!ecr?badge(val(m.statut)):''}${stF&&!nouveau&&ecr?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
     <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
     <div class="act">${lienEditeur?`<a class="btn p" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
+    ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>`).join(''):''}
     ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
     ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
     ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
@@ -1280,8 +1296,12 @@ async function documentsAffaire(cde){
       L.push({ico:'ddp',lab:fo,sous:rep+mt,titre:true,k:'consult',id:r.id,dossier:dos});
       if(dos)for(const f of fic)L.push(doc({ico:'pdf',lab:f,sous:'',url:dos.replace(/\/+$/,'')+'/'+encodeURIComponent(f),nom:f,ind:true}))}
     if(L.length)G.push(['Devis fournisseurs',L])}
-  /* 4. Tâches : PDF généré à partir de Baserow */
+  /* 4. Fiches atelier (liens dans les notes des tâches) puis PDF des tâches généré à partir de Baserow */
   if(D.taches){const TT=D.taches.filter(r=>lie(r,'Commande')&&!/annul/i.test(txt(r.Statut)));
+    const FA=[],vus=new Set();let dosFA='';
+    for(const r of TT)for(const x of fichesNotes(r.Notes)){if(vus.has(x.url))continue;vus.add(x.url);if(!dosFA&&/sharepoint\.com/i.test(x.url))dosFA=x.url.split(/[?#]/)[0].replace(/\/[^\/]*$/,'');
+      FA.push(doc({ico:'pdf',lab:x.fichier,sous:txt(r['Type de tâche'])||'',url:x.url,nom:x.fichier}))}
+    if(FA.length)G.push(['Fiches atelier',dosFA?[{ico:'dossier',lab:'Dossier « Fiches atelier »',sous:'',titre:true,lienDossier:dosFA},...FA]:FA]);
     if(TT.length)G.push(['Tâches',[doc({ico:'taches',lab:`Tâches ${n}`,sous:`${TT.length} tâche(s) – PDF généré`,gen:()=>pdfTaches(cde,TT),nom:`Taches_${n}.pdf`})]])}
   /* 5. Synthèse */
   const sy=[];
@@ -1297,6 +1317,7 @@ async function documentsAffaire(cde){
     ${/^https?:/.test(cde['Dossier SharePoint']||'')?`<a class="btn" style="padding:4px 10px" href="${esc(cde['Dossier SharePoint'])}" target="_blank" title="Dossier complet de l’affaire sur SharePoint (sélectionner tout → Télécharger = zip)">${ico('dossier')}Dossier SharePoint</a>`:''}</div>`:'';
   for(const [nom,L] of G){h+=`<div class="mut" style="padding:9px 14px 3px;font-size:11px;text-transform:uppercase;letter-spacing:.04em">${esc(nom)}</div>`;
     for(const d of L){const i=docs.indexOf(d);
+      if(d.lienDossier){h+=`<a class="lien" href="${esc(d.lienDossier)}" target="_blank">${ico('dossier')}<span>${esc(d.lab)}</span></a>`;continue}
       if(d.titre){h+=`<div class="lien" style="justify-content:space-between"><a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous)}</span></a>${d.dossier?`<a class="btn" style="padding:3px 7px" href="${esc(d.dossier)}" target="_blank" title="Dossier des réponses">${ico('dossier')}</a>`:''}</div>`;continue}
       const lab=d.k?`<a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous||'')}</span></a>`
         :`<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.lab)}">${ico(d.ico)}<span style="margin-left:6px">${esc(d.lab)}</span> <span class="mut">${esc(d.sous||'')}</span></span>`;
