@@ -261,7 +261,8 @@ const I={
  pdf:'<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="M8 15h1.5a1.5 1.5 0 0 0 0-3H8v5"/>',
  retour:'<path d="M15 18l-6-6 6-6"/>',euro:'<path d="M17 6.5A6.5 6.5 0 1 0 17 17.5M4 10h9M4 14h9"/>',alerte:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
  loupe:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
- cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+ cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+ stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'
 };
 const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${s}>${I[n]||''}</svg>`;
 
@@ -433,6 +434,7 @@ let MOI=ls.get('moi',null);
 function dessinerMenu(){
   let h=`<div class="marque"><span class="k">A</span><div>Akteev<small>KTE · gestion</small></div></div>`;
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
+  if(peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   let g='';
   for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`}
   if(estAdmin()){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
@@ -468,6 +470,7 @@ async function route(){
     if(k==='accueil')return await vueAccueil();
     if(k==='utilisateurs'&&estAdmin())return await vueUtilisateurs();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
+    if(k==='stats'&&peutVoir('stats')&&montants())return await vueStats();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
     if(id)return await vueFiche(k,id);
     return await vueListe(k);
@@ -604,6 +607,228 @@ function dessinerDDP(){
   document.querySelectorAll('.puce[data-e]').forEach(b=>b.onclick=()=>{DDPF=b.dataset.e;ls.set('ddpf',DDPF);dessinerDDP()});
   document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/devis/${tr.dataset.id}`);
   $('dMaj').onclick=async()=>{$('dMaj').disabled=true;try{await Promise.all([charger(MODS.devis.t,true),charger(MODS.consult.t,true)]);dessinerDDP();toast('DDP actualisées')}catch(e){toast('Échec : '+e.message,true);$('dMaj').disabled=false}};
+}
+
+/* ---------- Statistiques (données comptables Axonaut) ----------
+   Table Baserow « Stats Axonaut » (T_STATS) : une ligne par mois (« 2026-01 »…, plus « Avant 2026 » pour les
+   commandes fournisseurs antérieures d'affaires facturées dans l'année). Remplie par la tâche planifiée
+   « Stats Axonaut → Akteev » (API Axonaut, le navigateur ne peut pas l'appeler directement : CORS).
+   Colonnes JSON : Factures [n°, date, id client, client, affaire, nom commande, HT, TTC, reste dû, échéance, payée le, commercial, id]
+   Commandes [affaire, nom, date, id client, client, HT, livraison prévue, nb factures, id]
+   Achats (commandes fournisseurs) [affaire, titre, date, fournisseur, HT, id]
+   Dépenses (factures fournisseurs) [date, fournisseur, réf, HT, catégorie, payée, id]
+   Marge sur achats d'une affaire = CA facturé − commandes fournisseurs de l'affaire ; pour une période, les achats
+   sont imputés au prorata du facturé (taux d'achat = achats / max(commandé, facturé total)). */
+const T_STATS=1277595;
+const STATS_COUL={ca:'#2F6FED',cde:'#9DBBF7',marge:'#16A34A',achats:'#F59E0B',dep:'#DC2626'};
+const MOIS_COURT=m=>new Date(m+'-01T00:00').toLocaleDateString('fr-FR',{month:'short'}).replace('.','');
+const MOIS_LONG=m=>new Date(m+'-01T00:00').toLocaleDateString('fr-FR',{month:'long',year:'numeric'});
+const pct=x=>isFinite(x)?(Math.round(x*1000)/10).toLocaleString('fr-FR')+' %':'—';
+let STV=ls.get('stv',{o:'mois',du:'',au:'',q:'',mat:false});
+const STRI={};
+function statsDonnees(){
+  const R=S.rows[T_STATS]||[],P=v=>{try{const x=JSON.parse(v||'[]');return Array.isArray(x)?x:[]}catch(e){return[]}};
+  const F=[],C=[],A=[],D=[];let maj='';const mois=[];
+  for(const r of R){const m=txt(r.Mois);if(/^\d{4}-\d{2}$/.test(m))mois.push(m);
+    P(r.Factures).forEach(x=>F.push({num:x[0],date:x[1],cid:x[2],cli:x[3],aff:x[4],cnom:x[5],ht:+x[6]||0,ttc:+x[7]||0,reste:+x[8]||0,ech:x[9],paye:x[10],com:x[11],id:x[12]}));
+    P(r.Commandes).forEach(x=>C.push({aff:x[0],nom:x[1],date:x[2],cid:x[3],cli:x[4],ht:+x[5]||0,livr:x[6],nbf:x[7],id:x[8]}));
+    P(r.Achats).forEach(x=>A.push({aff:x[0],titre:x[1],date:x[2],four:x[3],ht:+x[4]||0,id:x[5]}));
+    P(r['Dépenses']).forEach(x=>D.push({date:x[0],four:x[1],ref:x[2],ht:+x[3]||0,cat:x[4]||'Autres',payee:!!x[5],id:x[6]}));
+    const u=r['Mis à jour le'];if(u&&u>maj)maj=u}
+  mois.sort();
+  // affaires
+  const AF={};const af=k=>AF[k]||(AF[k]={aff:k,cid:null,cli:'',noms:new Set(),ca:0,cde:0,dateCde:'',achats:0,fours:new Map(),nbf:0,derF:''});
+  for(const f of F){const a=af(f.aff||'(sans commande)');a.ca+=f.ht;a.nbf++;if(!a.cid){a.cid=f.cid;a.cli=f.cli}if(f.cnom)a.noms.add(f.cnom);if(f.date>a.derF)a.derF=f.date}
+  for(const c of C){const a=af(c.aff);a.cde+=c.ht;if(!a.cid){a.cid=c.cid;a.cli=c.cli}if(!a.dateCde||c.date<a.dateCde)a.dateCde=c.date;if(c.nom)a.noms.add(c.nom)}
+  for(const x of A){const a=af(x.aff);a.achats+=x.ht;a.fours.set(x.four,(a.fours.get(x.four)||0)+x.ht)}
+  for(const a of Object.values(AF)){const base=Math.max(a.cde,a.ca);a.taux=base>0?a.achats/base:0;a.marge=a.ca-a.ca*a.taux;
+    a.resteAF=a.cde>0?Math.max(0,a.cde-a.ca):0}
+  return{F,C,A,D,mois,maj,AF};
+}
+function statsPeriode(X){const ms=X.mois;let du=STV.du&&ms.includes(STV.du)?STV.du:ms[0]||'',au=STV.au&&ms.includes(STV.au)?STV.au:ms[ms.length-1]||'';if(du>au)[du,au]=[au,du];
+  const dans=d=>{const m=String(d||'').slice(0,7);return m>=du&&m<=au};return{du,au,dans}}
+function statsClients(){const M={};for(const r of S.rows[MODS.clients.t]||[]){const id=+r['ID Axonaut'];if(id)M[id]=r}return M}
+function statsTable(id,cols,rows,opt={}){
+  const st=STRI[id]||(STRI[id]={k:opt.tri||cols[0].k,d:opt.desc===false?1:-1});
+  const L=[...rows].sort((a,b)=>{const x=a[st.k],y=b[st.k];return(typeof x==='number'||typeof y==='number'?((+x||0)-(+y||0)):String(x??'').localeCompare(String(y??''),'fr'))*st.d});
+  const lim=opt.lim&&!opt.tout?opt.lim:Infinity;
+  let h=`<div class="tw"><table class="l" id="${id}"><thead><tr>${cols.map(c=>`<th class="${c.n?'n':''}" data-k="${c.k}" title="${esc(c.t||'')}">${esc(c.l)}${st.k===c.k?(st.d>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead><tbody>`;
+  h+=L.slice(0,lim).map(r=>`<tr ${opt.lien?`data-h="${esc(opt.lien(r)||'')}"`:''} ${r._cl?`class="${r._cl}"`:''}>${cols.map(c=>`<td class="${c.n?'n':''}${c.p?' prim':''}" ${c.s?`style="${c.s(r)}"`:''}>${c.f?c.f(r[c.k],r):esc(r[c.k]??'')}</td>`).join('')}</tr>`).join('');
+  h+='</tbody>';
+  if(opt.total)h+=`<tfoot><tr>${cols.map((c,i)=>`<td class="${c.n?'n':''}">${i===0?'Total':c.tot?c.tot(L):''}</td>`).join('')}</tr></tfoot>`;
+  h+='</table></div>';
+  if(L.length>lim)h+=`<div class="plus"><button class="btn" data-tout="${id}">Afficher les ${L.length} lignes</button></div>`;
+  if(!L.length)h+='<div class="vide">Aucune donnée sur la période</div>';
+  return h;
+}
+function brancherStatsTables(){
+  document.querySelectorAll('#main table.l thead th[data-k]').forEach(th=>th.onclick=()=>{const id=th.closest('table').id,st=STRI[id];if(!st)return;
+    if(st.k===th.dataset.k)st.d=-st.d;else{st.k=th.dataset.k;st.d=-1}dessinerStats()});
+  document.querySelectorAll('#main table.l tbody tr[data-h]').forEach(tr=>{if(tr.dataset.h)tr.onclick=()=>location.hash=tr.dataset.h;else tr.style.cursor='default'});
+  document.querySelectorAll('#main [data-tout]').forEach(b=>b.onclick=()=>{STRI[b.dataset.tout].tout=true;dessinerStats()});
+}
+function exporterStats(){
+  const t=document.querySelector('#main table.l');if(!t)return;
+  const lig=[...t.querySelectorAll('tr')].filter(tr=>!tr.closest('tr.filtres')).map(tr=>[...tr.children].map(td=>{let v=td.innerText.replace(/[▲▼]/g,'').replace(/\s+/g,' ').trim();
+    if(/^-?[\d\s  ]+(,\d+)?\s?(€|%)?$/.test(v))v=v.replace(/[\s  €%]/g,'');return'"'+v.replace(/"/g,'""')+'"'}).join(';'));
+  const b=new Blob(['﻿'+lig.join('\r\n')],{type:'text/csv;charset=utf-8'}),a=document.createElement('a');
+  a.href=URL.createObjectURL(b);a.download=`akteev-stats-${STV.o}-${auj()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+}
+function grapheStats(ms,series,opt={}){
+  // series : [{n:'CA', v:[...], c:couleur, type:'barre'|'ligne'}]
+  const W=760,H=210,G=44,b=(W-G)/Math.max(ms.length,1),barres=series.filter(s=>s.type!=='ligne');
+  const max=Math.max(1,...series.flatMap(s=>s.v)),min=Math.min(0,...series.flatMap(s=>s.v));
+  const y=v=>H-(v-min)/(max-min)*H*.92;
+  let s=`<svg viewBox="0 0 ${W} ${H+44}" role="img">`;
+  for(let i=0;i<=4;i++){const v=min+(max-min)/0.92*i/4*0.92;const Y=y(v);s+=`<line x1="${G}" x2="${W}" y1="${Y}" y2="${Y}" stroke="#EEF0F4"/><text x="${G-6}" y="${Y+4}" text-anchor="end" font-size="10" fill="#8A93A6">${Math.abs(v)>=1000?Math.round(v/1000)+'k':Math.round(v)}</text>`}
+  if(min<0)s+=`<line x1="${G}" x2="${W}" y1="${y(0)}" y2="${y(0)}" stroke="#C9CFDA"/>`;
+  ms.forEach((m,i)=>{const X0=G+i*b,bw=b*.72/Math.max(barres.length,1);
+    barres.forEach((se,j)=>{const v=se.v[i]||0,y1=y(Math.max(v,0)),y2=y(Math.min(v,0));
+      s+=`<rect x="${X0+b*.14+j*bw}" y="${y1}" width="${bw-1}" height="${Math.max(y2-y1,1)}" rx="3" fill="${se.c}"><title>${MOIS_LONG(m)} – ${se.n} : ${eur(v)}</title></rect>`});
+    s+=`<text x="${X0+b/2}" y="${H+16}" text-anchor="middle" font-size="11" fill="#6B7385">${MOIS_COURT(m)}</text>`});
+  series.filter(se=>se.type==='ligne').forEach(se=>{const pts=ms.map((m,i)=>`${G+i*b+b/2},${y(se.v[i]||0)}`);
+    s+=`<polyline points="${pts.join(' ')}" fill="none" stroke="${se.c}" stroke-width="2.2"/>`+ms.map((m,i)=>`<circle cx="${G+i*b+b/2}" cy="${y(se.v[i]||0)}" r="3.5" fill="${se.c}"><title>${MOIS_LONG(m)} – ${se.n} : ${eur(se.v[i])}</title></circle>`).join('')});
+  s+=`<g font-size="11.5" fill="#4A5366">${series.map((se,i)=>`<rect x="${G+i*150}" y="${H+28}" width="11" height="11" rx="2" fill="${se.c}"/><text x="${G+i*150+16}" y="${H+38}">${esc(se.n)}</text>`).join('')}</g>`;
+  return s+'</svg>';
+}
+async function vueStats(){
+  document.title='Akteev – Statistiques';
+  if(!S.rows[T_STATS])chargement();
+  await Promise.all([charger(T_STATS),charger(MODS.clients.t).catch(()=>[]),charger(MODS.commandes.t).catch(()=>[])]);
+  dessinerStats();
+}
+function dessinerStats(){
+  const X=statsDonnees(),P=statsPeriode(X),CL=statsClients(),pr=params();
+  if(!X.mois.length){$('main').innerHTML=`<div class="entete"><h1>Statistiques</h1></div><div class="card vide">Aucune donnée Axonaut pour l’instant : la tâche planifiée « Stats Axonaut → Akteev » remplit la table Baserow « Stats Axonaut ».</div>`;return}
+  const an=X.mois[0].slice(0,4),Fp=X.F.filter(f=>P.dans(f.date)),Cp=X.C.filter(c=>P.dans(c.date)),Dp=X.D.filter(d=>P.dans(d.date)),Ap=X.A.filter(a=>P.dans(a.date));
+  const tx=f=>(X.AF[f.aff||'(sans commande)']?.taux)||0;
+  const ca=Fp.reduce((s,f)=>s+f.ht,0),achI=Fp.reduce((s,f)=>s+f.ht*tx(f),0),marge=ca-achI,cde=Cp.reduce((s,c)=>s+c.ht,0);
+  const dep=Dp.reduce((s,d)=>s+d.ht,0),a=auj();
+  const enc=X.F.filter(f=>f.reste>0.005),echu=enc.filter(f=>f.ech&&f.ech<a);
+  const engNF=Object.values(X.AF).filter(x=>x.achats>0&&x.ca===0);
+  const msP=X.mois.filter(m=>m>=P.du&&m<=P.au);
+  const cliNom=cid=>{const r=CL[cid];return r?txt(r.Entreprise)||txt(r[sch(MODS.clients.t).prim]):''};
+  const lienCli=cid=>CL[cid]?`#/clients/${CL[cid].id}`:'';
+  const cdeAkteev={};for(const r of S.rows[MODS.commandes.t]||[]){const k=String(txt(r['N° affaire'])).trim().split(/\s+/)[0].toUpperCase();if(k)cdeAkteev[k]=r.id}
+  const ong=[['mois','Par mois'],['clients','Par client'],['affaires','Par affaire'],['depenses','Dépenses'],['encours','Encours clients']];
+  const o=pr.c?'client':ong.some(x=>x[0]===STV.o)?STV.o:'mois';
+  const optM=sel=>X.mois.map(m=>`<option value="${m}" ${m===sel?'selected':''}>${MOIS_LONG(m)}</option>`).join('');
+  let h=`<div class="entete"><h1>Statistiques ${an}</h1><span class="sous">Données comptables Axonaut · mises à jour le ${dtfr(X.maj)||'—'}</span>
+    <div class="act"><button class="btn" id="stMaj">${ico('cal')}Recharger</button><button class="btn" id="stCsv">${ico('dl')}Export CSV</button></div></div>
+  <div class="card" style="margin-bottom:16px"><div class="outils">
+    <span class="mut">Période</span><select id="stDu">${optM(P.du)}</select><span class="mut">→</span><select id="stAu">${optM(P.au)}</select>
+    <div class="puces"><button class="puce" data-per="an">Année</button>${[1,2,3,4].map(t=>`<button class="puce" data-per="T${t}">T${t}</button>`).join('')}<button class="puce" data-per="dernier">Dernier mois</button></div>
+  </div></div>
+  <div class="kpis">
+   <div class="card kpi" data-o="mois"><div class="lab">${ico('euro')}CA facturé HT</div><div class="val">${keur(ca)}</div><div class="det">${Fp.length} facture(s) · ${new Set(Fp.map(f=>f.cid)).size} client(s)</div></div>
+   <div class="card kpi" data-o="affaires"><div class="lab">${ico('commandes')}Prise de commandes HT</div><div class="val">${keur(cde)}</div><div class="det">${Cp.length} commande(s) · ratio facturé / commandé ${cde?pct(ca/cde):'—'}</div></div>
+   <div class="card kpi" data-o="affaires"><div class="lab" style="color:#15803D">${ico('arc')}Marge sur achats</div><div class="val" style="color:#15803D">${keur(marge)}</div><div class="det">${pct(ca?marge/ca:NaN)} du CA · achats imputés ${keur(achI)}</div></div>
+   <div class="card kpi" data-o="depenses"><div class="lab">${ico('cf')}Dépenses enregistrées HT</div><div class="val">${keur(dep)}</div><div class="det">${Dp.length} facture(s) fournisseur · CF passées ${keur(Ap.reduce((s,x)=>s+x.ht,0))}</div></div>
+   <div class="card kpi" data-o="encours"><div class="lab" style="${echu.length?'color:var(--err)':''}">${ico('alerte')}Encours clients TTC</div><div class="val">${keur(enc.reduce((s,f)=>s+f.reste,0))}</div><div class="det">${echu.length?`<b style="color:var(--err)">${keur(echu.reduce((s,f)=>s+f.reste,0))} échu</b> · `:''}${enc.length} facture(s) non soldée(s)</div></div>
+  </div>
+  <div class="card"><div class="onglets">${ong.map(([k,n])=>`<button data-o="${k}" class="${o===k?'on':''}">${n}</button>`).join('')}${o==='client'?`<button class="on">${esc(cliNom(+pr.c)||X.F.find(f=>f.cid==pr.c)?.cli||'Client')}</button>`:''}</div>`;
+  // ----- par mois
+  if(o==='mois'){
+    const L=msP.map(m=>{const f=Fp.filter(x=>x.date.startsWith(m)),c=Cp.filter(x=>x.date.startsWith(m)),d=Dp.filter(x=>x.date.startsWith(m));
+      const ca=f.reduce((s,x)=>s+x.ht,0),ach=f.reduce((s,x)=>s+x.ht*tx(x),0);
+      return{m,mois:MOIS_LONG(m),ca,cde:c.reduce((s,x)=>s+x.ht,0),ach,marge:ca-ach,taux:ca?(ca-ach)/ca:NaN,dep:d.reduce((s,x)=>s+x.ht,0),nf:f.length,nc:new Set(f.map(x=>x.cid)).size}});
+    let cum=0;L.forEach(r=>{cum+=r.ca;r.cum=cum});
+    h+=`<div class="graph">${grapheStats(msP,[{n:'CA facturé',v:L.map(r=>r.ca),c:STATS_COUL.ca},{n:'Commandé',v:L.map(r=>r.cde),c:STATS_COUL.cde},{n:'Marge sur achats',v:L.map(r=>r.marge),c:STATS_COUL.marge,type:'ligne'},{n:'Dépenses',v:L.map(r=>r.dep),c:STATS_COUL.dep,type:'ligne'}])}</div>`;
+    const S0=k=>L2=>eur(L2.reduce((s,r)=>s+(+r[k]||0),0));
+    h+=statsTable('stMois',[{k:'m',l:'Mois',f:(v,r)=>esc(r.mois),p:1},{k:'ca',l:'CA facturé HT',n:1,f:eur,tot:S0('ca')},{k:'cum',l:'Cumul CA',n:1,f:eur},{k:'cde',l:'Commandé HT',n:1,f:eur,tot:S0('cde')},
+      {k:'ach',l:'Achats imputés',n:1,f:eur,tot:S0('ach'),t:'Commandes fournisseurs des affaires, au prorata du facturé'},{k:'marge',l:'Marge sur achats',n:1,f:v=>`<b style="color:#15803D">${eur(v)}</b>`,tot:S0('marge')},
+      {k:'taux',l:'Taux',n:1,f:pct,tot:L2=>{const c=L2.reduce((s,r)=>s+r.ca,0);return pct(c?L2.reduce((s,r)=>s+r.marge,0)/c:NaN)}},{k:'dep',l:'Dépenses HT',n:1,f:eur,tot:S0('dep'),t:'Factures fournisseurs saisies dans Axonaut (toutes catégories)'},
+      {k:'nf',l:'Factures',n:1,tot:L2=>L2.reduce((s,r)=>s+r.nf,0)},{k:'nc',l:'Clients',n:1}],L,{tri:'m',desc:false,total:true});
+    const com={};Fp.forEach(f=>{const k=f.com||'—';(com[k] ||= {com:k,ca:0,nf:0,marge:0});com[k].ca+=f.ht;com[k].nf++;com[k].marge+=f.ht*(1-tx(f))});
+    h+=`<h3 style="font-size:14px;margin:18px 16px 6px">CA par commercial (Axonaut)</h3>`+statsTable('stCom',[{k:'com',l:'Commercial',p:1},{k:'ca',l:'CA facturé HT',n:1,f:eur},{k:'part',l:'Part',n:1,f:pct},{k:'marge',l:'Marge sur achats',n:1,f:eur},{k:'nf',l:'Factures',n:1}],
+      Object.values(com).map(r=>({...r,part:ca?r.ca/ca:0})),{tri:'ca'});
+  }
+  // ----- par client
+  if(o==='clients'){
+    const q=norm(STV.q||'');const M={};
+    for(const f of Fp){const k=f.cid||f.cli;const c=M[k]||(M[k]={cid:f.cid,cli:cliNom(f.cid)||f.cli,code:txt(CL[f.cid]?.['Code client']),ca:0,ach:0,nf:0,der:'',cde:0,reste:0,echu:0,mois:{},affs:new Set()});
+      c.ca+=f.ht;c.ach+=f.ht*tx(f);c.nf++;if(f.date>c.der)c.der=f.date;c.mois[f.date.slice(0,7)]=(c.mois[f.date.slice(0,7)]||0)+f.ht;if(f.aff)c.affs.add(f.aff)}
+    for(const x of Cp){const k=x.cid||x.cli;const c=M[k]||(M[k]={cid:x.cid,cli:cliNom(x.cid)||x.cli,code:txt(CL[x.cid]?.['Code client']),ca:0,ach:0,nf:0,der:'',cde:0,reste:0,echu:0,mois:{},affs:new Set()});c.cde+=x.ht}
+    for(const f of enc){const c=M[f.cid||f.cli];if(c){c.reste+=f.reste;if(f.ech&&f.ech<a)c.echu+=f.reste}}
+    let L=Object.values(M).map(c=>({...c,marge:c.ca-c.ach,taux:c.ca?(c.ca-c.ach)/c.ca:NaN,part:ca?c.ca/ca:0,naf:c.affs.size,...Object.fromEntries(msP.map(m=>['m'+m,c.mois[m]||0]))}));
+    if(q)L=L.filter(c=>norm(c.cli+' '+c.code).includes(q));
+    h+=`<div class="outils"><div class="rech">${ico('loupe')}<input id="stQ" placeholder="Filtrer les clients" value="${esc(STV.q||'')}"></div>
+      <div class="puces"><button class="puce ${!STV.mat?'on':''}" data-mat="0">Synthèse</button><button class="puce ${STV.mat?'on':''}" data-mat="1">CA mois par mois</button></div><span class="mut">${L.length} client(s)</span></div>`;
+    const S0=k=>L2=>eur(L2.reduce((s,r)=>s+(+r[k]||0),0));
+    const lien=r=>`#/stats?c=${encodeURIComponent(r.cid||'')}`;
+    if(STV.mat)h+=statsTable('stCliM',[{k:'cli',l:'Client',p:1},...msP.map(m=>({k:'m'+m,l:MOIS_COURT(m),n:1,f:v=>v?keur(v):'<span class="mut">·</span>',tot:S0('m'+m)})),{k:'ca',l:'Total HT',n:1,f:v=>`<b>${eur(v)}</b>`,tot:S0('ca')},{k:'marge',l:'Marge',n:1,f:v=>`<span style="color:#15803D">${keur(v)}</span>`,tot:S0('marge')}],L,{tri:'ca',total:true,lien});
+    else h+=statsTable('stCli',[{k:'cli',l:'Client',p:1},{k:'code',l:'Code'},{k:'ca',l:'CA facturé HT',n:1,f:eur,tot:S0('ca')},{k:'part',l:'Part du CA',n:1,f:pct},{k:'marge',l:'Marge sur achats',n:1,f:v=>`<b style="color:#15803D">${eur(v)}</b>`,tot:S0('marge')},
+      {k:'taux',l:'Taux',n:1,f:pct,s:r=>r.taux<.3?'color:var(--err)':''},{k:'cde',l:'Commandé HT',n:1,f:eur,tot:S0('cde')},{k:'nf',l:'Factures',n:1},{k:'naf',l:'Affaires',n:1},
+      {k:'reste',l:'Reste dû TTC',n:1,f:(v,r)=>v?`${eur(v)}${r.echu?`<div style="color:var(--err);font-size:11.5px">${eur(r.echu)} échu</div>`:''}`:'<span class="mut">—</span>',tot:S0('reste')},{k:'der',l:'Dernière facture',f:dfr}],L,{tri:'ca',total:true,lien});
+  }
+  // ----- détail d'un client
+  if(o==='client'){
+    const cid=+pr.c,f=X.F.filter(x=>x.cid===cid),fP=f.filter(x=>P.dans(x.date)),c=X.C.filter(x=>x.cid===cid);
+    const caC=fP.reduce((s,x)=>s+x.ht,0),achC=fP.reduce((s,x)=>s+x.ht*tx(x),0),encC=f.filter(x=>x.reste>0.005);
+    h+=`<div style="padding:14px 16px;display:flex;gap:28px;flex-wrap:wrap;border-bottom:1px solid var(--trait)">
+      <div><div class="mut" style="font-size:12px">CA facturé HT</div><b style="font-size:18px">${eur(caC)}</b> <span class="mut">${ca?pct(caC/ca)+' du CA':''}</span></div>
+      <div><div class="mut" style="font-size:12px">Marge sur achats</div><b style="font-size:18px;color:#15803D">${eur(caC-achC)}</b> <span class="mut">${pct(caC?(caC-achC)/caC:NaN)}</span></div>
+      <div><div class="mut" style="font-size:12px">Commandé HT</div><b style="font-size:18px">${eur(c.filter(x=>P.dans(x.date)).reduce((s,x)=>s+x.ht,0))}</b></div>
+      <div><div class="mut" style="font-size:12px">Reste dû TTC</div><b style="font-size:18px">${eur(encC.reduce((s,x)=>s+x.reste,0))}</b></div>
+      <div style="margin-left:auto;display:flex;gap:8px;align-items:center">${lienCli(cid)?`<a class="btn" href="${lienCli(cid)}">${ico('clients')}Fiche client</a>`:''}<a class="btn" href="#/stats">${ico('retour')}Tous les clients</a></div></div>`;
+    h+=`<div class="graph">${grapheStats(msP,[{n:'CA facturé',v:msP.map(m=>fP.filter(x=>x.date.startsWith(m)).reduce((s,x)=>s+x.ht,0)),c:STATS_COUL.ca},{n:'Commandé',v:msP.map(m=>c.filter(x=>x.date.startsWith(m)).reduce((s,x)=>s+x.ht,0)),c:STATS_COUL.cde},{n:'Marge sur achats',v:msP.map(m=>fP.filter(x=>x.date.startsWith(m)).reduce((s,x)=>s+x.ht*(1-tx(x)),0)),c:STATS_COUL.marge,type:'ligne'}])}</div>`;
+    const affs=[...new Set([...fP.map(x=>x.aff),...c.filter(x=>P.dans(x.date)).map(x=>x.aff)])].map(k=>X.AF[k||'(sans commande)']).filter(Boolean);
+    h+=`<h3 style="font-size:14px;margin:12px 16px 6px">Affaires</h3>`+tableAffaires('stCliAff',affs,cdeAkteev);
+    h+=`<h3 style="font-size:14px;margin:18px 16px 6px">Factures</h3>`+statsTable('stCliF',[{k:'num',l:'N° facture',p:1},{k:'date',l:'Date',f:dfr},{k:'aff',l:'Affaire'},{k:'ht',l:'HT',n:1,f:eur,tot:L2=>eur(L2.reduce((s,r)=>s+r.ht,0))},{k:'ttc',l:'TTC',n:1,f:eur},
+      {k:'reste',l:'Reste dû',n:1,f:(v,r)=>v>0.005?`<span style="${r.ech&&r.ech<a?'color:var(--err);font-weight:600':''}">${eur(v)}</span>`:'<span style="color:#15803D">Payée</span>'},{k:'ech',l:'Échéance',f:dfr},{k:'paye',l:'Payée le',f:dfr},{k:'com',l:'Commercial'}],fP,{tri:'date',total:true});
+  }
+  // ----- par affaire
+  if(o==='affaires'){
+    const q=norm(STV.q||'');
+    let L=Object.values(X.AF).filter(x=>Fp.some(f=>(f.aff||'(sans commande)')===x.aff)||Cp.some(c=>c.aff===x.aff)||Ap.some(y=>y.aff===x.aff));
+    if(q)L=L.filter(x=>norm([x.aff,x.cli,cliNom(x.cid),...x.noms,...x.fours.keys()].join(' ')).includes(q));
+    h+=`<div class="outils"><div class="rech">${ico('loupe')}<input id="stQ" placeholder="Filtrer (affaire, client, fournisseur)" value="${esc(STV.q||'')}"></div><span class="mut">${L.length} affaire(s) · marge calculée sur l’affaire entière (tout le facturé ${an} et toutes ses commandes fournisseurs)${engNF.length?` · ${engNF.length} affaire(s) avec achats non encore facturées (${keur(engNF.reduce((s,x)=>s+x.achats,0))})`:''}</span></div>`;
+    h+=tableAffaires('stAff',L,cdeAkteev,cliNom);
+  }
+  // ----- dépenses
+  if(o==='depenses'){
+    const cats=[...new Set(X.D.map(d=>d.cat))].sort((x,y)=>x.localeCompare(y,'fr'));
+    const L=cats.map(c=>{const d=Dp.filter(x=>x.cat===c);return{cat:c,tot:d.reduce((s,x)=>s+x.ht,0),n:d.length,part:dep?d.reduce((s,x)=>s+x.ht,0)/dep:0,...Object.fromEntries(msP.map(m=>['m'+m,d.filter(x=>x.date.startsWith(m)).reduce((s,x)=>s+x.ht,0)]))}});
+    const S0=k=>L2=>keur(L2.reduce((s,r)=>s+(+r[k]||0),0));
+    h+=`<div class="outils"><span class="mut">Factures fournisseurs saisies dans Axonaut, classées par catégorie selon le fournisseur. Les commandes fournisseurs des affaires (Rogle, Kingvow, Coste…) servent au calcul des marges ; leurs factures n’y sont pas toutes saisies.</span></div>`;
+    h+=statsTable('stDep',[{k:'cat',l:'Catégorie',p:1},...msP.map(m=>({k:'m'+m,l:MOIS_COURT(m),n:1,f:v=>v?keur(v):'<span class="mut">·</span>',tot:S0('m'+m)})),{k:'tot',l:'Total HT',n:1,f:v=>`<b>${eur(v)}</b>`,tot:L2=>eur(L2.reduce((s,r)=>s+r.tot,0))},{k:'part',l:'Part',n:1,f:pct}],L,{tri:'tot',total:true});
+    const four={};Dp.forEach(d=>{(four[d.four] ||= {four:d.four,cat:d.cat,ht:0,n:0,np:0});four[d.four].ht+=d.ht;four[d.four].n++;if(!d.payee)four[d.four].np++});
+    const cf={};Ap.forEach(x=>{(cf[x.four] ||= 0);cf[x.four]+=x.ht});
+    const LF=Object.values(four);Object.keys(cf).forEach(k=>{if(!four[k])LF.push({four:k,cat:'(commandes seules)',ht:0,n:0,np:0})});LF.forEach(r=>r.cf=cf[r.four]||0);
+    h+=`<h3 style="font-size:14px;margin:18px 16px 6px">Par fournisseur</h3>`+statsTable('stFour',[{k:'four',l:'Fournisseur',p:1},{k:'cat',l:'Catégorie'},{k:'ht',l:'Factures HT',n:1,f:eur,tot:L2=>eur(L2.reduce((s,r)=>s+r.ht,0))},{k:'n',l:'Nb',n:1},{k:'np',l:'Non payées',n:1},{k:'cf',l:'Commandes fournisseurs HT',n:1,f:v=>v?eur(v):'<span class="mut">—</span>',tot:L2=>eur(L2.reduce((s,r)=>s+r.cf,0))}],LF,{tri:'ht',total:true,lim:40});
+  }
+  // ----- encours
+  if(o==='encours'){
+    const L=enc.map(f=>({...f,cliN:cliNom(f.cid)||f.cli,retard:f.ech&&f.ech<a?Math.round((new Date(a)-new Date(f.ech))/864e5):0,_cl:''}));
+    h+=`<div class="outils"><span class="mut">Toutes les factures ${an} non soldées (quelle que soit la période choisie). En rouge : échéance dépassée.</span></div>`;
+    h+=statsTable('stEnc',[{k:'num',l:'N° facture',p:1},{k:'cliN',l:'Client'},{k:'aff',l:'Affaire'},{k:'date',l:'Date',f:dfr},{k:'ech',l:'Échéance',f:(v,r)=>`<span class="${r.retard?'retard':''}">${dfr(v)}</span>`},
+      {k:'retard',l:'Retard',n:1,f:v=>v?`<span class="retard">${v} j</span>`:'<span class="mut">—</span>'},{k:'ttc',l:'TTC',n:1,f:eur},{k:'reste',l:'Reste dû',n:1,f:v=>`<b>${eur(v)}</b>`,tot:L2=>eur(L2.reduce((s,r)=>s+r.reste,0))},{k:'com',l:'Commercial'}],L,{tri:'retard',total:true,lien:r=>`#/stats?c=${r.cid}`});
+  }
+  h+=`<div class="plus mut" style="font-size:12.5px;text-align:left">Marge sur achats = CA facturé − commandes fournisseurs (sous-traitance, achats) rattachées à l’affaire dans Axonaut ; le temps atelier, la matière et les frais non rattachés à une affaire n’y sont pas déduits. Avoirs inclus (montants négatifs). Montants HT sauf encours (TTC).</div></div>`;
+  $('main').innerHTML=h;
+  brancherStatsTables();
+  const majP=()=>{STV.du=$('stDu').value;STV.au=$('stAu').value;ls.set('stv',STV);dessinerStats()};
+  $('stDu').onchange=majP;$('stAu').onchange=majP;
+  document.querySelectorAll('[data-per]').forEach(b=>b.onclick=()=>{const p=b.dataset.per,ms=X.mois;
+    if(p==='an'){STV.du=ms[0];STV.au=ms[ms.length-1]}else if(p==='dernier'){STV.du=STV.au=ms[ms.length-1]}else{const t=+p[1];STV.du=`${an}-${String(t*3-2).padStart(2,'0')}`;STV.au=`${an}-${String(t*3).padStart(2,'0')}`;
+      if(!ms.includes(STV.du))STV.du=ms[0];if(!ms.includes(STV.au))STV.au=ms[ms.length-1]}
+    ls.set('stv',STV);dessinerStats()});
+  document.querySelectorAll('.onglets button[data-o],.kpi[data-o]').forEach(b=>b.onclick=()=>{STV.o=b.dataset.o;ls.set('stv',STV);if(location.hash!=='#/stats')location.hash='#/stats';else dessinerStats()});
+  document.querySelectorAll('[data-mat]').forEach(b=>b.onclick=()=>{STV.mat=b.dataset.mat==='1';ls.set('stv',STV);dessinerStats()});
+  const q=$('stQ');if(q)q.oninput=()=>{STV.q=q.value;ls.set('stv',STV);dessinerStats();const n=$('stQ');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
+  $('stCsv').onclick=exporterStats;
+  $('stMaj').onclick=async()=>{$('stMaj').disabled=true;try{await charger(T_STATS,true);dessinerStats();toast('Statistiques rechargées')}catch(e){toast('Échec : '+e.message,true);$('stMaj').disabled=false}};
+}
+function tableAffaires(id,L,cdeAkteev,cliNom=()=>''){
+  const R=L.map(x=>({...x,cliN:cliNom(x.cid)||x.cli,fourT:[...x.fours.entries()].sort((a,b)=>b[1]-a[1]).map(([f,v])=>f.replace(/(DONGGUAN|CO\.?,?LTD|PRECISION|TOOL AND DIE|METAL TOOL|INDUSTRIES?|SAS)\b/gi,'').replace(/\s+/g,' ').trim()+' '+keur(v)).join(' · '),
+    tauxM:x.ca?x.marge/x.ca:NaN,partiel:x.resteAF>0.5}));
+  const S0=k=>L2=>eur(L2.reduce((s,r)=>s+(+r[k]||0),0));
+  return statsTable(id,[{k:'aff',l:'Affaire',p:1,f:(v,r)=>esc(v)+([...r.noms].find(n=>n!==v&&n.startsWith(v))?` <span class="mut" style="font-weight:400">${esc([...r.noms].find(n=>n!==v&&n.startsWith(v)).slice(v.length).trim())}</span>`:'')},
+    {k:'cliN',l:'Client'},{k:'dateCde',l:'Commande',f:dfr},{k:'cde',l:'Commandé HT',n:1,f:v=>v?eur(v):'<span class="mut">—</span>',tot:S0('cde')},
+    {k:'ca',l:'Facturé HT',n:1,f:(v,r)=>`${eur(v)}${r.partiel?`<div class="mut" style="font-size:11.5px">reste ${keur(r.resteAF)}</div>`:''}`,tot:S0('ca')},
+    {k:'achats',l:'Achats (CF) HT',n:1,f:v=>v?eur(v):'<span class="mut">—</span>',tot:S0('achats')},{k:'fourT',l:'Fournisseurs',f:v=>`<span class="mut" style="font-size:12px">${esc(v)}</span>`},
+    {k:'marge',l:'Marge sur achats',n:1,f:v=>`<b style="color:${v<0?'var(--err)':'#15803D'}">${eur(v)}</b>`,tot:S0('marge')},{k:'tauxM',l:'Taux',n:1,f:pct,s:r=>r.tauxM<.3?'color:var(--err)':''}],
+    R,{tri:'ca',total:true,lim:150,lien:r=>cdeAkteev[r.aff]?`#/commandes/${cdeAkteev[r.aff]}`:''});
 }
 
 /* ---------- Liste ---------- */
