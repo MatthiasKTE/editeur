@@ -1237,30 +1237,108 @@ async function editerLigne(t,x,r){
       const p=await api(`/rows/table/${SALE.t}/${SALE.row.id}/?user_field_names=true`);majRow(SALE.t,p);SALE.row=p;dessinerFiche();dessinerLiees(ONG)}catch(e){toast('Échec : '+e.message,true)}};
 }
 
-/* ---------- Documents de l'affaire : PDF des devis, ARC, BL, commandes fournisseurs, synthèse ---------- */
+/* ---------- Documents de l'affaire : tous les PDF liés à une commande ----------
+   Commande client (devis, ARC, BL), commandes fournisseurs (+ offre retenue), devis des fournisseurs reçus en
+   consultation (Consultations SST : fichiers archivés dans « Dossier réponses »), PDF des tâches (généré à la volée),
+   synthèse. Chaque fichier se télécharge seul, ou tous d'un coup (« Tout télécharger »). */
+const urlDl=u=>/sharepoint\.com/i.test(u)&&!/[?&]download=/.test(u)?u+(u.includes('?')?'&':'?')+'download=1':u;
+const extDe=u=>{const m=decodeURIComponent(String(u).split(/[?#]/)[0]).match(/\.([a-z0-9]{2,5})$/i);return m?m[1].toUpperCase():''};
+let DOCS_AFF=[];
 async function documentsAffaire(cde){
   const n=txt(cde['N° affaire']);
-  const vis=['devis','arc','bl','cf'].filter(peutVoir);
-  const T=await Promise.all(vis.map(k=>charger(MODS[k].t).catch(()=>[])));const D={};vis.forEach((k,i)=>D[k]=T[i]);
+  const vis=['devis','arc','bl','cf','consult','taches'].filter(k=>MODS[k]&&peutVoir(k));
+  const T=await Promise.all(vis.map(k=>charger(MODS[k].t).catch(()=>null)));const D={};vis.forEach((k,i)=>{if(T[i])D[k]=T[i]});
   if(SALE?.row?.id!==cde.id||!$('docsAff'))return;
   const lie=(r,champ)=>ids(r[champ]).includes(cde.id);
-  const groupes=[];
-  if(D.devis)groupes.push(['devis','Devis',D.devis.filter(r=>lie(r,'Commande')||ids(cde.Devis).includes(r.id)||txt(r['N° devis'])===n)]);
-  if(D.arc)groupes.push(['arc','ARC',D.arc.filter(r=>lie(r,'Affaire')||txt(r['N° ARC'])==='ARC-'+n)]);
-  if(D.bl)groupes.push(['bl','BL',D.bl.filter(r=>lie(r,'Affaire')||String(txt(r['N° BL'])).startsWith('BL-'+n+'-'))]);
-  if(D.cf)groupes.push(['cf','Commandes fournisseurs',D.cf.filter(r=>lie(r,'Affaire'))]);
-  let h='';
-  for(const [k,nom,L] of groupes){if(!L.length)continue;const m=MODS[k];
-    L.sort((a,b)=>String(txt(a[m.num])).localeCompare(String(txt(b[m.num]))));
-    for(const r of L){const num=txt(r[m.num]),pdf=r.PDF,v=r.Version?' v.'+nb(r.Version):'';
-      h+=`<div class="lien" style="justify-content:space-between"><a href="#/${k}/${r.id}" style="color:var(--txt)">${ico(m.ico)}<b style="margin-left:6px">${esc(num)}</b><span class="mut">${esc(v)}</span></a>
-        ${pdf?`<a class="btn" style="padding:3px 9px" href="${esc(pdf)}" target="_blank" title="Ouvrir le PDF enregistré">${ico('pdf')}PDF</a>`:m.editeur?`<a class="btn" style="padding:3px 9px" href="${EDITEUR}?${m.editeur}=${encodeURIComponent(num)}" target="_blank" title="Pas encore de PDF enregistré : ouvrir dans l’éditeur pour l’imprimer">${ico('ext')}Éditeur</a>`:'<span class="mut" style="font-size:12px">pas de PDF</span>'}</div>`;
-      if(k==='cf'&&r['Devis fournisseur (PDF)'])h+=`<a class="lien" href="${esc(r['Devis fournisseur (PDF)'])}" target="_blank" style="padding-left:38px">${ico('pdf')}Offre fournisseur ${esc(num)}</a>`}}
-  if(peutVoir('devis')&&cde['PDF devis Axonaut'])h+=`<a class="lien" href="${esc(cde['PDF devis Axonaut'])}" target="_blank">${ico('pdf')}Devis Axonaut (PDF)</a>`;
-  if(cde['Synthèse PDF'])h+=`<a class="lien" href="${esc(cde['Synthèse PDF'])}" target="_blank">${ico('pdf')}Synthèse des pièces${cde['Synthèse version']?' v.'+nb(cde['Synthèse version']):''} (PDF)</a>`;
-  if(cde['Synthèse Excel'])h+=`<a class="lien" href="${esc(cde['Synthèse Excel'])}" target="_blank">${ico('dl')}Synthèse des pièces (Excel)</a>`;
+  const tri=k=>(a,b)=>String(txt(a[MODS[k].num])).localeCompare(String(txt(b[MODS[k].num])));
+  const G=[],docs=[];
+  const doc=(o)=>{if(o.url||o.gen)docs.push(o);return o};
+  /* 1. Commande client */
+  const cli=[];
+  const devis=D.devis?D.devis.filter(r=>lie(r,'Commande')||ids(cde.Devis).includes(r.id)||txt(r['N° devis'])===n).sort(tri('devis')):[];
+  const ligneEd=(k,r)=>{const m=MODS[k],num=txt(r[m.num]),v=r.Version?' v.'+nb(r.Version):'';
+    cli.push(doc({k,id:r.id,ico:m.ico,lab:num,sous:v,url:r.PDF||'',nom:num+'.pdf',ed:!r.PDF&&m.editeur?`${EDITEUR}?${m.editeur}=${encodeURIComponent(num)}`:''}))};
+  devis.forEach(r=>ligneEd('devis',r));
+  if(peutVoir('devis')&&cde['PDF devis Axonaut'])cli.push(doc({ico:'pdf',lab:'Devis Axonaut',url:cde['PDF devis Axonaut']}));
+  if(D.arc)D.arc.filter(r=>lie(r,'Affaire')||txt(r['N° ARC'])==='ARC-'+n).sort(tri('arc')).forEach(r=>ligneEd('arc',r));
+  if(D.bl)D.bl.filter(r=>lie(r,'Affaire')||String(txt(r['N° BL'])).startsWith('BL-'+n+'-')).sort(tri('bl')).forEach(r=>ligneEd('bl',r));
+  if(cli.length)G.push(['Commande client',cli]);
+  /* 2. Commandes fournisseurs */
+  if(D.cf){const L=[];
+    for(const r of D.cf.filter(r=>lie(r,'Affaire')&&!/annul/i.test(txt(r.Statut))).sort(tri('cf'))){const num=txt(r['N° CF']),fo=txt(r.Fournisseur);
+      L.push(doc({k:'cf',id:r.id,ico:'cf',lab:num,sous:fo,url:r.PDF||'',nom:num+'.pdf'}));
+      if(r['Devis fournisseur (PDF)'])L.push(doc({ico:'pdf',lab:'Offre retenue'+(r['Réf. devis fournisseur']?' '+txt(r['Réf. devis fournisseur']):''),sous:fo,url:r['Devis fournisseur (PDF)'],ind:true}));
+      for(const f of (Array.isArray(r['Devis fournisseur (fichier)'])?r['Devis fournisseur (fichier)']:[]))if(f?.url)L.push(doc({ico:'pdf',lab:f.visible_name||f.name||'Offre fournisseur',sous:fo,url:f.url,nom:f.visible_name,ind:true}))}
+    if(L.length)G.push(['Commandes fournisseurs',L])}
+  /* 3. Devis des fournisseurs (réponses aux consultations SST du devis de l'affaire) */
+  if(D.consult&&devis.length){const dv=new Set(devis.map(r=>r.id)),L=[];
+    const C=D.consult.filter(r=>ids(r.Devis).some(i=>dv.has(i))&&!/annul/i.test(txt(r['Réponse'])))
+      .sort((a,b)=>String(txt(a.Fournisseur)).localeCompare(String(txt(b.Fournisseur))));
+    for(const r of C){const fo=txt(r.Fournisseur)||txt(r['Réf']),rep=txt(r['Réponse'])||'En attente',dos=r['Dossier réponses']||'';
+      const fic=String(r['Fichiers archivés']||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+      const mt=r.Montant!=null&&r.Montant!==''?' · '+nb(r.Montant)+' '+(txt(r.Devise)||'EUR'):'';
+      L.push({ico:'ddp',lab:fo,sous:rep+mt,titre:true,k:'consult',id:r.id,dossier:dos});
+      if(dos)for(const f of fic)L.push(doc({ico:'pdf',lab:f,sous:'',url:dos.replace(/\/+$/,'')+'/'+encodeURIComponent(f),nom:f,ind:true}))}
+    if(L.length)G.push(['Devis fournisseurs',L])}
+  /* 4. Tâches : PDF généré à partir de Baserow */
+  if(D.taches){const TT=D.taches.filter(r=>lie(r,'Commande')&&!/annul/i.test(txt(r.Statut)));
+    if(TT.length)G.push(['Tâches',[doc({ico:'taches',lab:`Tâches ${n}`,sous:`${TT.length} tâche(s) – PDF généré`,gen:()=>pdfTaches(cde,TT),nom:`Taches_${n}.pdf`})]])}
+  /* 5. Synthèse */
+  const sy=[];
+  if(cde['Synthèse PDF'])sy.push(doc({ico:'pdf',lab:'Synthèse des pièces'+(cde['Synthèse version']?' v.'+nb(cde['Synthèse version']):''),url:cde['Synthèse PDF']}));
+  if(cde['Synthèse Excel'])sy.push(doc({ico:'dl',lab:'Synthèse des pièces (Excel)',url:cde['Synthèse Excel']}));
+  if(sy.length)G.push(['Synthèse',sy]);
+  DOCS_AFF=docs;
+  const btn=(d,i)=>d.gen?`<button class="btn" style="padding:3px 9px" data-dl="${i}" title="Générer et télécharger le PDF">${ico('dl')}PDF</button>`
+    :d.url?`<span style="display:flex;gap:4px"><a class="btn" style="padding:3px 7px" href="${esc(d.url)}" target="_blank" title="Ouvrir">${ico('ext')}</a><a class="btn" style="padding:3px 9px" href="${esc(urlDl(d.url))}" data-dl="${i}" title="Télécharger">${ico('dl')}${esc(extDe(d.url)||'Fichier')}</a></span>`
+    :d.ed?`<a class="btn" style="padding:3px 9px" href="${d.ed}" target="_blank" title="Pas encore de PDF enregistré : ouvrir dans l’éditeur pour l’imprimer">${ico('ext')}Éditeur</a>`:'<span class="mut" style="font-size:12px">pas de PDF</span>';
+  let h=docs.length||cde['Dossier SharePoint']?`<div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #F0F2F6">
+    ${docs.length?`<button class="btn p" id="dlTout" style="padding:4px 10px" title="Télécharge chaque fichier l’un après l’autre (le navigateur peut demander d’autoriser les téléchargements multiples)">${ico('dl')}Tout télécharger (${docs.length})</button>`:''}
+    ${/^https?:/.test(cde['Dossier SharePoint']||'')?`<a class="btn" style="padding:4px 10px" href="${esc(cde['Dossier SharePoint'])}" target="_blank" title="Dossier complet de l’affaire sur SharePoint (sélectionner tout → Télécharger = zip)">${ico('dossier')}Dossier SharePoint</a>`:''}</div>`:'';
+  for(const [nom,L] of G){h+=`<div class="mut" style="padding:9px 14px 3px;font-size:11px;text-transform:uppercase;letter-spacing:.04em">${esc(nom)}</div>`;
+    for(const d of L){const i=docs.indexOf(d);
+      if(d.titre){h+=`<div class="lien" style="justify-content:space-between"><a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous)}</span></a>${d.dossier?`<a class="btn" style="padding:3px 7px" href="${esc(d.dossier)}" target="_blank" title="Dossier des réponses">${ico('dossier')}</a>`:''}</div>`;continue}
+      const lab=d.k?`<a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous||'')}</span></a>`
+        :`<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.lab)}">${ico(d.ico)}<span style="margin-left:6px">${esc(d.lab)}</span> <span class="mut">${esc(d.sous||'')}</span></span>`;
+      h+=`<div class="lien" style="justify-content:space-between;${d.ind?'padding-left:34px':''}">${lab}${btn(d,i)}</div>`}}
   $('docsAff').innerHTML=h||'<div class="c mut">Aucun document pour cette affaire.</div>';
+  $('docsAff').querySelectorAll('[data-dl]').forEach(b=>b.onclick=e=>{const d=DOCS_AFF[+b.dataset.dl];if(d?.gen){e.preventDefault();telechargerDoc(d).catch(er=>toast('Échec : '+er.message,true))}});
+  if($('dlTout'))$('dlTout').onclick=()=>toutTelecharger(DOCS_AFF);
 }
+/* Un fichier : généré → blob ; SharePoint → lien « ?download=1 » suivi dans la page (le serveur répond en pièce jointe :
+   la page reste affichée et la session SharePoint de l'utilisateur est utilisée) ; autre → cadre caché. */
+async function telechargerDoc(d){
+  if(d.gen){const b=await d.gen();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.nom||'document.pdf';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return}
+  if(/sharepoint\.com/i.test(d.url)){const a=document.createElement('a');a.href=urlDl(d.url);document.body.appendChild(a);a.click();a.remove();return}
+  const f=document.createElement('iframe');f.style.display='none';f.src=d.url;document.body.appendChild(f);setTimeout(()=>f.remove(),120000)}
+async function toutTelecharger(L){
+  const b=$('dlTout');if(b)b.disabled=true;let ok=0;
+  for(const [i,d] of L.entries()){if(b)b.innerHTML=`${ico('dl')}Téléchargement ${i+1} / ${L.length}…`;
+    try{await telechargerDoc(d);ok++}catch(e){toast(`${d.lab} : ${e.message}`,true)}
+    await new Promise(r=>setTimeout(r,1500))}
+  if(b){b.disabled=false;b.innerHTML=`${ico('dl')}Tout télécharger (${L.length})`}
+  toast(`${ok} fichier(s) lancé(s). S’il en manque, autorisez les téléchargements multiples pour cette page, ou utilisez « Dossier SharePoint ».`)}
+/* PDF des tâches de l'affaire (jsPDF chargé à la demande). */
+let JSPDF=null;
+function chargerScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ko(new Error('chargement impossible : '+src));document.head.appendChild(s)})}
+async function pdfTaches(cde,TT){
+  if(!JSPDF){await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');JSPDF=window.jspdf.jsPDF}
+  const p=s=>String(s??'').replace(/[–—]/g,'-').replace(/[‘’]/g,"'").replace(/[“”«»]/g,'"').replace(/…/g,'...').replace(/ | /g,' ').replace(/[^\x00-\xff€]/g,'');
+  const n=txt(cde['N° affaire']),doc=new JSPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const ech=r=>r['Échéance']||'9999';
+  const L=[...TT].sort((a,b)=>ech(a).localeCompare(ech(b))||a.id-b.id);
+  const C=S.rows[MODS.commandes.t]||[],SY=new Map((S.rows[MODS.synthese.t]||[]).map(x=>[x.id,x])),DV=new Map((S.rows[MODS.devis.t]||[]).map(x=>[x.id,x])),LD=new Map((S.rows[1261171]||[]).map(x=>[x.id,x]));
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(p(`KTE - Tâches de l'affaire ${n}`),14,15);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  doc.text(p([txt(cde.Client),txt(cde.Objet)].filter(Boolean).join(' - ')),14,21);
+  doc.text(p([cde['N° Cde Client']?'Cde client '+txt(cde['N° Cde Client']):'',cde['Date Livraison']?'Livraison prévue '+dfr(cde['Date Livraison']):'',txt(cde['Référent KTE'])?'Référent '+txt(cde['Référent KTE']):''].filter(Boolean).join('   |   ')),14,26);
+  doc.autoTable({startY:31,head:[['Tâche','Référent','Échéance','Statut','Fait le','Pièces','Notes'].map(p)],
+    body:L.map(r=>[txt(r['Type de tâche'])||String(txt(r['Libellé'])).replace(/^\S+\s*[–-]\s*/,''),txt(r['Référent']),dfr(r['Échéance']),txt(r.Statut),dfr(r['Fait le']),
+      (()=>{try{return piecesTache(r,(r.Commande||[]).map(x=>C.find(c=>c.id===x.id)).filter(Boolean),SY,DV,LD)}catch(e){return''}})(),txt(r.Notes)].map(p)),
+    styles:{fontSize:8.5,cellPadding:1.8,valign:'top'},headStyles:{fillColor:[31,58,95]},
+    columnStyles:{0:{cellWidth:48},1:{cellWidth:24},2:{cellWidth:20},3:{cellWidth:28},4:{cellWidth:20},5:{cellWidth:26},6:{cellWidth:'auto'}},margin:{left:14,right:14}});
+  const nbP=doc.getNumberOfPages();for(let i=1;i<=nbP;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(120);doc.text(p(`${n} - édité le ${new Date().toLocaleDateString('fr-FR')} - page ${i}/${nbP}`),283,203,{align:'right'})}
+  return doc.output('blob')}
 
 /* ---------- Bons de livraison : création en un clic depuis une commande ----------
    Même logique que l'éditeur : n° BL-<affaire>-NN, lignes reprises de l'ARC (sinon du devis), « Déjà livré » =
