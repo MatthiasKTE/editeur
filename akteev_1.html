@@ -1,0 +1,1330 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Akteev – KTE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --side:#17233A;--side2:#1F2E4A;--sideTxt:#AEB9CC;--accent:#2F6FED;--accentL:#E8F0FE;--kte:#2B4C7E;
+  --bg:#F3F5F9;--card:#fff;--txt:#1C2433;--mut:#6B7385;--trait:#E3E7EE;--hover:#F6F8FB;
+  --ok:#16A34A;--warn:#D97706;--err:#DC2626;--r:10px;--sh:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.08)
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{font:14px/1.45 Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:var(--txt);background:var(--bg);display:flex}
+a{color:var(--accent);text-decoration:none}
+button{font:inherit;cursor:pointer}
+input,select,textarea{font:inherit;color:inherit}
+/* ---------- Menu gauche ---------- */
+#side{width:232px;flex:none;background:var(--side);color:var(--sideTxt);display:flex;flex-direction:column;height:100vh;position:sticky;top:0;overflow-y:auto}
+#side .marque{display:flex;align-items:center;gap:10px;padding:18px 18px 14px;color:#fff;font-weight:700;font-size:17px;letter-spacing:.2px}
+#side .marque span.k{display:grid;place-items:center;width:32px;height:32px;border-radius:8px;background:var(--accent);font-size:15px}
+#side .marque small{display:block;font-weight:500;font-size:11px;color:var(--sideTxt);letter-spacing:0}
+#side .grp{padding:14px 18px 6px;font-size:11px;text-transform:uppercase;letter-spacing:.8px;color:#6F7D96;font-weight:600}
+#side a.it{display:flex;align-items:center;gap:11px;margin:1px 10px;padding:8px 10px;border-radius:8px;color:var(--sideTxt);font-weight:500;position:relative}
+#side a.it:hover{background:var(--side2);color:#fff}
+#side a.it.on{background:var(--accent);color:#fff}
+#side a.it svg{width:18px;height:18px;flex:none;opacity:.9}
+#side a.it .nb:empty{display:none}
+#side a.it .nb{margin-left:auto;font-size:11px;background:rgba(255,255,255,.12);padding:1px 7px;border-radius:10px}
+#side a.it.on .nb{background:rgba(255,255,255,.25)}
+#side .bas{margin-top:auto;padding:14px 18px;border-top:1px solid #26354F;font-size:12px}
+#side .bas select{width:100%;margin-top:5px;background:var(--side2);border:1px solid #2C3D5C;color:#fff;border-radius:6px;padding:5px}
+#side .bas a{color:var(--sideTxt);display:block;margin-top:8px}
+#side .bas a:hover{color:#fff}
+/* ---------- Zone principale ---------- */
+#wrap{flex:1;min-width:0;display:flex;flex-direction:column;height:100vh;overflow:hidden}
+#top{height:58px;flex:none;background:#fff;border-bottom:1px solid var(--trait);display:flex;align-items:center;gap:14px;padding:0 24px}
+#top .burger{display:none;border:0;background:none;padding:4px}
+#gsearch{position:relative;flex:1;max-width:520px}
+#gsearch input{width:100%;border:1px solid var(--trait);background:var(--bg);border-radius:8px;padding:8px 12px 8px 34px;outline:none}
+#gsearch input:focus{border-color:var(--accent);background:#fff}
+#gsearch svg{position:absolute;left:10px;top:9px;width:16px;height:16px;color:var(--mut)}
+#gres{position:absolute;top:40px;left:0;right:0;background:#fff;border:1px solid var(--trait);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:420px;overflow:auto;display:none;z-index:50}
+#gres a{display:flex;gap:10px;padding:8px 12px;color:var(--txt);border-bottom:1px solid var(--hover)}
+#gres a:hover,#gres a.sel{background:var(--accentL)}
+#gres .ty{font-size:11px;color:var(--mut);width:90px;flex:none;padding-top:1px}
+#top .droite{margin-left:auto;display:flex;align-items:center;gap:10px;color:var(--mut);font-size:12px}
+#main{flex:1;overflow:auto;padding:22px 26px 60px}
+/* ---------- Éléments communs ---------- */
+h1{font-size:21px;margin:0;font-weight:700}
+.entete{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.entete .sous{color:var(--mut);font-size:13px}
+.entete .act{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.btn{border:1px solid var(--trait);background:#fff;border-radius:8px;padding:7px 13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;color:var(--txt);white-space:nowrap}
+.btn:hover{background:var(--hover)}
+.btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.p:hover{filter:brightness(.95)}
+.btn.d{color:var(--err)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn svg{width:15px;height:15px}
+.card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);border:1px solid #EAEDF2}
+.badge{display:inline-flex;align-items:center;gap:5px;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:500;white-space:nowrap;line-height:18px}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;opacity:.8}
+.chip{display:inline-block;background:#EEF1F6;border-radius:5px;padding:1px 7px;margin:1px 3px 1px 0;font-size:12.5px;color:var(--txt);white-space:nowrap}
+a.chip:hover{background:var(--accentL);color:var(--accent)}
+.mut{color:var(--mut)}
+.retard{color:var(--err);font-weight:600}
+.vide{padding:40px;text-align:center;color:var(--mut)}
+/* ---------- Barre d'outils de liste ---------- */
+.outils{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:12px 14px;border-bottom:1px solid var(--trait)}
+.outils .rech{position:relative}
+.outils .rech input{border:1px solid var(--trait);border-radius:7px;padding:6px 10px 6px 30px;width:240px;outline:none}
+.outils .rech input:focus{border-color:var(--accent)}
+.outils .rech svg{position:absolute;left:9px;top:8px;width:14px;height:14px;color:var(--mut)}
+.outils select{border:1px solid var(--trait);border-radius:7px;padding:6px 8px;background:#fff;max-width:220px}
+.puces{display:flex;gap:6px;flex-wrap:wrap}
+.puce{border:1px solid var(--trait);background:#fff;border-radius:20px;padding:4px 11px;font-size:12.5px;color:var(--mut)}
+.puce b{font-weight:600;color:var(--txt);margin-left:3px}
+.puce.on{background:var(--accentL);border-color:#B8CDF8;color:var(--accent)}
+.puce.on b{color:var(--accent)}
+.bascule{display:inline-flex;border:1px solid var(--trait);border-radius:7px;overflow:hidden;margin-left:auto}
+.bascule button{border:0;background:#fff;padding:6px 10px;color:var(--mut);display:flex;align-items:center;gap:5px}
+.bascule button.on{background:var(--accentL);color:var(--accent)}
+.bascule svg{width:15px;height:15px}
+/* ---------- Tableaux ---------- */
+.tw{overflow-x:auto}
+table.l{width:100%;border-collapse:collapse}
+table.l th{text-align:left;font-size:12px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.3px;padding:9px 12px;border-bottom:1px solid var(--trait);white-space:nowrap;cursor:pointer;user-select:none;background:#FAFBFC;position:sticky;top:0}
+table.l th:hover{color:var(--txt)}
+table.l th .fl{opacity:.6;font-size:10px}
+table.l tr.filtres th{position:static;background:#fff;padding:5px 6px;cursor:default;text-transform:none;letter-spacing:0;font-weight:400}
+table.l tr.filtres input,table.l tr.filtres select{width:100%;min-width:70px;border:1px solid var(--trait);border-radius:6px;padding:4px 7px;font-size:12.5px;background:#fff;outline:none;color:var(--txt)}
+table.l tr.filtres input:focus,table.l tr.filtres select:focus{border-color:var(--accent)}
+table.l tr.filtres .on{border-color:#B8CDF8;background:var(--accentL)}
+table.l td{padding:9px 12px;border-bottom:1px solid #EFF1F5;vertical-align:middle;max-width:340px;overflow:hidden;text-overflow:ellipsis}
+table.l tbody tr{cursor:pointer}
+table.l tbody tr:hover{background:var(--hover)}
+table.l td.n,table.l th.n{text-align:right;white-space:nowrap}
+table.l td.prim{font-weight:600;color:var(--kte);white-space:nowrap}
+table.l tfoot td{font-weight:600;padding:10px 12px;background:#FAFBFC}
+.plus{padding:12px;text-align:center}
+/* ---------- Kanban ---------- */
+.kanban{display:flex;gap:14px;overflow-x:auto;padding-bottom:10px;align-items:flex-start}
+.kcol{flex:0 0 272px;background:#EBEEF3;border-radius:var(--r);padding:10px;min-height:120px}
+.kcol.over{outline:2px dashed var(--accent);outline-offset:-2px}
+.kcol h3{margin:2px 4px 10px;font-size:13px;display:flex;align-items:center;gap:8px}
+.kcol h3 .nb{margin-left:auto;color:var(--mut);font-weight:500}
+.kcard{background:#fff;border-radius:8px;padding:10px 11px;margin-bottom:8px;box-shadow:var(--sh);cursor:grab;border-left:3px solid transparent}
+.kcard:hover{box-shadow:0 2px 8px rgba(0,0,0,.12)}
+.kcard .t{font-weight:600;font-size:13px;margin-bottom:4px}
+.kcard .m{font-size:12px;color:var(--mut);display:flex;gap:8px;flex-wrap:wrap}
+/* ---------- Tableau de bord ---------- */
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px}
+.kpi{padding:16px 18px;cursor:pointer}
+.kpi:hover{box-shadow:0 2px 10px rgba(0,0,0,.1)}
+.kpi .lab{color:var(--mut);font-size:12.5px;font-weight:500;display:flex;align-items:center;gap:7px}
+.kpi .lab svg{width:16px;height:16px}
+.kpi .val{font-size:26px;font-weight:700;margin-top:6px;letter-spacing:-.5px}
+.kpi .det{font-size:12.5px;color:var(--mut);margin-top:2px}
+.grille{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(380px,100%),1fr));gap:16px}
+.bloc h2{font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait);display:flex;align-items:center;gap:8px}
+.bloc h2 a{margin-left:auto;font-size:12.5px;font-weight:500}
+.ligneDb{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #F0F2F6;cursor:pointer}
+.ligneDb:hover{background:var(--hover)}
+.ligneDb .x{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ligneDb .x small{color:var(--mut);margin-left:6px}
+/* ---------- Fiche ---------- */
+.fiche{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:16px;align-items:start}
+.form{padding:6px 20px 18px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 22px}
+.form .ch{padding:9px 0;border-bottom:1px solid #F0F2F6;min-width:0}
+.form .ch.plein{grid-column:1/-1}
+.form .ch label{display:block;font-size:12px;color:var(--mut);font-weight:500;margin-bottom:4px}
+.form .ch label .req{color:var(--err)}
+.form .ch .ro{min-height:22px;word-wrap:break-word;white-space:pre-wrap}
+.ed{width:100%;border:1px solid transparent;border-radius:6px;padding:5px 7px;margin-left:-7px;background:transparent;outline:none;min-height:32px}
+.ed:hover{border-color:var(--trait);background:#fff}
+.ed:focus{border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px var(--accentL)}
+textarea.ed{resize:vertical;min-height:60px}
+.ed.modif{background:#FFF8E6;border-color:#F5D58A}
+.dtw{display:flex;align-items:center;gap:2px;position:relative}
+.dtw .ed{flex:1;min-width:0}
+.dtw .cal{border:0;background:none;color:var(--mut);padding:4px;display:flex}
+.dtw .cal:hover{color:var(--accent)}
+.dtw .cal svg{width:17px;height:17px}
+.dtw .dtn{position:absolute;right:0;bottom:0;width:1px;height:1px;opacity:0;border:0;padding:0;pointer-events:none}
+.ed.invalide{border-color:var(--err)!important;background:#FEF2F2}
+.lienEd{display:flex;flex-wrap:wrap;align-items:center;gap:3px;min-height:32px;padding:4px 0}
+.lienEd .chip .x{margin-left:5px;color:var(--mut);cursor:pointer}
+.lienEd .chip .x:hover{color:var(--err)}
+.lienEd button{border:1px dashed var(--trait);background:#fff;border-radius:5px;padding:1px 8px;color:var(--mut);font-size:12px}
+.lienEd button:hover{border-color:var(--accent);color:var(--accent)}
+.lienEd.modif{background:#FFF8E6;border-radius:6px}
+.section{font-size:12px;text-transform:uppercase;letter-spacing:.6px;color:var(--mut);font-weight:600;padding:16px 20px 4px;grid-column:1/-1}
+details.calc summary{cursor:pointer;padding:12px 20px;color:var(--mut);font-size:13px;font-weight:500}
+.cote .card{margin-bottom:14px}
+.cote .card h3{font-size:13px;margin:0;padding:12px 14px;border-bottom:1px solid var(--trait)}
+.cote .card .c{padding:10px 14px;font-size:13px}
+.cote .lien{display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid #F0F2F6;color:var(--txt)}
+.cote .lien:hover{background:var(--hover)}
+.cote .lien svg{width:16px;height:16px;color:var(--accent)}
+.onglets{display:flex;gap:2px;border-bottom:1px solid var(--trait);padding:0 12px;overflow-x:auto}
+.onglets button{border:0;background:none;padding:11px 12px;color:var(--mut);font-weight:500;border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.onglets button.on{color:var(--accent);border-bottom-color:var(--accent)}
+.onglets button .nb{background:#EEF1F6;border-radius:10px;padding:0 6px;font-size:11px;margin-left:4px}
+#barreEnr{position:fixed;left:50%;bottom:20px;transform:translateX(-50%) translateY(200px);background:var(--side);color:#fff;border-radius:10px;padding:10px 12px 10px 18px;display:flex;align-items:center;gap:14px;box-shadow:0 10px 30px rgba(0,0,0,.25);transition:transform .2s;z-index:40}
+#barreEnr.vis{transform:translateX(-50%) translateY(0)}
+#barreEnr .btn{border-color:#3A4B6A;background:transparent;color:#fff}
+#barreEnr .btn.p{background:var(--accent);border-color:var(--accent)}
+.selStatut{position:relative;display:inline-block}
+.selStatut select{position:absolute;inset:0;opacity:0;cursor:pointer}
+/* ---------- Fenêtres ---------- */
+#modal{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:flex-start;justify-content:center;padding-top:8vh;z-index:60}
+#modal .box{background:#fff;border-radius:12px;width:min(640px,94vw);max-height:80vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,.3)}
+#modal .box h3{margin:0;padding:16px 18px;border-bottom:1px solid var(--trait);font-size:15px;display:flex;align-items:center}
+#modal .box h3 button{margin-left:auto;border:0;background:none;font-size:20px;color:var(--mut)}
+#modal .box .corps{padding:14px 18px;overflow:auto;flex:1}
+#modal .box .pied{padding:12px 18px;border-top:1px solid var(--trait);display:flex;justify-content:flex-end;gap:8px}
+.choixL{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:6px;cursor:pointer}
+.choixL:hover{background:var(--hover)}
+.choixL small{color:var(--mut)}
+#toast{position:fixed;right:20px;bottom:20px;z-index:70;display:flex;flex-direction:column;gap:8px}
+#toast div{background:#fff;border-left:4px solid var(--ok);box-shadow:0 6px 20px rgba(0,0,0,.15);border-radius:8px;padding:10px 14px;min-width:240px;max-width:420px;animation:entre .2s}
+#toast div.err{border-left-color:var(--err)}
+@keyframes entre{from{opacity:0;transform:translateX(20px)}}
+.charge{display:flex;align-items:center;gap:10px;color:var(--mut);padding:40px;justify-content:center}
+.charge::before{content:"";width:18px;height:18px;border:2px solid var(--trait);border-top-color:var(--accent);border-radius:50%;animation:tourne .8s linear infinite}
+@keyframes tourne{to{transform:rotate(360deg)}}
+.graph{padding:14px 16px 8px}
+.graph svg{width:100%;height:auto;display:block}
+#cfg{max-width:480px;margin:10vh auto;padding:28px}
+body.deconnecte #side,body.deconnecte #top{display:none}
+#cfg label{display:block;font-size:12.5px;color:var(--mut);margin-top:10px}
+#cfg input,#cfg select{width:100%;border:1px solid var(--trait);border-radius:8px;padding:9px 11px;margin:4px 0 0}
+.formU{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px 16px;padding:16px}
+.formU label{font-size:12px;color:var(--mut);font-weight:500}
+.formU input,.formU select{width:100%;border:1px solid var(--trait);border-radius:7px;padding:7px 9px;margin-top:3px}
+.droits td{font-size:12.5px}
+#cfg input{width:100%;border:1px solid var(--trait);border-radius:8px;padding:9px 11px;margin:12px 0}
+/* ---------- Écrans étroits ---------- */
+@media (max-width:900px){
+  #side{position:fixed;left:-240px;z-index:80;transition:left .2s}
+  body.menu #side{left:0;box-shadow:0 0 40px rgba(0,0,0,.4)}
+  #top .burger{display:block}
+  #main{padding:16px}
+  .fiche{grid-template-columns:1fr}
+  .form{grid-template-columns:1fr}
+  .grille{grid-template-columns:1fr}
+  .outils .rech input{width:170px}
+}
+</style>
+</head>
+<body>
+<nav id="side"></nav>
+<div id="wrap">
+  <header id="top">
+    <button class="burger" onclick="document.body.classList.toggle('menu')" aria-label="Menu"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+    <div id="gsearch"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="gq" placeholder="Rechercher un devis, une commande, un client… (touche /)" autocomplete="off"><div id="gres"></div></div>
+    <div class="droite"><span id="etat"></span><button class="btn" id="bRafr" title="Recharger les données depuis Baserow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg></button></div>
+  </header>
+  <main id="main"></main>
+</div>
+<div id="barreEnr"><span id="beTxt">Modifications non enregistrées</span><button class="btn" id="beAnn">Annuler</button><button class="btn p" id="beEnr">Enregistrer</button></div>
+<div id="modal"><div class="box"><h3><span id="mTitre"></span><button onclick="fermerModal()">×</button></h3><div class="corps" id="mCorps"></div><div class="pied" id="mPied"></div></div></div>
+<div id="toast"></div>
+<script>
+/* =====================================================================
+   AKTEEV – interface KTE au-dessus de Baserow (base 592007)
+   Même origine que l'éditeur (matthiaskte.github.io/editeur/) :
+   le jeton est partagé via localStorage.kte_baserow_jeton.
+   Règles : aucune suppression de ligne (on passe le statut à « Annulée ») ;
+   devis / ARC / BL se créent et se mettent en page dans l'éditeur.
+   ===================================================================== */
+const API='https://api.baserow.io/api/database';
+const EDITEUR='./';
+const CLE='kte_baserow_jeton';
+let JETON=null;try{JETON=localStorage.getItem(CLE)}catch(e){}
+const ls={get(k,d){try{const v=localStorage.getItem('akteev_'+k);return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem('akteev_'+k,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- Icônes ---------- */
+const I={
+ accueil:'<path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/>',
+ devis:'<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+ commandes:'<path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L21 8H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/>',
+ arc:'<path d="M9 12l2 2 4-4"/><path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/>',
+ bl:'<path d="M1 6h13v10H1zM14 10h4l3 3v3h-7"/><circle cx="5" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+ clients:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.6 3.4-5.5 6.5-5.5s5.7 1.9 6.5 5.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M17 14.5c2.4.2 4 1.8 4.5 4.5"/>',
+ taches:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 10l2 2 4-4M8 16h8"/>',
+ synthese:'<path d="M4 5h16M4 10h16M4 15h10M4 20h6"/>',
+ ddp:'<path d="M4 13h4l2 3h4l2-3h4"/><path d="M5.5 6.5 4 13v6h16v-6l-1.5-6.5a1 1 0 0 0-1-.8H6.5a1 1 0 0 0-1 .8z"/>',
+ cf:'<path d="M20 7 12 3 4 7v10l8 4 8-4z"/><path d="m4 7 8 4 8-4M12 11v10"/>',
+ fournisseurs:'<path d="M3 21V9l6-4v4l6-4v4l6-4v16z"/><path d="M7 17h2M11 17h2M15 17h2"/>',
+ referents:'<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/>',
+ catalogue:'<path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',ext:'<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+ liste:'<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',kanban:'<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="8" rx="1"/>',
+ dl:'<path d="M12 3v12M7 10l5 5 5-5M5 21h14"/>',dossier:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+ pdf:'<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5"/><path d="M8 15h1.5a1.5 1.5 0 0 0 0-3H8v5"/>',
+ retour:'<path d="M15 18l-6-6 6-6"/>',euro:'<path d="M17 6.5A6.5 6.5 0 1 0 17 17.5M4 10h9M4 14h9"/>',alerte:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
+ loupe:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
+ cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>'
+};
+const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${s}>${I[n]||''}</svg>`;
+
+/* ---------- Modules (menu de gauche) ----------
+   t : id de table Baserow ; cols : colonnes de la liste (ignorées si absentes) ;
+   statut : champ de statut (puces + kanban) ; editeur : type de document de l'éditeur ;
+   liees : listes affichées en onglets dans la fiche (table + champ lien vers la fiche). */
+const MODS={
+ devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
+   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé']},
+ commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
+   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
+ arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
+   liees:[{nom:'Lignes',t:1261373,lien:'ARC',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'}]},
+ bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut','PDF'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
+   liees:[{nom:'Lignes',t:1261381,lien:'BL',cols:['Description','Quantité commandée','Quantité livrée'],ordre:'Ordre'}]},
+ clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
+   liees:[{nom:'Devis',mod:'devis',lien:'Client'},{nom:'Commandes',mod:'commandes',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
+ taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
+   requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
+ synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
+ cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
+   liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant'],ordre:'Ordre',ajout:true}],cacheStatuts:['Annulée']},
+ consult:{t:1274941,nom:'Consultations SST',un:'consultation',fem:true,ico:'ddp',grp:'Achats',cols:['Réf','Devis','Fournisseur','Envoyée le','Réponse','Réponse le','Montant','Délai','Archivage','Dossier réponses'],statut:'Réponse',cacheStatuts:['Annulée']},
+ fournisseurs:{t:1260241,nom:'Fournisseurs',un:'fournisseur',ico:'fournisseurs',grp:'Achats',cols:['Nom','Type','Pays','Contact','E-mail','Devise','Conditions de paiement'],
+   liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'}]},
+ referents:{t:1260243,nom:'Référents',un:'référent',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Téléphone',"Référent d'affaire"],
+   liees:[{nom:'Tâches',mod:'taches',lien:'Référent'},{nom:'Commandes',mod:'commandes',lien:'Référent KTE'}]},
+ catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']}
+};
+for(const k in MODS)MODS[k].k=k;
+const MOD_DE_TABLE={};for(const k in MODS)MOD_DE_TABLE[MODS[k].t]=k;
+/* Cibles des liens si l'API des champs n'est pas lisible avec le jeton (secours). */
+const LIENS_SECOURS={'Client':1260239,'Référent KTE':1260243,'Référent':1260243,'Demandeur':1260243,'Référent par défaut':1260243,'Commande':1260240,'Affaire':1260240,
+ 'Fournisseur':1260241,'Intervenant':1260241,'Type de tâche':1261119,'Devis':1261170,'ARC':1261374,'BL':1261382,'Commande fournisseur':1263348,'Tâche':1261600,
+ 'Lignes de devis':1261171,'Consultations SST':1274941,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349};
+const RO_TYPES=new Set(['formula','lookup','rollup','count','created_on','last_modified','created_by','last_modified_by','autonumber','uuid','file','multiple_collaborators','ai','password']);
+
+/* ---------- Utilitaires ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const eur=x=>(Math.round((+x||0)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+const keur=x=>{x=+x||0;return Math.abs(x)>=10000?(x/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})+' k€':eur(x)};
+const nb=x=>(+x||0).toLocaleString('fr-FR',{maximumFractionDigits:2});
+const auj=()=>{const d=new Date();return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const plusJours=n=>{const d=new Date();d.setDate(d.getDate()+n);return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)};
+const dfr=s=>{if(!s)return'';const d=new Date(s.length<=10?s+'T00:00':s);return isNaN(d)?s:d.toLocaleDateString('fr-FR')};
+const dtfr=s=>{if(!s)return'';const d=new Date(s);return isNaN(d)?s:d.toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})};
+const estMonnaie=n=>/(HT|€|^Total|Montant|Prix)/i.test(n);
+const norm=s=>String(s??'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+function toast(t,err){const d=document.createElement('div');d.className=err?'err':'';d.textContent=t;$('toast').appendChild(d);setTimeout(()=>d.remove(),err?7000:3500)}
+const COUL={blue:['#E0ECFF','#1D4ED8'],'light-blue':['#E6F1FF','#2563EB'],'dark-blue':['#D3E1FB','#1E3A8A'],'darker-blue':['#C7D7F7','#172554'],
+ green:['#DCFCE7','#15803D'],'light-green':['#E7F9EE','#16A34A'],'dark-green':['#CDEFD9','#166534'],'darker-green':['#BFE8CE','#14532D'],
+ red:['#FEE2E2','#B91C1C'],'light-red':['#FDECEC','#DC2626'],'dark-red':['#FBD5D5','#991B1B'],'darker-red':['#F8C4C4','#7F1D1D'],
+ orange:['#FFEDD5','#C2410C'],'light-orange':['#FFF3E6','#EA580C'],'dark-orange':['#FED7AA','#9A3412'],'darker-orange':['#FDC48C','#7C2D12'],
+ yellow:['#FEF9C3','#A16207'],'light-yellow':['#FEFCE0','#CA8A04'],'dark-yellow':['#FDEFA0','#854D0E'],'darker-yellow':['#FBE47A','#713F12'],
+ purple:['#F3E8FF','#7E22CE'],'light-purple':['#F7EFFF','#9333EA'],'dark-purple':['#E9D5FF','#6B21A8'],'darker-purple':['#DDC2FC','#581C87'],
+ brown:['#F3E9E2','#8B5A3C'],'light-brown':['#F7EFE9','#9C6644'],'dark-brown':['#E8D8CC','#6F4430'],'darker-brown':['#DCC6B6','#5A3524'],
+ gray:['#EEF0F4','#4B5563'],'light-gray':['#F3F4F6','#6B7280'],'dark-gray':['#E1E4EA','#374151'],'darker-gray':['#D3D7DF','#1F2937'],
+ cyan:['#CFFAFE','#0E7490'],'light-cyan':['#E0FCFF','#0891B2'],'dark-cyan':['#A5F3FC','#155E75'],'darker-cyan':['#8DEAF7','#164E63'],
+ pink:['#FCE7F3','#BE185D'],'light-pink':['#FDF0F7','#DB2777'],'dark-pink':['#FBCFE8','#9D174D'],'darker-pink':['#F9B8DC','#831843']};
+const coul=c=>COUL[c]||COUL[String(c||'').replace(/^(light|dark|darker)-/,'')]||COUL.gray;
+const badge=o=>{if(!o||o.value==null||o.value==='')return'';const [bg,fg]=coul(o.color);return`<span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span>`};
+
+/* ---------- API Baserow ---------- */
+let ENCOURS=0;const FILE=[];
+async function api(path,opt={},essai=0){
+  if(ENCOURS>=4)await new Promise(r=>FILE.push(r));ENCOURS++;let r;
+  try{r=await fetch(API+path,{...opt,headers:{Authorization:'Token '+JETON,'Content-Type':'application/json',...(opt.headers||{})}})}finally{ENCOURS--;FILE.length&&FILE.shift()()}
+  if((r.status===429||r.status>=500)&&essai<4){await new Promise(x=>setTimeout(x,800*(essai+1)));return api(path,opt,essai+1)}
+  if(!r.ok){const t=await r.text();let m=t;try{const j=JSON.parse(t);m=(j.error||'')+' '+(j.detail?JSON.stringify(j.detail):'')}catch(e){}throw new Error(r.status+' '+m.slice(0,300))}
+  return r.status===204?null:r.json();
+}
+const S={sch:{},rows:{},prom:{}};
+async function tout(t){let out=[],p=1;for(;;){const j=await api(`/rows/table/${t}/?user_field_names=true&size=200&page=${p}`);out=out.concat(j.results);if(!j.next)break;p++}return out}
+async function lireChamps(t){try{return await api(`/fields/table/${t}/`)}catch(e){return null}}
+function charger(t,force){
+  if(force||!S.prom[t]){
+    S.prom[t]=Promise.all([S.sch[t]&&!force?Promise.resolve(null):lireChamps(t),tout(t)]).then(([f,rows])=>{
+      S.rows[t]=rows;if(f)S.sch[t]=faireSchema(f,false);else if(!S.sch[t]||S.sch[t].deduit)S.sch[t]=deduireSchema(rows);
+      majCompteurs();return rows}).catch(e=>{delete S.prom[t];throw e});
+  }
+  return S.prom[t];
+}
+function faireSchema(fields,deduit){
+  fields.sort((a,b)=>(b.primary?1:0)-(a.primary?1:0)||(a.order??0)-(b.order??0)||a.id-b.id);
+  const par={};fields.forEach(f=>par[f.name]=f);
+  return{fields,par,prim:(fields.find(f=>f.primary)||fields[0]||{}).name,deduit};
+}
+function deduireSchema(rows){
+  const noms=[];const vus={};
+  rows.forEach(r=>Object.keys(r).forEach(k=>{if(k!=='id'&&k!=='order'&&!vus[k]){vus[k]=1;noms.push(k)}}));
+  const fields=noms.map((n,i)=>{
+    const vals=rows.map(r=>r[n]).filter(v=>v!=null&&v!==''&&!(Array.isArray(v)&&!v.length));
+    const f={id:-(i+1),name:n,order:i,primary:i===0,type:'text'};
+    const v=vals[0];
+    if(v===undefined){f.type='text'}
+    else if(typeof v==='boolean')f.type='boolean';
+    else if(Array.isArray(v)){
+      if(v[0]&&('url' in v[0])&&('visible_name' in v[0]))f.type='file';
+      else if(v[0]&&'color' in v[0]){f.type='multiple_select';f.select_options=optsVues(vals.flat())}
+      else if(LIENS_SECOURS[n]&&v[0]&&'id' in v[0]){f.type='link_row';f.link_row_table_id=LIENS_SECOURS[n]}
+      else f.type='lookup';
+    }
+    else if(typeof v==='object'&&'color' in v){f.type='single_select';f.select_options=optsVues(vals)}
+    else if(typeof v==='object')f.type='formula';
+    else if(vals.every(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)))f.type='date';
+    else if(vals.every(x=>/^\d{4}-\d{2}-\d{2}T/.test(x))){f.type='date';f.date_include_time=true}
+    else if(vals.every(x=>/^-?\d+(\.\d+)?$/.test(String(x)))){f.type='number';f.number_decimal_places=Math.max(0,...vals.map(x=>(String(x).split('.')[1]||'').length))}
+    else if(vals.some(x=>String(x).includes('\n')))f.type='long_text';
+    else if(vals.every(x=>/^https?:\/\//.test(x)))f.type='url';
+    return f});
+  return faireSchema(fields,true);
+}
+function optsVues(vals){const m=new Map();vals.forEach(o=>{if(o&&o.id!=null&&!m.has(o.id))m.set(o.id,{id:o.id,value:o.value,color:o.color})});return[...m.values()]}
+const sch=t=>S.sch[t]||{fields:[],par:{},prim:'id'};
+const titre=(t,r)=>{const p=sch(t).prim;const v=r?.[p];return txt(v)||('#'+r?.id)};
+function txt(v){if(v==null)return'';if(Array.isArray(v))return v.map(txt).filter(Boolean).join(', ');if(typeof v==='object')return v.value!=null?txt(v.value):(v.name||v.visible_name||'');return String(v)}
+const nouv=m=>(m.fem?'Nouvelle ':/^[aeéiouy]/i.test(m.un)?'Nouvel ':'Nouveau ')+m.un;
+const ids=v=>(v||[]).map(x=>x.id);
+function majRow(t,row){const L=S.rows[t];if(!L)return;const i=L.findIndex(r=>r.id===row.id);if(i>=0)L[i]=row;else L.push(row)}
+
+/* ---------- Rendu d'une valeur ---------- */
+function rendu(f,v,court){
+  if(v==null||v===''||(Array.isArray(v)&&!v.length))return'<span class="mut">—</span>';
+  const ty=f?.type,n=f?.name||'';
+  if(ty==='single_select')return badge(v);
+  if(ty==='multiple_select')return v.map(badge).join(' ');
+  if(ty==='boolean')return v?'<span style="color:var(--ok)">✔</span>':'<span class="mut">—</span>';
+  if(ty==='link_row'){const m=MOD_DE_TABLE[f.link_row_table_id];return v.map(x=>m?`<a class="chip" href="#/${m}/${x.id}" onclick="event.stopPropagation()">${esc(x.value)}</a>`:`<span class="chip">${esc(x.value)}</span>`).join('')}
+  if(ty==='file')return v.map(x=>x.is_image?`<a href="${esc(x.url)}" target="_blank" onclick="event.stopPropagation()"><img src="${esc(x.thumbnails?.tiny?.url||x.url)}" style="height:${court?24:60}px;border-radius:4px;margin-right:4px;vertical-align:middle"></a>`:`<a href="${esc(x.url)}" target="_blank">${esc(x.visible_name)}</a>`).join(' ');
+  if(ty==='date'||ty==='created_on'||ty==='last_modified')return f.date_include_time||ty!=='date'?esc(dtfr(v)):esc(dfr(v));
+  if(ty==='number'||ty==='count'||ty==='rating'||((ty==='formula'||ty==='rollup')&&typeof v!=='object'&&/^-?\d+(\.\d+)?$/.test(String(v)))){return estMonnaie(n)?eur(v):nb(v)}
+  if(ty==='url'||(typeof v==='string'&&/^https?:\/\/\S+$/.test(v)))return`<a href="${esc(v)}" target="_blank" onclick="event.stopPropagation()">${court?'Ouvrir ↗':esc(v.length>60?v.slice(0,57)+'…':v)}</a>`;
+  if(ty==='email')return`<a href="mailto:${esc(v)}" onclick="event.stopPropagation()">${esc(v)}</a>`;
+  if(Array.isArray(v))return v.map(x=>typeof x==='object'&&x&&'color' in x?badge(x):`<span class="chip">${esc(txt(x))}</span>`).join('');
+  if(typeof v==='object'&&'color' in v)return badge(v);
+  const s=txt(v);
+  if(court&&s.length>90)return esc(s.slice(0,88))+'…';
+  if(/^\d{4}-\d{2}-\d{2}/.test(s))return esc(s.length>10?dtfr(s):dfr(s));
+  return esc(s);
+}
+function triVal(f,v){
+  if(v==null||v==='')return null;const ty=f?.type;
+  if(ty==='number'||ty==='count'||(typeof v==='string'&&/^-?\d+(\.\d+)?$/.test(v)))return+v;
+  if(typeof v==='object'&&!Array.isArray(v)&&'color' in v){const o=(f?.select_options||[]).findIndex(x=>x.id===v.id);return o>=0?o:norm(v.value)}
+  return norm(txt(v));
+}
+
+/* ---------- Accès : profils et session ----------
+   La vraie protection = les droits du jeton Baserow de chaque profil (créé par l'administrateur).
+   Les profils ci-dessous adaptent seulement l'affichage (menus, boutons, montants). */
+const PROFILS={
+ admin:{nom:'Direction / Admin',voir:'*',ecrire:'*',montants:true,admin:true},
+ commercial:{nom:'Commercial / ADV',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','referents'],ecrire:['devis','commandes','arc','bl','clients','taches','consult'],montants:true},
+ atelier:{nom:'Atelier',voir:['taches','synthese','commandes','referents'],ecrire:['taches','synthese'],montants:false},
+ achats:{nom:'Achats',voir:['devis','consult','commandes','taches','synthese','cf','fournisseurs','referents'],ecrire:['cf','fournisseurs','synthese','taches','consult'],montants:true}
+};
+let SESSION=null;try{SESSION=JSON.parse(localStorage.getItem('akteev_session')||'null')}catch(e){}
+const PR=()=>PROFILS[SESSION?.profil]||PROFILS.admin;
+const peutVoir=k=>PR().voir==='*'||PR().voir.includes(k);
+const peutEcrire=k=>PR().ecrire==='*'||PR().ecrire.includes(k);
+const montants=()=>PR().montants!==false;
+const estAdmin=()=>!!PR().admin;
+const masque=n=>!montants()&&estMonnaie(n);
+
+/* ---------- Menu ---------- */
+let MOI=ls.get('moi',null);
+function dessinerMenu(){
+  let h=`<div class="marque"><span class="k">A</span><div>Akteev<small>KTE · gestion</small></div></div>`;
+  h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
+  let g='';
+  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`}
+  if(estAdmin()){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
+  h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
+  $('side').innerHTML=h;
+  if($('bJeton'))$('bJeton').onclick=e=>{e.preventDefault();config(true)};
+  $('bSortir').onclick=e=>{e.preventDefault();deconnecter()};
+  $('moi').onchange=e=>{MOI=+e.target.value||null;ls.set('moi',MOI);route()};
+}
+function majMoi(){const R=S.rows[MODS.referents.t];if(!R)return;const s=$('moi');s.innerHTML='<option value="">— choisir —</option>'+R.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('');s.value=MOI||''}
+function majCompteurs(){
+  for(const k of ['devis','commandes','taches']){const m=MODS[k],R=S.rows[m.t],e=$('nb_'+k);if(!R||!e)continue;
+    const n=k==='taches'?R.filter(r=>tacheOuverte(r)&&r['Échéance']&&r['Échéance']<auj()).length:k==='devis'?R.filter(devisEnCours).length:R.filter(r=>txt(r.Statut)==='Commandé').length;
+    e.textContent=n||'';e.title=k==='taches'?'tâches en retard':'en cours'}
+  const eD=$('nb_ddp'),RD=S.rows[MODS.devis.t],RC=S.rows[MODS.consult.t];
+  if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
+  majMoi();
+}
+const devisEnCours=r=>!/accept|refus|perdu|annul|sans suite|class/i.test(txt(r.Statut));
+const tacheOuverte=r=>!/^(fait|annul)/i.test(txt(r.Statut));
+function actif(k){document.querySelectorAll('#side a.it').forEach(a=>a.classList.toggle('on',a.dataset.m===k));document.body.classList.remove('menu')}
+
+/* ---------- Routage ---------- */
+let SALE=null; // brouillon en cours {t,id,draft}
+window.addEventListener('hashchange',()=>{if(SALE&&Object.keys(SALE.draft).length&&!confirm('Des modifications ne sont pas enregistrées. Quitter quand même ?')){history.back();return}route()});
+function params(){const q=location.hash.split('?')[1]||'';return Object.fromEntries(new URLSearchParams(q))}
+async function route(){
+  SALE=null;barre();fermerModal();$('gres').style.display='none';
+  const h=(location.hash.replace(/^#\/?/,'').split('?')[0])||'accueil';
+  const [k,id]=h.split('/');
+  actif(k);$('main').scrollTop=0;
+  try{
+    if(k==='accueil')return await vueAccueil();
+    if(k==='utilisateurs'&&estAdmin())return await vueUtilisateurs();
+    if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
+    if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
+    if(id)return await vueFiche(k,id);
+    return await vueListe(k);
+  }catch(e){$('main').innerHTML=`<div class="card vide">Erreur de chargement : ${esc(e.message)}<br><br><button class="btn" onclick="route()">Réessayer</button></div>`;console.error(e)}
+}
+const chargement=()=>$('main').innerHTML='<div class="charge">Chargement depuis Baserow…</div>';
+
+/* ---------- Tableau de bord ---------- */
+async function vueAccueil(){
+  document.title='Akteev – Tableau de bord';
+  if(!S.rows[MODS.devis.t])chargement();
+  const ch=k=>peutVoir(k)?charger(MODS[k].t).catch(()=>[]):Promise.resolve([]);
+  const [D,C,T,CS]=await Promise.all([ch('devis'),ch('commandes'),ch('taches'),ch('consult')]);
+  const DDP=peutVoir('consult')?ddpListe(D,CS):[],dPr=DDP.filter(x=>x.etat==='complet').length,dPa=DDP.filter(x=>x.etat==='partiel').length;
+  const vD=peutVoir('devis')&&montants(),vC=peutVoir('commandes'),vM=montants();
+  const a=auj(),an=a.slice(0,4),mois=a.slice(0,7);
+  const dEC=D.filter(devisEnCours),cEC=C.filter(r=>txt(r.Statut)==='Commandé');
+  const mesT=T.filter(r=>tacheOuverte(r)&&(!MOI||ids(r['Référent']).includes(MOI)));
+  const tRet=mesT.filter(r=>r['Échéance']&&r['Échéance']<a);
+  const dateCde=r=>(r['Date cde client']||r['Date réception']||'').slice(0,10);
+  const caMois=C.filter(r=>dateCde(r).startsWith(mois)&&txt(r.Statut)!=='Annulée').reduce((s,r)=>s+(+r['Montant HT (€)']||0),0);
+  const caAn=C.filter(r=>dateCde(r).startsWith(an)&&txt(r.Statut)!=='Annulée').reduce((s,r)=>s+(+r['Montant HT (€)']||0),0);
+  const dAn=D.filter(r=>(r.Date||'').startsWith(an)),dAcc=dAn.filter(r=>/accept/i.test(txt(r.Statut))).length;
+  const nomMoi=MOI?txt((S.rows[MODS.referents.t]||[]).find(r=>r.id===MOI)?.[sch(MODS.referents.t).prim]):'';
+  let h=`<div class="entete"><h1>Bonjour${nomMoi?' '+esc(nomMoi.split(' ')[0]):''}</h1><span class="sous">${new Date().toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</span>
+    <div class="act">${peutEcrire('devis')?`<a class="btn p" href="${EDITEUR}" target="_blank">${ico('plus')}Nouveau devis</a>`:''}${peutEcrire('taches')?`<a class="btn" href="#/taches/nouveau">${ico('plus')}Nouvelle tâche</a>`:''}</div></div>
+  <div class="kpis">
+   ${vD?`<div class="card kpi" onclick="location.hash='#/devis?f=encours'"><div class="lab">${ico('devis')}Devis en cours</div><div class="val">${dEC.length}</div><div class="det">${keur(dEC.reduce((s,r)=>s+(+r['Total HT']||0),0))} HT</div></div>`:''}
+   ${vC?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('commandes')}Commandes en cours</div><div class="val">${cEC.length}</div><div class="det">${vM?keur(cEC.reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))+' HT à livrer':'à livrer'}</div></div>`:''}
+   ${vC&&vM?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('euro')}Commandé ce mois</div><div class="val">${keur(caMois)}</div><div class="det">${keur(caAn)} depuis le 1<sup>er</sup> janvier</div></div>`:''}
+   ${peutVoir('consult')?`<div class="card kpi" onclick="location.hash='#/ddp'"><div class="lab">${ico('ddp')}DDP en cours</div><div class="val">${DDP.length}</div><div class="det">${dPr?`<b style="color:#15803D">${dPr} complète(s)</b>`:'0 complète'} · ${dPa} partielle(s)</div></div>`:''}
+   <div class="card kpi" onclick="location.hash='#/taches?f=retard'"><div class="lab" style="${tRet.length?'color:var(--err)':''}">${ico('alerte')}Tâches en retard${MOI?' (moi)':''}</div><div class="val" style="${tRet.length?'color:var(--err)':''}">${tRet.length}</div><div class="det">${mesT.length} tâche(s) ouverte(s)</div></div>
+   ${vD?`<div class="card kpi" onclick="location.hash='#/devis'"><div class="lab">${ico('arc')}Transformation ${an}</div><div class="val">${dAn.length?Math.round(dAcc/dAn.length*100):0} %</div><div class="det">${dAcc} accepté(s) / ${dAn.length} devis</div></div>`:''}
+  </div>
+  <div class="grille">
+   <div class="card bloc"><h2>${ico('taches','width=17')}${MOI?'Mes tâches':'Tâches'} à traiter<a href="#/taches">Tout voir</a></h2>${listeTaches(mesT)}</div>
+   ${vC?`<div class="card bloc"><h2>${ico('bl','width=17')}Livraisons à venir<a href="#/commandes">Tout voir</a></h2>${listeLivraisons(cEC)}</div>`:''}
+   ${vC&&vM?`<div class="card bloc"><h2>${ico('euro','width=17')}Commandes reçues – 12 derniers mois</h2><div class="graph">${graphe(C,dateCde)}</div></div>`:''}
+   ${vD?`<div class="card bloc"><h2>${ico('devis','width=17')}Derniers devis<a href="#/devis">Tout voir</a></h2>${derniersDevis(D)}</div>`:''}
+  </div>`;
+  $('main').innerHTML=h;
+  charger(MODS.referents.t).catch(()=>{});
+}
+function listeTaches(T){
+  const a=auj(),L=[...T].filter(r=>r['Échéance']).sort((x,y)=>x['Échéance'].localeCompare(y['Échéance'])).slice(0,9);
+  if(!L.length)return'<div class="vide">Aucune tâche ouverte 🎉</div>';
+  return L.map(r=>`<div class="ligneDb" onclick="location.hash='#/taches/${r.id}'"><div class="x">${esc(txt(r['Libellé']))}<small>${esc(txt(r['Référent']))}</small></div>${badge(r.Statut)}<span class="${r['Échéance']<a?'retard':'mut'}" style="width:78px;text-align:right">${dfr(r['Échéance'])}</span></div>`).join('');
+}
+function listeLivraisons(C){
+  const a=auj(),L=[...C].filter(r=>r['Date Livraison']).sort((x,y)=>x['Date Livraison'].localeCompare(y['Date Livraison'])).slice(0,9);
+  if(!L.length)return'<div class="vide">Aucune commande en cours</div>';
+  return L.map(r=>`<div class="ligneDb" onclick="location.hash='#/commandes/${r.id}'"><div class="x"><b style="color:var(--kte)">${esc(txt(r['N° affaire']))}</b> ${esc(txt(r.Client))}<small>${esc(txt(r.Objet))}</small></div>${montants()?`<span class="mut">${keur(r['Montant HT (€)'])}</span>`:''}<span class="${r['Date Livraison']<a?'retard':''}" style="width:78px;text-align:right">${dfr(r['Date Livraison'])}</span></div>`).join('');
+}
+function derniersDevis(D){
+  const L=[...D].sort((x,y)=>String(y['N° devis']||'').localeCompare(String(x['N° devis']||''))).slice(0,9);
+  return L.map(r=>`<div class="ligneDb" onclick="location.hash='#/devis/${r.id}'"><div class="x"><b style="color:var(--kte)">${esc(txt(r['N° devis']))}</b> ${esc(txt(r.Client))}<small>${esc(txt(r.Objet))}</small></div>${badge(r.Statut)}<span class="mut" style="width:86px;text-align:right">${keur(r['Total HT'])}</span></div>`).join('')||'<div class="vide">Aucun devis</div>';
+}
+function graphe(C,dateCde){
+  const ms=[];const d=new Date();d.setDate(1);for(let i=11;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);ms.push(x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'))}
+  const v=ms.map(m=>C.filter(r=>dateCde(r).startsWith(m)&&txt(r.Statut)!=='Annulée').reduce((s,r)=>s+(+r['Montant HT (€)']||0),0));
+  const max=Math.max(1,...v),W=560,H=190,b=W/12;
+  let s=`<svg viewBox="0 0 ${W} ${H+34}">`;
+  [0,.5,1].forEach(p=>{const y=H-p*H*.9;s+=`<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="#EEF0F4"/>`});
+  v.forEach((x,i)=>{const h=x/max*H*.9,X=i*b+b*.18,w=b*.64;
+    s+=`<rect x="${X}" y="${H-h}" width="${w}" height="${Math.max(h,1)}" rx="4" fill="${i===11?'#2F6FED':'#9DBBF7'}"><title>${ms[i]} : ${eur(x)}</title></rect>`;
+    if(x)s+=`<text x="${X+w/2}" y="${H-h-5}" text-anchor="middle" font-size="10" fill="#6B7385">${x>=1000?Math.round(x/1000)+'k':Math.round(x)}</text>`;
+    s+=`<text x="${X+w/2}" y="${H+16}" text-anchor="middle" font-size="11" fill="#6B7385">${new Date(ms[i]+'-01T00:00').toLocaleDateString('fr-FR',{month:'short'}).replace('.','')}</text>`});
+  return s+'</svg>';
+}
+
+/* ---------- DDP en cours (demandes de prix en consultation chez les sous-traitants) ----------
+   Une DDP = un devis au statut Brouillon ou Consultation SST. Ses consultations viennent de la table
+   « Consultations SST » (une ligne par sous-traitant consulté). Réponses = offres reçues + refus. */
+const DDP_STATUTS=['Brouillon','Consultation SST'];
+const DDP_ETATS=[['complet','Toutes les réponses'],['partiel','Réponses partielles'],['aucune','Aucune réponse'],['sans','Pas encore consulté']];
+function delaiRelance(iso){const j=new Date(iso).getDay();return(j>=4&&j<=6?96:48)*36e5} // jeudi, vendredi, samedi : 96 h
+function ddpConsult(c){
+  const rep=txt(c['Réponse'])||'En attente',base=c['Dernière relance']||c['Envoyée le'];
+  const relance=rep==='En attente'&&base&&Date.now()-new Date(base)>delaiRelance(base);
+  return{c,rep,relance,four:txt(c.Fournisseur)||txt(c['Réf']).replace(/^\S+\s*[–-]\s*/,'')||'?'}}
+function ddpListe(D,CS){
+  const par=new Map();(CS||[]).forEach(c=>{if(txt(c['Réponse'])==='Annulée')return;ids(c.Devis).forEach(i=>{if(!par.has(i))par.set(i,[]);par.get(i).push(c)})});
+  return(D||[]).filter(d=>DDP_STATUTS.includes(txt(d.Statut))).map(d=>{
+    const C=(par.get(d.id)||[]).map(ddpConsult).sort((a,b)=>String(a.c['Envoyée le']||'').localeCompare(String(b.c['Envoyée le']||''))||a.four.localeCompare(b.four,'fr'));
+    const tot=C.length,off=C.filter(x=>x.rep==='Offre reçue'),ref=C.filter(x=>x.rep==='Refus').length,rep=off.length+ref;
+    const etat=!tot?'sans':rep===tot?'complet':rep?'partiel':'aucune';
+    const prix=off.filter(x=>x.c.Montant!=null&&x.c.Montant!==''&&(!x.c.Devise||/^(eur|€)$/i.test(x.c.Devise))).sort((a,b)=>+a.c.Montant-+b.c.Montant)[0];
+    return{d,C,tot,rep,ref,etat,prix,relances:C.filter(x=>x.relance).length}});
+}
+function badgeReponses(x){
+  if(!x.tot)return'<span class="badge" style="background:#F3F4F6;color:#6B7280">—</span>';
+  const [bg,fg]={complet:['#DCFCE7','#15803D'],partiel:['#FFEDD5','#C2410C'],aucune:['#FEE2E2','#B91C1C']}[x.etat];
+  return`<span class="badge" style="background:${bg};color:${fg};font-size:13.5px;font-weight:700;padding:3px 11px" title="${x.rep} réponse(s) sur ${x.tot} sous-traitant(s) consulté(s)">${x.rep}/${x.tot}</span>${x.ref?`<div class="mut" style="font-size:11.5px;margin-top:2px">dont ${x.ref} refus</div>`:''}`}
+function puceSST(x){
+  const c=x.c,[ic,bg,fg]={'Offre reçue':['✔','#DCFCE7','#15803D'],'Refus':['✕','#FEE2E2','#B91C1C'],'Question':['?','#FFEDD5','#C2410C']}[x.rep]||['⏳','#EEF0F4','#4B5563'];
+  const det=[x.four+' : '+x.rep,c['Envoyée le']?'consulté le '+dtfr(c['Envoyée le']):'',c['Réponse le']?'réponse le '+dtfr(c['Réponse le']):'',
+    c.Montant!=null&&c.Montant!==''?'montant '+(c.Devise&&!/^(eur|€)$/i.test(c.Devise)?nb(c.Montant)+' '+c.Devise:eur(c.Montant)):'',c['Délai']?'délai '+c['Délai']:'',
+    c['Dernière relance']?'relancé le '+dtfr(c['Dernière relance']):'',x.relance?'⚠ relance à faire':'',txt(c.Commentaire)].filter(Boolean).join('\n');
+  return`<a class="chip" href="#/consult/${c.id}" onclick="event.stopPropagation()" title="${esc(det)}" style="background:${bg};color:${fg};${x.relance?'box-shadow:inset 0 0 0 1.5px #DC2626;':''}">${ic} ${esc(x.four)}${x.relance?' · relance':''}</a>`}
+/* Date de réception en rouge si le devis n'est pas répondu sous 48 h ouvrées (samedi et dimanche exclus) :
+   le compte part du jour de réception (ou du lundi si reçue le week-end) ; rouge à partir du 2e jour ouvré suivant. */
+function plusJoursOuvres(iso,n){const d=new Date(iso.slice(0,10)+'T12:00');while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);
+  for(let i=0;i<n;){d.setDate(d.getDate()+1);if(d.getDay()!==0&&d.getDay()!==6)i++}return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10)}
+function dateReception(d){const v=d['Date réception']||d.Date;if(!v)return'<span class="mut">—</span>';
+  const lim=plusJoursOuvres(v,2),ret=auj()>=lim;
+  return`<span ${ret?'class="badge" style="background:#FEE2E2;color:#B91C1C;font-size:13px;font-weight:700;padding:3px 10px"':'style="white-space:nowrap"'} title="${ret?'Pas de réponse au client sous 48 h ouvrées (échéance le '+dfr(lim)+')':'Réponse attendue avant le '+dfr(lim)}">${dfr(v)}</span>`}
+let DDPF=ls.get('ddpf','');
+async function vueDDP(){
+  document.title='Akteev – DDP en cours';
+  if(!S.rows[MODS.devis.t]||!S.rows[MODS.consult.t])chargement();
+  await Promise.all([charger(MODS.devis.t),charger(MODS.consult.t)]);
+  charger(MODS.referents.t).catch(()=>{});
+  dessinerDDP();
+}
+function dessinerDDP(){
+  const T=ddpListe(S.rows[MODS.devis.t],S.rows[MODS.consult.t]),cpt={};T.forEach(x=>cpt[x.etat]=(cpt[x.etat]||0)+1);
+  const q=norm($('dq')?.value||'').split(/\s+/).filter(Boolean),ordre={complet:0,partiel:1,aucune:2,sans:3};
+  const L=T.filter(x=>(!DDPF||x.etat===DDPF)&&(!q.length||q.every(w=>norm([x.d['N° devis'],txt(x.d.Client),x.d.Objet,txt(x.d['Référent KTE']),...x.C.map(y=>y.four)].join(' ')).includes(w))))
+    .sort((a,b)=>ordre[a.etat]-ordre[b.etat]||String(a.d['Date réception']||a.d.Date||'').localeCompare(String(b.d['Date réception']||b.d.Date||'')));
+  const nbRel=T.reduce((s,x)=>s+x.relances,0);
+  let h=`<div class="entete"><h1>DDP en cours</h1><span class="sous">${T.length} demande(s) · ${cpt.complet||0} avec toutes les réponses${nbRel?` · <span style="color:#DC2626">${nbRel} relance(s) à faire</span>`:''}</span><div class="act">
+    <button class="btn" id="dMaj">${ico('cal')}Actualiser</button><a class="btn" href="#/consult">${ico('ddp')}Toutes les consultations</a></div></div>
+  <div class="card"><div class="outils">
+    <div class="rech">${ico('loupe')}<input id="dq" placeholder="Filtrer (n°, client, sous-traitant…)" value="${esc($('dq')?.value||'')}"></div>
+    <div class="puces"><button class="puce ${!DDPF?'on':''}" data-e="">Toutes<b>${T.length}</b></button>${DDP_ETATS.map(([e,n])=>`<button class="puce ${DDPF===e?'on':''}" data-e="${e}">${n}<b>${cpt[e]||0}</b></button>`).join('')}</div>
+  </div><div class="tw"><table class="l"><thead><tr><th style="cursor:default">Réponses</th><th style="cursor:default">N° devis</th><th style="cursor:default">Client</th><th style="cursor:default">Objet</th><th style="cursor:default">Sous-traitants consultés</th>${montants()?'<th class="n" style="cursor:default">Meilleure offre</th>':''}<th style="cursor:default">Reçue le</th><th style="cursor:default">Référent</th><th style="cursor:default">Statut</th></tr></thead><tbody>`;
+  h+=L.map(x=>{const d=x.d;return`<tr data-id="${d.id}"><td>${badgeReponses(x)}</td><td class="prim">${esc(txt(d['N° devis']))}</td><td>${esc(txt(d.Client))}</td><td title="${esc(txt(d.Objet))}">${esc(String(txt(d.Objet)).slice(0,70))}${String(txt(d.Objet)).length>70?'…':''}</td>
+    <td>${x.C.map(puceSST).join('')||'<span class="mut">Aucune consultation enregistrée</span>'}</td>${montants()?`<td class="n">${x.prix?`${eur(x.prix.c.Montant)}<div class="mut" style="font-size:11.5px">${esc(x.prix.four)}</div>`:'<span class="mut">—</span>'}</td>`:''}
+    <td>${dateReception(d)}</td><td>${esc(txt(d['Référent KTE']))||'<span class="mut">—</span>'}</td><td>${badge(d.Statut)}</td></tr>`}).join('');
+  h+=`</tbody></table></div>${L.length?'':'<div class="vide">Aucune DDP dans ce filtre</div>'}
+  <div class="plus mut" style="font-size:12.5px;text-align:left">✔ offre reçue · ✕ refus · ? question du sous-traitant · ⏳ en attente (encadré rouge : relance due, 48 h après l’envoi, 96 h si envoyé un jeudi, vendredi ou samedi). Date de réception en rouge : pas de réponse au client sous 48 h (hors samedi et dimanche). Mise à jour automatique toutes les heures (8 h – 19 h) à partir des boîtes kte@ et de Matthias.</div></div>`;
+  $('main').innerHTML=h;
+  const dq=$('dq');dq.oninput=()=>{dessinerDDP();const n=$('dq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
+  document.querySelectorAll('.puce[data-e]').forEach(b=>b.onclick=()=>{DDPF=b.dataset.e;ls.set('ddpf',DDPF);dessinerDDP()});
+  document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/devis/${tr.dataset.id}`);
+  $('dMaj').onclick=async()=>{$('dMaj').disabled=true;try{await Promise.all([charger(MODS.devis.t,true),charger(MODS.consult.t,true)]);dessinerDDP();toast('DDP actualisées')}catch(e){toast('Échec : '+e.message,true);$('dMaj').disabled=false}};
+}
+
+/* ---------- Liste ---------- */
+const ETAT=ls.get('etat',{});
+function etat(k){const E=ETAT[k]||(ETAT[k]={q:'',st:[],tri:null,vue:MODS[k].vue||'liste',ref:'',lim:100,tout:false});
+  if(typeof E.q!=='string')E.q='';if(!E.lim)E.lim=100;if(!Array.isArray(E.st))E.st=[];if(!E.cf)E.cf={};
+  if(k==='taches'&&!E.v2){E.vue='liste';E.tri=null;E.cf={};E.v2=true}return E}
+/* Colonnes calculées (affichage seulement, jamais envoyées à Baserow). */
+const VIRT={taches(rows,sc){
+  const C=S.rows[MODS.commandes.t]||[],parId=new Map(C.map(c=>[c.id,c]));
+  const aj=(name,f)=>{if(!sc.par[name]){const x={id:'v_'+name,name,virt:true,read_only:true,...f};sc.fields.push(x);sc.par[name]=x}};
+  aj('Affaire',{type:'link_row',link_row_table_id:MODS.commandes.t});aj('Client',{type:'link_row',link_row_table_id:MODS.clients.t});
+  aj('Tâche',{type:'text'});aj('Délai',{type:'date',relatif:true});aj('Pièces',{type:'text',infobulle:'Notes'});
+  const SY=new Map((S.rows[MODS.synthese.t]||[]).map(x=>[x.id,x])),DV=new Map((S.rows[MODS.devis.t]||[]).map(x=>[x.id,x])),LD=new Map((S.rows[1261171]||[]).map(x=>[x.id,x]));
+  for(const r of rows){const cde=(r.Commande||[]).map(x=>parId.get(x.id)).filter(Boolean);
+    r['Affaire']=r.Commande||[];
+    const cl=new Map();cde.forEach(c=>(c.Client||[]).forEach(x=>cl.set(x.id,x)));r['Client']=[...cl.values()];
+    r['Tâche']=txt(r['Type de tâche'])||String(txt(r['Libellé'])).replace(/^\S+\s*[–-]\s*/,'');
+    r['Délai']=r['Échéance']||null;
+    r['Pièces']=piecesTache(r,cde,SY,DV,LD)}
+}};
+/* « 3+5+6 pcs » : une quantité par ligne. Source : lignes de synthèse liées à la tâche ;
+   pour une expédition, lignes du devis de la commande ; sinon la quantité en tête des notes. */
+function piecesTache(r,cde,SY,DV,LD){
+  const ord=(a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id;
+  let q=ids(r['Synthèse commande']).map(i=>SY.get(i)).filter(x=>x&&!/annul/i.test(txt(x.Statut))).sort(ord).map(x=>+x['Qté attribuée']||+x['Quantité']||0);
+  if(!q.length&&/exp[ée]di|livr/i.test(txt(r['Type de tâche'])+' '+txt(r['Libellé']))){
+    const dv=cde.flatMap(c=>ids(c.Devis)).map(i=>DV.get(i)).filter(Boolean);
+    q=dv.flatMap(d=>ids(d['Lignes de devis'])).map(i=>LD.get(i)).filter(Boolean).sort(ord).map(x=>+x['Quantité']||0)}
+  if(!q.length){const mt=String(txt(r.Notes)).match(/^\s*(\d+(?:[.,]\d+)?)\s*(?:x|×)?\s*[A-Za-zÀ-ÿ]/);if(mt)q=[+mt[1].replace(',','.')]}
+  q=q.filter(x=>x>0);if(!q.length)return'';
+  const tot=q.reduce((a,b)=>a+b,0),u=tot>1?'pcs':'pc';
+  return q.length>8?`${q.length} lignes · ${nb(tot)} ${u}`:`${q.map(nb).join('+')} ${u}`}
+/* Statut modifiable directement dans les listes. */
+function celluleStatut(k,r){
+  const m=MODS[k],f=sch(m.t).par[m.statut],o=(f?.select_options)||[];if(!o.length)return rendu(f,r[m.statut],true);
+  return`<span class="selStatut" title="Changer le statut">${badge(r[m.statut])||'<span class="badge">—</span>'}<span class="mut" style="font-size:11px"> ▾</span><select data-st="${r.id}" data-k="${k}">${r[m.statut]?'':'<option value="" selected>—</option>'}${o.map(x=>`<option value="${x.id}" ${r[m.statut]?.id===x.id?'selected':''}>${esc(x.value)}</option>`).join('')}</select></span>`}
+function brancherStatuts(box,apres){
+  box.querySelectorAll('select[data-st]').forEach(s=>{s.onclick=e=>e.stopPropagation();s.parentElement.onclick=e=>e.stopPropagation();
+    s.onchange=async()=>{const k=s.dataset.k,m=MODS[k],row=S.rows[m.t].find(x=>x.id==s.dataset.st),o=sch(m.t).par[m.statut].select_options.find(x=>x.id==s.value);if(!row||!o)return;
+      s.disabled=true;try{await changerStatut(k,row,o.id,o.value)}catch(er){toast('Échec : '+er.message,true)}apres()}})}
+function enrichir(k){const m=MODS[k];if(m.virt&&S.rows[m.t])VIRT[m.virt](S.rows[m.t],sch(m.t))}
+function delaiRel(r,v){
+  if(!v)return'<span class="mut">—</span>';const d=Math.round((new Date(v.slice(0,10)+'T00:00')-new Date(auj()+'T00:00'))/864e5);
+  let b='';if(tacheOuverte(r)){b=d<0?`<span class="badge" style="background:#FEE2E2;color:#B91C1C">retard ${-d} j</span>`:d===0?`<span class="badge" style="background:#FFEDD5;color:#C2410C">aujourd’hui</span>`:d<=7?`<span class="badge" style="background:#FEF9C3;color:#A16207">J-${d}</span>`:`<span class="badge" style="background:#EEF0F4;color:#4B5563">J-${d}</span>`}
+  else if(/^fait/i.test(txt(r.Statut)))b=`<span class="mut" style="font-size:12px">fait${r['Fait le']?' le '+dfr(r['Fait le']):''}</span>`;
+  return`<span style="white-space:nowrap">${dfr(v)} ${b}</span>`}
+function sauverEtat(){const c={};for(const k in ETAT){const{q,lim,...r}=ETAT[k];c[k]=r}ls.set('etat',c)}
+async function vueListe(k){
+  const m=MODS[k],E=etat(k),p=params();
+  document.title='Akteev – '+m.nom;
+  if(p.f==='retard'){E.st=[];E.retard=true;E.tout=false}else if(p.f==='encours'){E.st=[];E.encours=true}
+  if(!S.rows[m.t])chargement();
+  await charger(m.t);
+  if(m.virt)await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));
+  if(m.ref)charger(MODS.referents.t).catch(()=>{});
+  dessinerListe(k);
+}
+function filtrer(k){
+  enrichir(k);
+  // une recherche ou un filtre de colonne retrouve aussi les éléments masqués (ex. devis acceptés / refusés)
+  const recherche=!!(etat(k).q.trim()||nbCf(etat(k)));
+  const m=MODS[k],E=etat(k),R=S.rows[m.t]||[],sc=sch(m.t),q=norm(E.q).split(/\s+/).filter(Boolean);
+  return R.filter(r=>{
+    const st=m.statut?txt(r[m.statut]):'';
+    if(E.st.length&&!E.st.includes(st))return false;
+    if(!E.st.length&&!E.tout&&!recherche&&m.cacheStatuts?.includes(st))return false;
+    if(E.retard&&!(tacheOuverte(r)&&r[m.date]&&r[m.date]<auj()))return false;
+    if(E.encours&&!devisEnCours(r))return false;
+    if(E.ref&&m.ref&&!ids(r[m.ref]).includes(+E.ref))return false;
+    if(q.length){const s=norm(Object.values(r).map(txt).join(' '));if(!q.every(w=>s.includes(w)))return false}
+    for(const [c,v] of Object.entries(E.cf||{})){if(!v||!sc.par[c])continue;const f=sc.par[c];
+      if(estChoix(f)){if(!valsChoix(f,r[c]).includes(v))return false}
+      else if(!norm(txtFiltre(r[c])).includes(norm(v)))return false}
+    return true});
+}
+const estChoix=f=>f&&['single_select','multiple_select','link_row','boolean'].includes(f.type);
+function valsChoix(f,x){if(f.type==='boolean')return[x?'Oui':'Non'];if(x==null||x===''||(Array.isArray(x)&&!x.length))return['(vide)'];return Array.isArray(x)?x.map(o=>txt(o)):[txt(x)]}
+function txtFiltre(x){const t=txt(x);return /^\d{4}-\d{2}-\d{2}/.test(t)?t+' '+dfr(t.slice(0,10)):t}
+const nbCf=E=>Object.values(E.cf||{}).filter(Boolean).length;
+function colonnes(k){enrichir(k);const m=MODS[k],sc=sch(m.t);let c=m.cols.filter(n=>sc.par[n]&&!masque(n));if(c.length<2)c=sc.fields.slice(0,7).map(f=>f.name);if(!m.sansPrim&&!c.includes(sc.prim))c.unshift(sc.prim);return c.filter(n=>!masque(n))}
+function trier(k,L){
+  const m=MODS[k],E=etat(k),sc=sch(m.t);
+  let f=E.tri?.f,dir=E.tri?.d||1;
+  if(!f){if(m.num&&sc.par[m.num]){f=m.num;dir=-1}else if(m.date&&sc.par[m.date]){f=m.date;dir=k==='taches'?1:-1}else if(m.ordre&&sc.par[m.ordre]){f=m.ordre}else f=sc.prim}
+  const F=sc.par[f];
+  return L.map(r=>[triVal(F,r[f]),r]).sort((a,b)=>a[0]==null?1:b[0]==null?-1:(a[0]<b[0]?-dir:a[0]>b[0]?dir:0)).map(x=>x[1]);
+}
+function dessinerListe(k){
+  const m=MODS[k],E=etat(k),sc=sch(m.t),R=S.rows[m.t]||[];
+  const cols=colonnes(k);
+  const L=trier(k,filtrer(k));
+  const stF=m.statut&&sc.par[m.statut];
+  const opts=stF?(stF.select_options?.length?stF.select_options:optsVues(R.map(r=>r[m.statut]).filter(Boolean))):[];
+  const cpt={};R.forEach(r=>{const s=txt(r[m.statut]);cpt[s]=(cpt[s]||0)+1});
+  const neuf=!peutEcrire(k)?'':k==='bl'?`<button class="btn p" onclick="nouveauBL()">${ico('plus')}Nouveau BL</button>`:m.editeur||k==='commandes'?`<a class="btn p" href="${EDITEUR}" target="_blank" title="${k==='commandes'?'Une commande se crée depuis le devis (bouton « Commande reçue » de l’éditeur)':'Numérotation et mise en page dans l’éditeur'}">${ico('plus')}${k==='commandes'?'Commande reçue (éditeur)':nouv(m)}</a>`:`<a class="btn p" href="#/${k}/nouveau">${ico('plus')}${nouv(m)}</a>`;
+  const refs=S.rows[MODS.referents.t]||[];
+  let h=`<div class="entete"><h1>${m.nom}</h1><span class="sous">${L.length} sur ${R.length}</span><div class="act">
+    <button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>
+  <div class="card"><div class="outils">
+    <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
+    ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
+    ${m.ref&&sc.par[m.ref]?`<select id="lref"><option value="">Tous les référents</option>${MOI?`<option value="${MOI}">Moi</option>`:''}${refs.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('')}</select>`:''}
+    ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout&&!(E.q.trim()||nbCf(E))?'En cours':'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
+    ${stF?`<div class="bascule"><button data-v="liste" class="${E.vue==='liste'?'on':''}">${ico('liste')}Liste</button><button data-v="kanban" class="${E.vue==='kanban'?'on':''}">${ico('kanban')}Tableau</button></div>`:''}
+  </div>`;
+  if(E.vue==='kanban'&&stF){h+=`</div><div style="margin-top:14px">${kanban(k,L,opts)}</div>`}
+  else{
+    const tot={};cols.forEach(c=>{const f=sc.par[c];if(f&&(f.type==='number'||f.type==='formula'||f.type==='rollup')&&estMonnaie(c))tot[c]=L.reduce((s,r)=>s+(+r[c]||0),0)});
+    h+=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c],num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));return`<th data-c="${esc(c)}" class="${num?'n':''}">${esc(c)} <span class="fl">${E.tri?.f===c?(E.tri.d>0?'▲':'▼'):''}</span></th>`}).join('')}</tr>${ligneFiltres(k,cols)}</thead><tbody>`;
+    const a=auj();
+    h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
+      const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
+      const prim=m.sansPrim?c===cols[0]:c===sc.prim;
+      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${c===m.statut&&k==='taches'&&peutEcrire(k)?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
+    h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
+    if(!L.length)h+='<div class="vide">Aucun résultat</div>';
+    if(L.length>E.lim)h+=`<div class="plus"><button class="btn" id="bPlus">Afficher plus (${L.length-E.lim} restants)</button></div>`;
+    h+='</div>';
+  }
+  $('main').innerHTML=h;
+  document.querySelectorAll('tr.filtres [data-cf]').forEach(e=>{const c=e.dataset.cf;
+    e[e.tagName==='SELECT'?'onchange':'oninput']=()=>{E.cf=E.cf||{};if(e.value)E.cf[c]=e.value;else delete E.cf[c];E.lim=100;sauverEtat();dessinerListe(k);
+      const n=[...document.querySelectorAll('tr.filtres [data-cf]')].find(x=>x.dataset.cf===c);if(n){n.focus();if(n.tagName==='INPUT')n.setSelectionRange(n.value.length,n.value.length)}}});
+  document.querySelectorAll('[data-cfclear]').forEach(b=>b.onclick=()=>{E.cf={};sauverEtat();dessinerListe(k)});
+  const lq=$('lq');lq.oninput=()=>{E.q=lq.value;E.lim=100;dessinerListe(k);const n=$('lq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
+  if($('lref')){$('lref').value=E.ref;$('lref').onchange=e=>{E.ref=e.target.value;sauverEtat();dessinerListe(k)}}
+  document.querySelectorAll('.puce[data-s]').forEach(b=>b.onclick=()=>{const s=b.dataset.s;E.retard=false;E.encours=false;if(!s)E.st=[];else E.st=E.st.includes(s)?E.st.filter(x=>x!==s):[...E.st,s];if(location.hash.includes('?'))history.replaceState(null,'','#/'+k);sauverEtat();dessinerListe(k)});
+  document.querySelectorAll('.puce[data-tout]').forEach(b=>b.onclick=()=>{E.tout=!E.tout;sauverEtat();dessinerListe(k)});
+  document.querySelectorAll('.bascule button').forEach(b=>b.onclick=()=>{E.vue=b.dataset.v;sauverEtat();dessinerListe(k)});
+  document.querySelectorAll('table.l th[data-c]').forEach(th=>th.onclick=()=>{const c=th.dataset.c;E.tri=E.tri?.f===c?{f:c,d:-E.tri.d}:{f:c,d:1};sauverEtat();dessinerListe(k)});
+  document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/${k}/${tr.dataset.id}`);
+  if($('bPlus'))$('bPlus').onclick=()=>{E.lim+=200;dessinerListe(k)};
+  if(E.vue==='kanban'&&peutEcrire(k))brancherKanban(k);
+  if(E.vue==='kanban'&&!peutEcrire(k))document.querySelectorAll('.kcard').forEach(c=>{c.draggable=false;c.onclick=()=>location.hash=`#/${k}/${c.dataset.id}`});
+  brancherStatuts($('main'),()=>dessinerListe(k));
+}
+function ligneFiltres(k,cols){
+  const m=MODS[k],E=etat(k),sc=sch(m.t),R=S.rows[m.t]||[];
+  return`<tr class="filtres">${cols.map(c=>{const f=sc.par[c],v=(E.cf||{})[c]||'';
+    if(estChoix(f)){const cpt=new Map();R.forEach(r=>valsChoix(f,r[c]).forEach(x=>cpt.set(x,(cpt.get(x)||0)+1)));
+      let vals=[...cpt.keys()];if(f.type==='single_select'&&f.select_options)vals.sort((a,b)=>{const i=f.select_options.findIndex(o=>o.value===a),j=f.select_options.findIndex(o=>o.value===b);return(i<0?999:i)-(j<0?999:j)});else vals.sort((a,b)=>a==='(vide)'?1:b==='(vide)'?-1:a.localeCompare(b,'fr'));
+      if(v&&!cpt.has(v))vals.unshift(v);
+      return`<th><select data-cf="${esc(c)}" class="${v?'on':''}"><option value="">Tous</option>${vals.map(x=>`<option value="${esc(x)}" ${x===v?'selected':''}>${esc(x)} (${cpt.get(x)||0})</option>`).join('')}</select></th>`}
+    return`<th><input data-cf="${esc(c)}" class="${v?'on':''}" placeholder="Contient…" value="${esc(v)}"></th>`}).join('')}</tr>`;
+}
+function kanban(k,L,opts){
+  const m=MODS[k],sc=sch(m.t),E=etat(k),a=auj();
+  const cols=opts.filter(o=>E.st.length?E.st.includes(o.value):E.tout||!m.cacheStatuts?.includes(o.value));
+  const sec=m.cols.filter(c=>c!==sc.prim&&c!==m.statut&&sc.par[c]).slice(0,3);
+  return`<div class="kanban">${cols.map(o=>{const [bg,fg]=coul(o.color);const C=L.filter(r=>r[m.statut]?.id===o.id||txt(r[m.statut])===o.value);
+    return`<div class="kcol" data-o="${o.id}" data-v="${esc(o.value)}"><h3><span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span><span class="nb">${C.length}</span></h3>
+    ${C.slice(0,150).map(r=>{const d=m.date&&r[m.date];return`<div class="kcard" draggable="true" data-id="${r.id}" style="border-left-color:${fg}"><div class="t">${esc(titre(m.t,r))}</div><div class="m">${sec.map(c=>{const v=r[c];if(v==null||v===''||(Array.isArray(v)&&!v.length))return'';const f=sc.par[c];return`<span class="${c===m.date&&v<a&&tacheOuverte(r)?'retard':''}">${f.type==='date'?'📅 '+dfr(v):esc(txt(v)).slice(0,40)}</span>`}).join('')}${d&&!sec.includes(m.date)?`<span class="${d<a&&tacheOuverte(r)?'retard':''}">📅 ${dfr(d)}</span>`:''}</div></div>`}).join('')}</div>`}).join('')}</div>`;
+}
+function brancherKanban(k){
+  const m=MODS[k];let drag=null;
+  document.querySelectorAll('.kcard').forEach(c=>{c.ondragstart=e=>{drag=c.dataset.id;e.dataTransfer.effectAllowed='move'};c.onclick=()=>location.hash=`#/${k}/${c.dataset.id}`});
+  document.querySelectorAll('.kcol').forEach(col=>{
+    col.ondragover=e=>{e.preventDefault();col.classList.add('over')};col.ondragleave=()=>col.classList.remove('over');
+    col.ondrop=async e=>{e.preventDefault();col.classList.remove('over');if(!drag)return;
+      const row=S.rows[m.t].find(r=>r.id==drag);if(row[m.statut]?.id==col.dataset.o)return;
+      try{await changerStatut(k,row,+col.dataset.o,col.dataset.v);dessinerListe(k)}catch(er){toast('Échec : '+er.message,true)}}});
+}
+async function changerStatut(k,row,oid,val){
+  const m=MODS[k],corps={[m.statut]:oid>0?oid:val};
+  if(m.faitLe&&sch(m.t).par[m.faitLe]&&/^fait/i.test(val)&&!row[m.faitLe])corps[m.faitLe]=auj();
+  const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
+  majRow(m.t,r);majCompteurs();toast(`${titre(m.t,r)} → ${val}`);return r;
+}
+function exporter(k){
+  const m=MODS[k],cols=colonnes(k),L=trier(k,filtrer(k));
+  const c=v=>'"'+String(v).replace(/"/g,'""')+'"';
+  const sc=sch(m.t);
+  const csv='﻿'+[cols.map(c).join(';'),...L.map(r=>cols.map(n=>{const v=r[n],f=sc.par[n];if(v&&(f?.type==='date'||f?.type==='created_on'||f?.type==='last_modified'))return c(f.date_include_time||f.type!=='date'?frDateHeure(v):frDate(v));return c(typeof v==='string'&&/^-?\d+\.\d+$/.test(v)?v.replace('.',','):txt(v))}).join(';'))].join('\r\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=`${m.nom}_${auj()}.csv`;a.click();
+}
+
+/* ---------- Fiche ---------- */
+async function vueFiche(k,id){
+  const m=MODS[k];
+  if(!S.rows[m.t])chargement();
+  await charger(m.t);
+  const sc=sch(m.t),nouveau=id==='nouveau';
+  let row=nouveau?{}:S.rows[m.t].find(r=>r.id==id);
+  if(!row&&!nouveau){row=await api(`/rows/table/${m.t}/${id}/?user_field_names=true`);majRow(m.t,row)}
+  SALE={k,t:m.t,id:nouveau?null:row.id,draft:{},row};
+  if(nouveau){const p=params();for(const [n,v] of Object.entries(p)){const f=sc.par[n];if(!f)continue;
+      if(f.type==='link_row'){const cible=S.rows[f.link_row_table_id]||await charger(f.link_row_table_id).catch(()=>[]);const x=cible.find(r=>r.id==v);SALE.draft[n]=[{id:+v,value:x?titre(f.link_row_table_id,x):'#'+v}]}
+      else SALE.draft[n]=v}
+    if(m.statut&&sc.par[m.statut]&&!SALE.draft[m.statut]){const o=sc.par[m.statut].select_options?.[0];if(o)SALE.draft[m.statut]=o}
+    if(k==='taches'&&MOI&&!SALE.draft['Référent']){const R=S.rows[MODS.referents.t]||[];const me=R.find(r=>r.id===MOI);if(me)SALE.draft['Référent']=[{id:MOI,value:titre(MODS.referents.t,me)}]}
+  }
+  dessinerFiche();
+}
+function val(n){return n in SALE.draft?SALE.draft[n]:SALE.row[n]}
+function dessinerFiche(){
+  const {k,t}=SALE,m=MODS[k],sc=sch(t),row=SALE.row,nouveau=!SALE.id;
+  const nom=nouveau?nouv(m):titre(t,row);
+  document.title='Akteev – '+nom;
+  const ecr=peutEcrire(k);
+  const ed=ecr?sc.fields.filter(f=>!f.virt&&!masque(f.name)&&!RO_TYPES.has(f.type)&&!f.read_only):[];
+  const ro=sc.fields.filter(f=>!f.virt&&!masque(f.name)&&(!ecr||RO_TYPES.has(f.type)||f.read_only));
+  const stF=m.statut&&sc.par[m.statut];
+  const lienEditeur=m.editeur&&!nouveau&&row[m.num]?`${EDITEUR}?${m.editeur}=${encodeURIComponent(txt(row[m.num]))}`:null;
+  const devisCde=k==='commandes'&&!nouveau?(row['Devis']?.[0]?.value||txt(row['N° affaire'])):null;
+  let h=`<div class="entete"><a class="btn" href="#/${k}" title="Retour à la liste">${ico('retour')}</a><h1>${esc(nom)}</h1>
+    ${stF&&!nouveau&&!ecr?badge(val(m.statut)):''}${stF&&!nouveau&&ecr?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
+    <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
+    <div class="act">${lienEditeur?`<a class="btn p" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
+    ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
+    ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
+    ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
+    ${!nouveau&&estAdmin()?`<a class="btn" href="https://baserow.io/database/592007/table/${t}/row/${row.id}" target="_blank" title="Ouvrir la ligne dans Baserow">Baserow ↗</a>`:''}</div></div>
+  <div class="fiche"><div>
+   <div class="card">${ecr?`<div class="form">${ed.map(f=>champ(f)).join('')}</div>`:''}
+   ${ro.length&&!nouveau?(()=>{const bloc=`<div class="form">${ro.map(f=>`<div class="ch ${f.type==='file'||f.type==='long_text'||String(txt(row[f.name])).length>60?'plein':''}"><label>${esc(f.name)}</label><div class="ro">${rendu(f,row[f.name])}</div></div>`).join('')}</div>`;return ecr?`<details class="calc"><summary>Champs calculés et pièces jointes (${ro.length})</summary>${bloc}</details>`:bloc})():''}
+   </div>
+   ${!nouveau&&m.liees?`<div class="card" style="margin-top:16px" id="liees"></div>`:''}
+  </div><div class="cote">${cote(k,row,nouveau)}</div></div>`;
+  $('main').innerHTML=h;
+  brancherChamps();
+  if($('bBL'))$('bBL').onclick=()=>fenetreBL(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
+  if($('selSt'))$('selSt').onchange=async e=>{const o=stF.select_options.find(x=>x.id==e.target.value);try{const r=await changerStatut(k,SALE.row,o.id,o.value);SALE.row=r;delete SALE.draft[m.statut];dessinerFiche()}catch(er){toast('Échec : '+er.message,true)}};
+  if(!nouveau&&m.liees)dessinerLiees(0);
+  if(!nouveau&&k==='commandes')documentsAffaire(row).catch(e=>{if($('docsAff'))$('docsAff').innerHTML=`<div class="c mut">${esc(e.message)}</div>`});
+  barre();
+}
+function cote(k,row,nouveau){
+  if(nouveau)return`<div class="card"><h3>Création</h3><div class="c mut">Renseignez les champs puis « Enregistrer ».${MODS[k].requis?'<br><br>Obligatoires : '+MODS[k].requis.join(', ')+'.':''}</div></div>`;
+  const liens=[];
+  for(const [n,v] of Object.entries(row)){if(k==='commandes'&&/pdf|excel/i.test(n))continue;if(typeof v==='string'&&/^https?:\/\//.test(v)){const lab=/sharepoint|dossier/i.test(n)?['dossier',n]:/pdf/i.test(n)?['pdf',n]:['ext',n];liens.push(`<a class="lien" href="${esc(v)}" target="_blank">${ico(lab[0])}${esc(lab[1])}</a>`)}}
+  let h=k==='commandes'?`<div class="card"><h3>Documents de l’affaire</h3><div id="docsAff"><div class="c mut">Recherche des documents…</div></div></div>`:'';
+  h+=liens.length?`<div class="card"><h3>${k==='commandes'?'Liens':'Documents et liens'}</h3>${liens.join('')}</div>`:'';
+  if(k==='clients'){const D=(S.rows[MODS.devis.t]||[]).filter(r=>ids(r.Client).includes(row.id)),C=(S.rows[MODS.commandes.t]||[]).filter(r=>ids(r.Client).includes(row.id));
+    if(montants())h+=`<div class="card"><h3>Synthèse client</h3><div class="c">${D.length} devis · ${C.length} commande(s)<br>Commandé total : <b>${eur(C.filter(r=>txt(r.Statut)!=='Annulée').reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))}</b> HT<br>Devis en cours : <b>${eur(D.filter(devisEnCours).reduce((s,r)=>s+(+r['Total HT']||0),0))}</b> HT</div></div>`;
+    charger(MODS.devis.t).then(()=>charger(MODS.commandes.t)).catch(()=>{});}
+  if(k==='commandes'){const T=(S.rows[MODS.taches.t]||[]).filter(r=>ids(r.Commande).includes(row.id)&&!/annul/i.test(txt(r.Statut)));
+    const f=T.filter(r=>/^fait/i.test(txt(r.Statut))).length;const p=T.length?Math.round(f/T.length*100):0;
+    h+=`<div class="card"><h3>Avancement</h3><div class="c"><div style="display:flex;justify-content:space-between"><span>${f} / ${T.length} tâche(s) faite(s)</span><b>${p} %</b></div><div style="height:8px;background:#EEF1F6;border-radius:4px;margin-top:8px"><div style="height:8px;width:${p}%;background:var(--ok);border-radius:4px"></div></div>${row['Date Livraison']?`<div style="margin-top:10px">Livraison prévue : <b class="${row['Date Livraison']<auj()&&txt(row.Statut)==='Commandé'?'retard':''}">${dfr(row['Date Livraison'])}</b></div>`:''}</div></div>`}
+  h+=`<div class="card"><h3>Informations</h3><div class="c mut">Ligne Baserow n° ${row.id}<br>Table ${MODS[k].nom}<br><br>Aucune suppression ici : pour retirer un élément, passez son statut à « Annulée ».</div></div>`;
+  return h;
+}
+function champ(f){
+  const n=f.name,v=val(n),m=MODS[SALE.k],req=m.requis?.includes(n);
+  const mod=n in SALE.draft?'modif':'';
+  const plein=f.type==='long_text'||(f.type==='link_row'&&(v||[]).length>3)||/adresse|observ|notes|commentaire|précisions|description/i.test(n);
+  let inp;
+  const lab=`<label>${esc(n)}${req?' <span class="req">*</span>':''}</label>`;
+  switch(f.type){
+    case 'long_text':inp=`<textarea class="ed ${mod}" data-f="${esc(n)}" rows="3">${esc(v??'')}</textarea>`;break;
+    case 'number':case 'rating':case 'duration':inp=`<input class="ed ${mod}" type="number" step="${f.number_decimal_places?Math.pow(10,-f.number_decimal_places):1}" data-f="${esc(n)}" value="${esc(v??'')}">`;break;
+    case 'boolean':inp=`<div style="padding:5px 0"><input type="checkbox" data-f="${esc(n)}" ${v?'checked':''} style="width:18px;height:18px"></div>`;break;
+    case 'date':inp=champDate(`data-f="${esc(n)}"`,v,!!f.date_include_time,mod);break;
+    case 'single_select':inp=`<select class="ed ${mod}" data-f="${esc(n)}"><option value="">—</option>${(f.select_options||[]).map(o=>`<option value="${o.id}" ${v?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select>`;break;
+    case 'multiple_select':inp=`<div class="lienEd ${mod}" data-ms="${esc(n)}">${(v||[]).map(o=>`<span class="chip">${esc(o.value)}<span class="x" data-x="${o.id}">×</span></span>`).join('')}<select class="ed" style="width:auto;min-height:24px;padding:1px 4px" data-msadd="${esc(n)}"><option value="">+ ajouter</option>${(f.select_options||[]).filter(o=>!(v||[]).some(x=>x.id===o.id)).map(o=>`<option value="${o.id}">${esc(o.value)}</option>`).join('')}</select></div>`;break;
+    case 'link_row':{const mm=MOD_DE_TABLE[f.link_row_table_id];
+      inp=`<div class="lienEd ${mod}" data-lien="${esc(n)}">${(v||[]).map(x=>`<span class="chip">${mm?`<a href="#/${mm}/${x.id}">${esc(x.value)}</a>`:esc(x.value)}<span class="x" data-x="${x.id}" title="Retirer">×</span></span>`).join('')}<button data-ajout="${esc(n)}">+ ${v&&v.length?'':'choisir'}</button></div>`;break}
+    case 'email':inp=`<input class="ed ${mod}" type="email" data-f="${esc(n)}" value="${esc(v??'')}">`;break;
+    case 'url':inp=`<div style="display:flex;gap:6px;align-items:center"><input class="ed ${mod}" type="url" data-f="${esc(n)}" value="${esc(v??'')}">${v?`<a href="${esc(v)}" target="_blank" title="Ouvrir">${ico('ext','width=16')}</a>`:''}</div>`;break;
+    default:inp=f.type==='text'&&(/^date\b/i.test(n)||/^\d{4}-\d{2}-\d{2}$/.test(txt(v)))?champDate(`data-f="${esc(n)}" data-txtdate="1"`,txt(v),false,mod):`<input class="ed ${mod}" data-f="${esc(n)}" value="${esc(txt(v))}">`;
+  }
+  return`<div class="ch ${plein?'plein':''}">${lab}${inp}</div>`;
+}
+function locIso(v){const d=new Date(v);return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,16)}
+/* Dates : toujours saisies et affichées en jj/mm/aaaa (indépendamment de la langue du navigateur),
+   enregistrées en ISO dans Baserow. Bouton calendrier = sélecteur natif caché. */
+const p2=n=>String(n).padStart(2,'0');
+function frDate(v){if(!v)return'';const m=String(v).match(/^(\d{4})-(\d{2})-(\d{2})/);return m?`${m[3]}/${m[2]}/${m[1]}`:String(v)}
+function frDateHeure(v){if(!v)return'';const d=new Date(v);return isNaN(d)?String(v):`${p2(d.getDate())}/${p2(d.getMonth()+1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}`}
+function lireDateFr(t,heure){t=String(t||'').trim();if(!t)return'';
+  let m=t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ](\d{1,2}):(\d{2}))?$/),j,mo,a,h=0,mi=0;
+  if(m){a=+m[1];mo=+m[2];j=+m[3];h=+(m[4]||0);mi=+(m[5]||0)}
+  else{m=t.match(/^(\d{1,2})[\/.\- ](\d{1,2})[\/.\- ](\d{2}|\d{4})(?:\s+(\d{1,2})[:h](\d{2}))?$/)||t.match(/^(\d{2})(\d{2})(\d{4}|\d{2})$/);if(!m)return undefined;
+    j=+m[1];mo=+m[2];a=+m[3];if(a<100)a+=2000;h=+(m[4]||0);mi=+(m[5]||0)}
+  const d=new Date(a,mo-1,j,h,mi);if(d.getFullYear()!==a||d.getMonth()!==mo-1||d.getDate()!==j||h>23||mi>59)return undefined;
+  return heure?d.toISOString():`${a}-${p2(mo)}-${p2(j)}`}
+function champDate(attrs,v,heure,cls){
+  return`<span class="dtw"><input class="ed ${cls||''}" ${attrs} data-date="${heure?2:1}" value="${esc(heure?frDateHeure(v):frDate(v))}" placeholder="${heure?'jj/mm/aaaa hh:mm':'jj/mm/aaaa'}" autocomplete="off"><button type="button" class="cal" tabindex="-1" title="Calendrier">${ico('cal')}</button><input type="${heure?'datetime-local':'date'}" class="dtn" tabindex="-1" aria-hidden="true"></span>`}
+document.addEventListener('click',e=>{const b=e.target.closest('.dtw .cal');if(!b)return;e.preventDefault();e.stopPropagation();
+  const w=b.parentElement,t=w.querySelector('[data-date]'),n=w.querySelector('.dtn'),iso=lireDateFr(t.value,t.dataset.date==='2');
+  n.value=iso?(t.dataset.date==='2'?locIso(iso):iso):'';try{n.showPicker()}catch(er){n.style.pointerEvents='auto';n.focus();n.click()}});
+document.addEventListener('change',e=>{if(!e.target.classList?.contains('dtn'))return;const n=e.target,t=n.parentElement.querySelector('[data-date]');
+  t.value=t.dataset.date==='2'?(n.value?frDateHeure(new Date(n.value).toISOString()):''):frDate(n.value);t.dispatchEvent(new Event('change',{bubbles:true}))});
+document.addEventListener('change',e=>{const t=e.target;if(!t.dataset?.date)return;const ok=lireDateFr(t.value,t.dataset.date==='2')!==undefined;t.classList.toggle('invalide',!ok);
+  if(!ok)toast('Date invalide : utilisez le format jj/mm/aaaa',true);else if(t.value&&t.dataset.date==='1'){const iso=lireDateFr(t.value);t.value=frDate(iso)}},true);
+function brancherChamps(){
+  const sc=sch(SALE.t);
+  document.querySelectorAll('.form [data-f]').forEach(e=>{
+    const f=sc.par[e.dataset.f];
+    const lire=()=>{let x;
+      if(f.type==='boolean')x=e.checked;
+      else if(f.type==='single_select'){const o=(f.select_options||[]).find(o=>o.id==e.value);x=o||null}
+      else if(e.dataset.date){const d=lireDateFr(e.value,e.dataset.date==='2');if(d===undefined)return;x=e.dataset.txtdate?d:(d||null)}
+      else x=e.value;
+      const orig=SALE.row[f.name];
+      const same=f.type==='single_select'?(orig?.id??null)===(x?.id??null):f.type==='number'?(orig==null||orig===''?'':+orig)===(x===''?'':+x):f.type==='date'&&!f.date_include_time?((orig||'').slice(0,10)===(x||'')):String(orig??'')===String(x??'');
+      if(same)delete SALE.draft[f.name];else SALE.draft[f.name]=x;
+      e.classList.toggle('modif',!same);barre()};
+    e.addEventListener(e.tagName==='SELECT'||e.type==='checkbox'||e.dataset.date?'change':'input',lire);
+  });
+  document.querySelectorAll('[data-lien]').forEach(box=>{const n=box.dataset.lien;
+    box.querySelectorAll('[data-x]').forEach(x=>x.onclick=()=>{SALE.draft[n]=(val(n)||[]).filter(o=>o.id!=x.dataset.x);dessinerFiche()});
+    box.querySelector('[data-ajout]').onclick=()=>choisirLien(sc.par[n])});
+  document.querySelectorAll('[data-ms]').forEach(box=>{const n=box.dataset.ms,f=sc.par[n];
+    box.querySelectorAll('[data-x]').forEach(x=>x.onclick=()=>{SALE.draft[n]=(val(n)||[]).filter(o=>o.id!=x.dataset.x);dessinerFiche()});
+    box.querySelector('[data-msadd]').onchange=e=>{const o=f.select_options.find(o=>o.id==e.target.value);if(o){SALE.draft[n]=[...(val(n)||[]),o];dessinerFiche()}}});
+}
+async function choisirLien(f){
+  const t=f.link_row_table_id;if(!t){toast('Table liée inconnue',true);return}
+  ouvrirModal('Choisir : '+f.name,'<div class="charge">Chargement…</div>','');
+  let R;try{R=await charger(t)}catch(e){$('mCorps').innerHTML='Erreur : '+esc(e.message);return}
+  const sc=sch(t),mm=MOD_DE_TABLE[t],sec=mm?MODS[mm].cols.filter(c=>c!==sc.prim&&sc.par[c]).slice(0,2):sc.fields.slice(1,3).map(x=>x.name);
+  const multi=f.link_row_multiple_relationships!==false;
+  let sel=new Set(ids(val(f.name)));
+  const dessiner=q=>{const w=norm(q).split(/\s+/).filter(Boolean);
+    let L=R.filter(r=>{if(!w.length)return true;const s=norm(Object.values(r).map(txt).join(' '));return w.every(x=>s.includes(x))});
+    if(mm&&MODS[mm].num&&sc.par[MODS[mm].num])L=[...L].sort((a,b)=>String(txt(b[MODS[mm].num])).localeCompare(String(txt(a[MODS[mm].num]))));
+    $('mListe').innerHTML=L.slice(0,200).map(r=>`<label class="choixL"><input type="${multi?'checkbox':'radio'}" name="cl" value="${r.id}" ${sel.has(r.id)?'checked':''}><span><b>${esc(titre(t,r))}</b> <small>${sec.map(c=>typeof r[c]==='boolean'?'':esc(txt(r[c]))).filter(Boolean).join(' · ')}</small></span></label>`).join('')||'<div class="vide">Aucun résultat</div>';
+    $('mListe').querySelectorAll('input').forEach(i=>i.onchange=()=>{const id=+i.value;if(!multi)sel=new Set([id]);else i.checked?sel.add(id):sel.delete(id)})};
+  $('mCorps').innerHTML=`<input id="mQ" class="ed" style="border-color:var(--trait);margin:0 0 10px;width:100%" placeholder="Rechercher…"><div id="mListe"></div>`;
+  $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="mOk">Valider</button>`;
+  dessiner('');$('mQ').oninput=e=>dessiner(e.target.value);$('mQ').focus();
+  $('mOk').onclick=()=>{const v=[...sel].map(id=>{const r=R.find(x=>x.id===id);return{id,value:r?titre(t,r):'#'+id}});
+    const orig=ids(SALE.row[f.name]).sort().join(),nv=v.map(x=>x.id).sort().join();
+    if(orig===nv)delete SALE.draft[f.name];else SALE.draft[f.name]=v;fermerModal();dessinerFiche()};
+}
+function barre(){const n=SALE&&peutEcrire(SALE.k)?Object.keys(SALE.draft).length:0;if(SALE&&!peutEcrire(SALE.k)){$('barreEnr').classList.remove('vis');return}const nouveau=SALE&&!SALE.id;$('barreEnr').classList.toggle('vis',!!(n||nouveau&&SALE));$('beTxt').textContent=nouveau?'Nouvel enregistrement':`${n} modification(s) non enregistrée(s)`}
+$('beAnn').onclick=()=>{if(!SALE)return;if(!SALE.id){SALE.draft={};location.hash='#/'+SALE.k;return}SALE.draft={};dessinerFiche()};
+$('beEnr').onclick=()=>enregistrer().catch(e=>toast('Échec de l’enregistrement : '+e.message,true));
+function versApi(f,v){
+  switch(f.type){
+    case 'link_row':return(v||[]).map(x=>x.id);
+    case 'single_select':return v?(v.id>0?v.id:v.value):null;
+    case 'multiple_select':return(v||[]).map(x=>x.id);
+    case 'number':case 'rating':case 'duration':return v===''||v==null?null:+v;
+    case 'date':return v||null;
+    case 'boolean':return!!v;
+    default:return v??'';
+  }
+}
+async function enregistrer(){
+  const {k,t}=SALE,m=MODS[k],sc=sch(t);
+  const manq=(m.requis||[]).filter(n=>sc.par[n]&&!txt(val(n)));
+  if(manq.length){toast('Champs obligatoires : '+manq.join(', '),true);return}
+  const corps={};for(const [n,v] of Object.entries(SALE.draft)){const f=sc.par[n];if(f)corps[n]=versApi(f,v)}
+  if(m.faitLe&&sc.par[m.faitLe]&&m.statut in SALE.draft&&/^fait/i.test(txt(SALE.draft[m.statut]))&&!val(m.faitLe))corps[m.faitLe]=auj();
+  $('beEnr').disabled=true;
+  try{
+    const r=SALE.id?await api(`/rows/table/${t}/${SALE.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)})
+                   :await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
+    majRow(t,r);majCompteurs();
+    const nouveau=!SALE.id;SALE.draft={};SALE.row=r;SALE.id=r.id;
+    toast(nouveau?`${titre(t,r)} créé(e)`:'Enregistré');
+    // les tables liées ont pu changer (liens réciproques) : on invalide leur cache
+    sc.fields.filter(f=>f.type==='link_row').forEach(f=>{delete S.prom[f.link_row_table_id]});
+    if(nouveau)history.replaceState(null,'',`#/${k}/${r.id}`);
+    dessinerFiche();
+  }finally{$('beEnr').disabled=false}
+}
+let ONG=0;
+async function dessinerLiees(i){
+  const {k,row}=SALE,m=MODS[k],box=$('liees');if(!box)return;ONG=i;
+  const L=m.liees.filter(x=>x.mod?peutVoir(x.mod):montants()||!/devis|arc/i.test(x.lien));
+  if(!L.length){box.style.display='none';return}if(i>=L.length)i=0;
+  box.innerHTML=`<div class="onglets">${L.map((x,j)=>`<button class="${j===i?'on':''}" data-o="${j}">${esc(x.nom)}<span class="nb" id="on_${j}"></span></button>`).join('')}</div><div id="lCorps"><div class="charge">Chargement…</div></div>`;
+  box.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>dessinerLiees(+b.dataset.o));
+  // compteurs de tous les onglets (en arrière-plan)
+  L.forEach((x,j)=>{const t=x.t||MODS[x.mod].t;charger(t).then(R=>{const e=$('on_'+j);if(e)e.textContent=R.filter(r=>ids(r[x.lien]).includes(row.id)).length}).catch(()=>{})});
+  const x=L[i],t=x.t||MODS[x.mod].t;
+  let R;try{R=await charger(t)}catch(e){$('lCorps').innerHTML=`<div class="vide">Table inaccessible : ${esc(e.message)}</div>`;return}
+  if(SALE?.row!==row||ONG!==i)return;
+  const sc=sch(t);
+  let F=R.filter(r=>ids(r[x.lien]).includes(row.id));
+  const ordre=x.ordre||(x.mod&&MODS[x.mod].ordre);
+  if(ordre&&sc.par[ordre])F.sort((a,b)=>(+a[ordre]||0)-(+b[ordre]||0)||a.id-b.id);
+  else if(x.mod&&MODS[x.mod].date)F.sort((a,b)=>String(a[MODS[x.mod].date]||'9').localeCompare(String(b[MODS[x.mod].date]||'9')));
+  if(x.mod&&MODS[x.mod].virt){await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));if(SALE?.row!==row||ONG!==i)return}
+  if(x.mod)enrichir(x.mod);
+  let cols=(x.cols||(x.mod?MODS[x.mod].cols:[])).filter(c=>sc.par[c]&&!masque(c)&&c!==x.lien&&!(sc.par[c].virt&&sc.par[c].type==='link_row'));if(cols.length<1)cols=sc.fields.slice(0,5).map(f=>f.name);
+  const sansPrim=x.mod&&MODS[x.mod].sansPrim;if(!sansPrim&&!cols.includes(sc.prim))cols.unshift(sc.prim);
+  const cible=x.mod;
+  const a=auj();
+  let h=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c];return`<th class="${f?.type==='number'?'n':''}" style="cursor:default">${esc(c)}</th>`}).join('')}</tr></thead><tbody>`;
+  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='taches'&&c===MODS[cible].statut&&peutEcrire(cible)?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
+  h+='</tbody></table></div>';
+  if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
+  if(x.ajout&&cible&&peutEcrire(cible))h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
+  else if(x.ajout&&!cible&&peutEcrire(k))h+=`<div class="plus"><button class="btn" id="bAjL">${ico('plus')}Ajouter une ligne</button></div>`;
+  if(m.editeur&&x.t)h+=`<div class="plus mut" style="font-size:12.5px">Les lignes se modifient dans l’éditeur (mise en page, vignettes, versions).</div>`;
+  $('lCorps').innerHTML=h;
+  $('lCorps').querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{if(cible)location.hash=`#/${cible}/${tr.dataset.id}`;else if(!m.editeur&&peutEcrire(k))editerLigne(t,x,R.find(r=>r.id==tr.dataset.id))});
+  brancherStatuts($('lCorps'),()=>dessinerLiees(ONG));
+  if($('bAjL'))$('bAjL').onclick=()=>editerLigne(t,x,null);
+}
+/* Petite fenêtre d'édition pour les lignes sans module propre (ex. lignes de commande fournisseur). */
+async function editerLigne(t,x,r){
+  const sc=sch(t),fs=sc.fields.filter(f=>!RO_TYPES.has(f.type)&&!f.read_only&&f.name!==x.lien);
+  ouvrirModal(r?'Modifier la ligne':'Nouvelle ligne',`<div class="form" style="padding:0">${fs.map(f=>`<div class="ch ${f.type==='long_text'?'plein':''}"><label>${esc(f.name)}</label>${f.type==='long_text'?`<textarea class="ed" data-l="${esc(f.name)}">${esc(r?.[f.name]??'')}</textarea>`:f.type==='single_select'?`<select class="ed" data-l="${esc(f.name)}"><option value="">—</option>${(f.select_options||[]).map(o=>`<option value="${o.id}" ${r?.[f.name]?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select>`:f.type==='link_row'?`<div class="ro mut" style="padding:6px 0">${esc(txt(r?.[f.name]))||'—'}</div>`:f.type==='date'?champDate(`data-l="${esc(f.name)}"`,r?.[f.name],!!f.date_include_time):`<input class="ed" data-l="${esc(f.name)}" type="${f.type==='number'?'number':'text'}" step="any" value="${esc(r?.[f.name]??'')}">`}</div>`).join('')}</div>`,
+   `<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="mOk">Enregistrer</button>`);
+  $('mOk').onclick=async()=>{const c={};$('mCorps').querySelectorAll('[data-l]').forEach(e=>{const f=sc.par[e.dataset.l];const v=f.type==='number'?(e.value===''?null:+e.value):f.type==='single_select'?(e.value?+e.value:null):f.type==='date'?(lireDateFr(e.value,!!f.date_include_time)||null):e.value;
+      if(!r||String(versApi(f,r[f.name])??'')!==String(v??''))c[f.name]=v});
+    if(!r){c[x.lien]=[SALE.row.id];if(sc.par.Ordre&&c.Ordre==null){const L=(S.rows[t]||[]).filter(z=>ids(z[x.lien]).includes(SALE.row.id));c.Ordre=L.length+1}}
+    try{const n=r?await api(`/rows/table/${t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)}):await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});
+      majRow(t,n);fermerModal();toast('Ligne enregistrée');delete S.prom[SALE.t];
+      const p=await api(`/rows/table/${SALE.t}/${SALE.row.id}/?user_field_names=true`);majRow(SALE.t,p);SALE.row=p;dessinerFiche();dessinerLiees(ONG)}catch(e){toast('Échec : '+e.message,true)}};
+}
+
+/* ---------- Documents de l'affaire : tous les PDF liés à une commande ----------
+   Commande client (devis, ARC, BL), commandes fournisseurs (+ offre retenue), devis des fournisseurs reçus en
+   consultation (Consultations SST : fichiers archivés dans « Dossier réponses »), PDF des tâches (généré à la volée),
+   synthèse. Chaque fichier se télécharge seul, ou tous d'un coup (« Tout télécharger »). */
+const urlDl=u=>/sharepoint\.com/i.test(u)&&!/[?&]download=/.test(u)?u+(u.includes('?')?'&':'?')+'download=1':u;
+const extDe=u=>{const m=decodeURIComponent(String(u).split(/[?#]/)[0]).match(/\.([a-z0-9]{2,5})$/i);return m?m[1].toUpperCase():''};
+let DOCS_AFF=[];
+async function documentsAffaire(cde){
+  const n=txt(cde['N° affaire']);
+  const vis=['devis','arc','bl','cf','consult','taches'].filter(k=>MODS[k]&&peutVoir(k));
+  const T=await Promise.all(vis.map(k=>charger(MODS[k].t).catch(()=>null)));const D={};vis.forEach((k,i)=>{if(T[i])D[k]=T[i]});
+  if(SALE?.row?.id!==cde.id||!$('docsAff'))return;
+  const lie=(r,champ)=>ids(r[champ]).includes(cde.id);
+  const tri=k=>(a,b)=>String(txt(a[MODS[k].num])).localeCompare(String(txt(b[MODS[k].num])));
+  const G=[],docs=[];
+  const doc=(o)=>{if(o.url||o.gen)docs.push(o);return o};
+  /* 1. Commande client */
+  const cli=[];
+  const devis=D.devis?D.devis.filter(r=>lie(r,'Commande')||ids(cde.Devis).includes(r.id)||txt(r['N° devis'])===n).sort(tri('devis')):[];
+  const ligneEd=(k,r)=>{const m=MODS[k],num=txt(r[m.num]),v=r.Version?' v.'+nb(r.Version):'';
+    cli.push(doc({k,id:r.id,ico:m.ico,lab:num,sous:v,url:r.PDF||'',nom:num+'.pdf',ed:!r.PDF&&m.editeur?`${EDITEUR}?${m.editeur}=${encodeURIComponent(num)}`:''}))};
+  devis.forEach(r=>ligneEd('devis',r));
+  if(peutVoir('devis')&&cde['PDF devis Axonaut'])cli.push(doc({ico:'pdf',lab:'Devis Axonaut',url:cde['PDF devis Axonaut']}));
+  if(D.arc)D.arc.filter(r=>lie(r,'Affaire')||txt(r['N° ARC'])==='ARC-'+n).sort(tri('arc')).forEach(r=>ligneEd('arc',r));
+  if(D.bl)D.bl.filter(r=>lie(r,'Affaire')||String(txt(r['N° BL'])).startsWith('BL-'+n+'-')).sort(tri('bl')).forEach(r=>ligneEd('bl',r));
+  if(cli.length)G.push(['Commande client',cli]);
+  /* 2. Commandes fournisseurs */
+  if(D.cf){const L=[];
+    for(const r of D.cf.filter(r=>lie(r,'Affaire')&&!/annul/i.test(txt(r.Statut))).sort(tri('cf'))){const num=txt(r['N° CF']),fo=txt(r.Fournisseur);
+      L.push(doc({k:'cf',id:r.id,ico:'cf',lab:num,sous:fo,url:r.PDF||'',nom:num+'.pdf'}));
+      if(r['Devis fournisseur (PDF)'])L.push(doc({ico:'pdf',lab:'Offre retenue'+(r['Réf. devis fournisseur']?' '+txt(r['Réf. devis fournisseur']):''),sous:fo,url:r['Devis fournisseur (PDF)'],ind:true}));
+      for(const f of (Array.isArray(r['Devis fournisseur (fichier)'])?r['Devis fournisseur (fichier)']:[]))if(f?.url)L.push(doc({ico:'pdf',lab:f.visible_name||f.name||'Offre fournisseur',sous:fo,url:f.url,nom:f.visible_name,ind:true}))}
+    if(L.length)G.push(['Commandes fournisseurs',L])}
+  /* 3. Devis des fournisseurs (réponses aux consultations SST du devis de l'affaire) */
+  if(D.consult&&devis.length){const dv=new Set(devis.map(r=>r.id)),L=[];
+    const C=D.consult.filter(r=>ids(r.Devis).some(i=>dv.has(i))&&!/annul/i.test(txt(r['Réponse'])))
+      .sort((a,b)=>String(txt(a.Fournisseur)).localeCompare(String(txt(b.Fournisseur))));
+    for(const r of C){const fo=txt(r.Fournisseur)||txt(r['Réf']),rep=txt(r['Réponse'])||'En attente',dos=r['Dossier réponses']||'';
+      const fic=String(r['Fichiers archivés']||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+      const mt=r.Montant!=null&&r.Montant!==''?' · '+nb(r.Montant)+' '+(txt(r.Devise)||'EUR'):'';
+      L.push({ico:'ddp',lab:fo,sous:rep+mt,titre:true,k:'consult',id:r.id,dossier:dos});
+      if(dos)for(const f of fic)L.push(doc({ico:'pdf',lab:f,sous:'',url:dos.replace(/\/+$/,'')+'/'+encodeURIComponent(f),nom:f,ind:true}))}
+    if(L.length)G.push(['Devis fournisseurs',L])}
+  /* 4. Tâches : PDF généré à partir de Baserow */
+  if(D.taches){const TT=D.taches.filter(r=>lie(r,'Commande')&&!/annul/i.test(txt(r.Statut)));
+    if(TT.length)G.push(['Tâches',[doc({ico:'taches',lab:`Tâches ${n}`,sous:`${TT.length} tâche(s) – PDF généré`,gen:()=>pdfTaches(cde,TT),nom:`Taches_${n}.pdf`})]])}
+  /* 5. Synthèse */
+  const sy=[];
+  if(cde['Synthèse PDF'])sy.push(doc({ico:'pdf',lab:'Synthèse des pièces'+(cde['Synthèse version']?' v.'+nb(cde['Synthèse version']):''),url:cde['Synthèse PDF']}));
+  if(cde['Synthèse Excel'])sy.push(doc({ico:'dl',lab:'Synthèse des pièces (Excel)',url:cde['Synthèse Excel']}));
+  if(sy.length)G.push(['Synthèse',sy]);
+  DOCS_AFF=docs;
+  const btn=(d,i)=>d.gen?`<button class="btn" style="padding:3px 9px" data-dl="${i}" title="Générer et télécharger le PDF">${ico('dl')}PDF</button>`
+    :d.url?`<span style="display:flex;gap:4px"><a class="btn" style="padding:3px 7px" href="${esc(d.url)}" target="_blank" title="Ouvrir">${ico('ext')}</a><a class="btn" style="padding:3px 9px" href="${esc(urlDl(d.url))}" data-dl="${i}" title="Télécharger">${ico('dl')}${esc(extDe(d.url)||'Fichier')}</a></span>`
+    :d.ed?`<a class="btn" style="padding:3px 9px" href="${d.ed}" target="_blank" title="Pas encore de PDF enregistré : ouvrir dans l’éditeur pour l’imprimer">${ico('ext')}Éditeur</a>`:'<span class="mut" style="font-size:12px">pas de PDF</span>';
+  let h=docs.length||cde['Dossier SharePoint']?`<div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #F0F2F6">
+    ${docs.length?`<button class="btn p" id="dlTout" style="padding:4px 10px" title="Télécharge chaque fichier l’un après l’autre (le navigateur peut demander d’autoriser les téléchargements multiples)">${ico('dl')}Tout télécharger (${docs.length})</button>`:''}
+    ${/^https?:/.test(cde['Dossier SharePoint']||'')?`<a class="btn" style="padding:4px 10px" href="${esc(cde['Dossier SharePoint'])}" target="_blank" title="Dossier complet de l’affaire sur SharePoint (sélectionner tout → Télécharger = zip)">${ico('dossier')}Dossier SharePoint</a>`:''}</div>`:'';
+  for(const [nom,L] of G){h+=`<div class="mut" style="padding:9px 14px 3px;font-size:11px;text-transform:uppercase;letter-spacing:.04em">${esc(nom)}</div>`;
+    for(const d of L){const i=docs.indexOf(d);
+      if(d.titre){h+=`<div class="lien" style="justify-content:space-between"><a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous)}</span></a>${d.dossier?`<a class="btn" style="padding:3px 7px" href="${esc(d.dossier)}" target="_blank" title="Dossier des réponses">${ico('dossier')}</a>`:''}</div>`;continue}
+      const lab=d.k?`<a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous||'')}</span></a>`
+        :`<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.lab)}">${ico(d.ico)}<span style="margin-left:6px">${esc(d.lab)}</span> <span class="mut">${esc(d.sous||'')}</span></span>`;
+      h+=`<div class="lien" style="justify-content:space-between;${d.ind?'padding-left:34px':''}">${lab}${btn(d,i)}</div>`}}
+  $('docsAff').innerHTML=h||'<div class="c mut">Aucun document pour cette affaire.</div>';
+  $('docsAff').querySelectorAll('[data-dl]').forEach(b=>b.onclick=e=>{const d=DOCS_AFF[+b.dataset.dl];if(d?.gen){e.preventDefault();telechargerDoc(d).catch(er=>toast('Échec : '+er.message,true))}});
+  if($('dlTout'))$('dlTout').onclick=()=>toutTelecharger(DOCS_AFF);
+}
+/* Un fichier : généré → blob ; SharePoint → lien « ?download=1 » suivi dans la page (le serveur répond en pièce jointe :
+   la page reste affichée et la session SharePoint de l'utilisateur est utilisée) ; autre → cadre caché. */
+async function telechargerDoc(d){
+  if(d.gen){const b=await d.gen();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.nom||'document.pdf';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return}
+  if(/sharepoint\.com/i.test(d.url)){const a=document.createElement('a');a.href=urlDl(d.url);document.body.appendChild(a);a.click();a.remove();return}
+  const f=document.createElement('iframe');f.style.display='none';f.src=d.url;document.body.appendChild(f);setTimeout(()=>f.remove(),120000)}
+async function toutTelecharger(L){
+  const b=$('dlTout');if(b)b.disabled=true;let ok=0;
+  for(const [i,d] of L.entries()){if(b)b.innerHTML=`${ico('dl')}Téléchargement ${i+1} / ${L.length}…`;
+    try{await telechargerDoc(d);ok++}catch(e){toast(`${d.lab} : ${e.message}`,true)}
+    await new Promise(r=>setTimeout(r,1500))}
+  if(b){b.disabled=false;b.innerHTML=`${ico('dl')}Tout télécharger (${L.length})`}
+  toast(`${ok} fichier(s) lancé(s). S’il en manque, autorisez les téléchargements multiples pour cette page, ou utilisez « Dossier SharePoint ».`)}
+/* PDF des tâches de l'affaire (jsPDF chargé à la demande). */
+let JSPDF=null;
+function chargerScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ko(new Error('chargement impossible : '+src));document.head.appendChild(s)})}
+async function pdfTaches(cde,TT){
+  if(!JSPDF){await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');JSPDF=window.jspdf.jsPDF}
+  const p=s=>String(s??'').replace(/[–—]/g,'-').replace(/[‘’]/g,"'").replace(/[“”«»]/g,'"').replace(/…/g,'...').replace(/ | /g,' ').replace(/[^\x00-\xff€]/g,'');
+  const n=txt(cde['N° affaire']),doc=new JSPDF({orientation:'landscape',unit:'mm',format:'a4'});
+  const ech=r=>r['Échéance']||'9999';
+  const L=[...TT].sort((a,b)=>ech(a).localeCompare(ech(b))||a.id-b.id);
+  const C=S.rows[MODS.commandes.t]||[],SY=new Map((S.rows[MODS.synthese.t]||[]).map(x=>[x.id,x])),DV=new Map((S.rows[MODS.devis.t]||[]).map(x=>[x.id,x])),LD=new Map((S.rows[1261171]||[]).map(x=>[x.id,x]));
+  doc.setFont('helvetica','bold');doc.setFontSize(15);doc.text(p(`KTE - Tâches de l'affaire ${n}`),14,15);
+  doc.setFont('helvetica','normal');doc.setFontSize(10);
+  doc.text(p([txt(cde.Client),txt(cde.Objet)].filter(Boolean).join(' - ')),14,21);
+  doc.text(p([cde['N° Cde Client']?'Cde client '+txt(cde['N° Cde Client']):'',cde['Date Livraison']?'Livraison prévue '+dfr(cde['Date Livraison']):'',txt(cde['Référent KTE'])?'Référent '+txt(cde['Référent KTE']):''].filter(Boolean).join('   |   ')),14,26);
+  doc.autoTable({startY:31,head:[['Tâche','Référent','Échéance','Statut','Fait le','Pièces','Notes'].map(p)],
+    body:L.map(r=>[txt(r['Type de tâche'])||String(txt(r['Libellé'])).replace(/^\S+\s*[–-]\s*/,''),txt(r['Référent']),dfr(r['Échéance']),txt(r.Statut),dfr(r['Fait le']),
+      (()=>{try{return piecesTache(r,(r.Commande||[]).map(x=>C.find(c=>c.id===x.id)).filter(Boolean),SY,DV,LD)}catch(e){return''}})(),txt(r.Notes)].map(p)),
+    styles:{fontSize:8.5,cellPadding:1.8,valign:'top'},headStyles:{fillColor:[31,58,95]},
+    columnStyles:{0:{cellWidth:48},1:{cellWidth:24},2:{cellWidth:20},3:{cellWidth:28},4:{cellWidth:20},5:{cellWidth:26},6:{cellWidth:'auto'}},margin:{left:14,right:14}});
+  const nbP=doc.getNumberOfPages();for(let i=1;i<=nbP;i++){doc.setPage(i);doc.setFontSize(8);doc.setTextColor(120);doc.text(p(`${n} - édité le ${new Date().toLocaleDateString('fr-FR')} - page ${i}/${nbP}`),283,203,{align:'right'})}
+  return doc.output('blob')}
+
+/* ---------- Bons de livraison : création en un clic depuis une commande ----------
+   Même logique que l'éditeur : n° BL-<affaire>-NN, lignes reprises de l'ARC (sinon du devis), « Déjà livré » =
+   somme des BL précédents de l'affaire ; « Livré » = reste par défaut (BL complet) ou quantités saisies (partiel).
+   Le BL est créé en Brouillon ; la mise en page / validation / PDF se fait dans l'éditeur (?bl=…). */
+const T_LBL=1261381,T_LARC=1261373,T_LDV=1261171;
+async function nouveauBL(){
+  ouvrirModal('Nouveau BL : choisir la commande','<div class="charge">Chargement…</div>','');
+  const C=await charger(MODS.commandes.t);const sc=sch(MODS.commandes.t);
+  const dessiner=q=>{const w=norm(q).split(/\s+/).filter(Boolean);
+    const L=C.filter(r=>/command/i.test(txt(r.Statut))||w.length).filter(r=>{const s=norm(Object.values(r).map(txt).join(' '));return w.every(x=>s.includes(x))}).sort((a,b)=>String(txt(b['N° affaire'])).localeCompare(String(txt(a['N° affaire'])))).slice(0,100);
+    $('mListe').innerHTML=L.map(r=>`<div class="choixL" data-id="${r.id}"><span><b>${esc(txt(r['N° affaire']))}</b> ${esc(txt(r.Client))} <small>${esc(txt(r.Objet)).slice(0,70)}</small></span></div>`).join('')||'<div class="vide">Aucune commande</div>';
+    $('mListe').querySelectorAll('[data-id]').forEach(d=>d.onclick=()=>fenetreBL(C.find(r=>r.id==d.dataset.id)).catch(e=>toast('Erreur : '+e.message,true)))};
+  $('mCorps').innerHTML=`<input id="mQ" class="ed" style="border-color:var(--trait);margin:0 0 10px;width:100%" placeholder="Rechercher une affaire, un client…"><div id="mListe"></div>`;
+  $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Annuler</button>`;
+  dessiner('');$('mQ').oninput=e=>dessiner(e.target.value);$('mQ').focus();
+}
+async function fenetreBL(cde){
+  const n=txt(cde['N° affaire']);
+  ouvrirModal('Créer un BL – '+n,'<div class="charge">Préparation des lignes…</div>','');
+  const [BL,ARC,LBL,LARC,DV,LDV]=await Promise.all([MODS.bl.t,MODS.arc.t,T_LBL,T_LARC,MODS.devis.t,T_LDV].map(t=>charger(t).catch(()=>[])));
+  const arc=ARC.find(a=>ids(a.Affaire).includes(cde.id))||ARC.find(a=>txt(a['N° ARC'])==='ARC-'+n);
+  const dv=DV.find(d=>ids(d.Commande).includes(cde.id))||DV.find(d=>txt(d['N° devis'])===n);
+  const ord=(a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id;
+  const src=arc?LARC.filter(l=>ids(l.ARC).includes(arc.id)):dv?LDV.filter(l=>ids(l.Devis).includes(dv.id)):[];
+  src.sort(ord);
+  const prec=BL.filter(b=>String(txt(b['N° BL'])).startsWith('BL-'+n+'-')&&!/annul/i.test(txt(b.Statut)));
+  const deja={};for(const b of prec)for(const l of LBL.filter(x=>ids(x.BL).includes(b.id)))deja[l.Description]=(deja[l.Description]||0)+(+l['Quantité livrée']||0);
+  const lignes=src.map(l=>{const c=+l['Quantité']||0,d=deja[l.Description]||0;return{l,c,d,reste:Math.max(0,c-d)}}).filter(x=>x.reste>0||!prec.length);
+  const suf=Math.max(0,...BL.map(b=>String(txt(b['N° BL']))).filter(x=>x.startsWith('BL-'+n+'-')).map(x=>+x.split('-').pop()||0))+1;
+  const num=`BL-${n}-${String(suf).padStart(2,'0')}`;
+  if(!src.length){$('mCorps').innerHTML=`<div class="vide">Aucune ligne trouvée : ni ARC (ARC-${esc(n)}) ni devis ${esc(n)} avec des lignes.<br>Créez le BL dans l’éditeur.</div>`;$('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Fermer</button><a class="btn p" href="${EDITEUR}?bl=" target="_blank">Ouvrir l’éditeur</a>`;return}
+  if(!lignes.length){$('mCorps').innerHTML=`<div class="vide">Tout est déjà livré pour ${esc(n)} (${prec.length} BL).</div>`;$('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Fermer</button>`;return}
+  $('mCorps').innerHTML=`<div class="mut" style="margin-bottom:8px">${esc(num)} · ${esc(txt(cde.Client))} · lignes reprises ${arc?'de l’'+esc(txt(arc['N° ARC'])):'du devis '+esc(n)}${prec.length?` · ${prec.length} BL précédent(s)`:''}</div>
+   <table class="l"><thead><tr><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Commandé</th><th class="n" style="cursor:default">Déjà livré</th><th class="n" style="cursor:default">À livrer</th></tr></thead><tbody>
+   ${lignes.map((x,i)=>`<tr style="cursor:default"><td style="white-space:normal">${esc(txt(x.l.Description))}${x.l['Précisions']?`<div class="mut" style="font-size:12px">${esc(String(txt(x.l['Précisions'])).split('\n')[0]).slice(0,80)}</div>`:''}</td><td class="n">${nb(x.c)}</td><td class="n">${nb(x.d)}</td><td class="n"><input type="number" min="0" step="any" data-i="${i}" value="${x.reste}" style="width:80px;text-align:right;border:1px solid var(--trait);border-radius:6px;padding:4px 6px"></td></tr>`).join('')}
+   </tbody></table>
+   <label style="display:flex;gap:8px;align-items:center;margin-top:12px;font-size:13px"><input type="checkbox" id="blLiv"> Passer la commande à « Livrée » (si tout est livré avec ce BL)</label>`;
+  $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn" id="blTout">Tout le reste</button><button class="btn p" id="blOk">Créer le BL</button>`;
+  const ins=[...$('mCorps').querySelectorAll('input[data-i]')];
+  const complet=()=>lignes.every((x,i)=>(+ins[i].value||0)>=x.reste);
+  const maj=()=>{$('blLiv').checked=complet();$('blOk').textContent=complet()?'Créer le BL complet':'Créer le BL partiel'};
+  ins.forEach(i=>i.oninput=maj);maj();
+  $('blTout').onclick=()=>{ins.forEach((e,i)=>e.value=lignes[i].reste);maj()};
+  $('blOk').onclick=async()=>{
+    const q=ins.map(e=>Math.max(0,+e.value||0));if(!q.some(x=>x>0))return toast('Aucune quantité à livrer',true);
+    $('blOk').disabled=true;$('blOk').textContent='Création…';
+    try{
+      const ex=await api(`/rows/table/${MODS.bl.t}/?user_field_names=true&size=1&filter__N° BL__equal=${encodeURIComponent(num)}`);
+      if(ex.count)throw new Error(num+' existe déjà (créé entre-temps ?) – rechargez');
+      const corps={'N° BL':num,'Statut':'Brouillon','Version':1,'Date':auj(),Affaire:[cde.id],Client:ids(cde.Client),'Référent KTE':ids(cde['Référent KTE']),
+        'N° commande client':txt(arc?.['N° commande client'])||txt(cde['N° Cde Client'])||'','Adresse de livraison':txt(arc?.['Adresse de livraison'])||txt(cde['Adresse de livraison'])||''};
+      if(arc)corps.ARC=[arc.id];
+      const bl=await api(`/rows/table/${MODS.bl.t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
+      const items=lignes.map((x,i)=>({Description:x.l.Description,'Précisions':x.l['Précisions']||'',Rep:x.l.Rep??'',Vignette:(x.l.Vignette||[]).map(f=>({name:f.name})),
+        'Quantité commandée':x.c,'Déjà livré':x.d,'Quantité livrée':q[i],Ordre:i+1,BL:[bl.id]}));
+      const scL=sch(T_LBL);for(const it of items)for(const k of Object.keys(it))if(scL.fields.length&&!scL.par[k])delete it[k];
+      await api(`/rows/table/${T_LBL}/batch/?user_field_names=true`,{method:'POST',body:JSON.stringify({items})});
+      if($('blLiv').checked){const o=sch(MODS.commandes.t).par.Statut?.select_options?.find(x=>/^livr/i.test(x.value));if(o){const r=await api(`/rows/table/${MODS.commandes.t}/${cde.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({Statut:o.id})});majRow(MODS.commandes.t,r);if(SALE?.row?.id===cde.id)SALE.row=r}}
+      [MODS.bl.t,T_LBL,MODS.commandes.t].forEach(t=>delete S.prom[t]);
+      $('mTitre').textContent=num+' créé';
+      $('mCorps').innerHTML=`<div style="padding:10px 0">Le BL <b>${esc(num)}</b> est créé en brouillon (${items.length} ligne(s), ${q.reduce((a,b)=>a+b,0)} pièce(s)).<br>Ouvrez-le dans l’éditeur pour le vérifier, le valider et faire le PDF.</div>`;
+      $('mPied').innerHTML=`<button class="btn" onclick="fermerModal();route()">Fermer</button><a class="btn p" href="${EDITEUR}?bl=${encodeURIComponent(num)}" target="_blank" onclick="setTimeout(()=>{fermerModal();route()},300)">${ico('ext')}Ouvrir le BL dans l’éditeur</a>`;
+      toast(num+' créé');
+    }catch(e){toast('Échec : '+e.message,true);$('blOk').disabled=false;maj()}
+  };
+}
+
+/* ---------- Fenêtre modale ---------- */
+function ouvrirModal(t,c,p){$('mTitre').textContent=t;$('mCorps').innerHTML=c;$('mPied').innerHTML=p;$('modal').style.display='flex'}
+function fermerModal(){$('modal').style.display='none'}
+$('modal').onclick=e=>{if(e.target.id==='modal')fermerModal()};
+
+/* ---------- Recherche globale ---------- */
+const GMODS0=['devis','commandes','clients','taches','cf','fournisseurs','arc','bl'];
+let GMODS=GMODS0;
+let gsel=0;
+$('gq').oninput=async()=>{
+  const q=norm($('gq').value).split(/\s+/).filter(Boolean),box=$('gres');
+  if(!q.length){box.style.display='none';return}
+  GMODS.forEach(k=>charger(MODS[k].t).catch(()=>{}));
+  const res=[];
+  for(const k of GMODS){const m=MODS[k],R=S.rows[m.t];if(!R)continue;
+    for(const r of R){const s=norm(Object.values(r).map(txt).join(' '));if(q.every(w=>s.includes(w))){res.push([k,r]);if(res.filter(x=>x[0]===k).length>=6)break}}}
+  gsel=0;
+  box.innerHTML=res.slice(0,30).map(([k,r],i)=>{const m=MODS[k],sc=sch(m.t),sec=m.cols.filter(c=>c!==sc.prim&&sc.par[c]).slice(0,2);
+    return`<a href="#/${k}/${r.id}" class="${i===0?'sel':''}"><span class="ty">${m.nom}</span><span><b>${esc(titre(m.t,r))}</b> <span class="mut">${sec.map(c=>esc(txt(r[c]))).filter(Boolean).join(' · ')}</span></span></a>`}).join('')||'<div class="vide" style="padding:16px">Aucun résultat</div>';
+  box.style.display='block';
+};
+$('gq').onkeydown=e=>{const L=[...$('gres').querySelectorAll('a')];
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();gsel=Math.max(0,Math.min(L.length-1,gsel+(e.key==='ArrowDown'?1:-1)));L.forEach((a,i)=>a.classList.toggle('sel',i===gsel))}
+  if(e.key==='Enter'&&L[gsel]){location.hash=L[gsel].getAttribute('href');fermerG()}
+  if(e.key==='Escape')fermerG()};
+$('gres').onclick=()=>setTimeout(fermerG,0);
+document.addEventListener('click',e=>{if(!e.target.closest('#gsearch'))$('gres').style.display='none'});
+function fermerG(){$('gres').style.display='none';$('gq').value='';$('gq').blur()}
+document.addEventListener('keydown',e=>{if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)){e.preventDefault();$('gq').focus()}
+  if((e.metaKey||e.ctrlKey)&&e.key==='s'&&SALE&&(Object.keys(SALE.draft).length||!SALE.id)){e.preventDefault();$('beEnr').click()}});
+window.addEventListener('beforeunload',e=>{if(SALE&&Object.keys(SALE.draft).length){e.preventDefault();e.returnValue=''}});
+$('bRafr').onclick=async()=>{for(const t in S.prom)delete S.prom[t];toast('Données rechargées');await route()};
+
+/* ---------- Comptes : fichier akteev-acces.json (jetons chiffrés, publiable) ----------
+   Chaque utilisateur : {login, nom, profil, referent, iter, sel, iv, jeton} ; jeton = jeton Baserow du profil chiffré
+   AES-GCM avec une clé PBKDF2-SHA256 (600 000 itérations) tirée de son mot de passe. Aucun secret en clair. */
+let ACCES=null;
+const FICHIER_ACCES='akteev-acces.json';
+async function lireAcces(){try{const r=await fetch(FICHIER_ACCES+'?t='+Date.now(),{cache:'no-store'});if(!r.ok)return null;return await r.json()}catch(e){return null}}
+const b64=u=>btoa(String.fromCharCode(...new Uint8Array(u)));
+const deb64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const normLogin=s=>norm(s).trim().replace(/\s+/g,'.');
+async function cle(mdp,sel,iter){const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(mdp),'PBKDF2',false,['deriveKey']);
+  return crypto.subtle.deriveKey({name:'PBKDF2',salt:sel,iterations:iter,hash:'SHA-256'},base,{name:'AES-GCM',length:256},false,['encrypt','decrypt'])}
+async function chiffrer(jeton,mdp){const sel=crypto.getRandomValues(new Uint8Array(16)),iv=crypto.getRandomValues(new Uint8Array(12)),iter=600000;
+  const c=await crypto.subtle.encrypt({name:'AES-GCM',iv},await cle(mdp,sel,iter),new TextEncoder().encode(jeton));return{iter,sel:b64(sel),iv:b64(iv),jeton:b64(c)}}
+async function dechiffrer(u,mdp){const c=await crypto.subtle.decrypt({name:'AES-GCM',iv:deb64(u.iv)},await cle(mdp,deb64(u.sel),u.iter||600000),deb64(u.jeton));return new TextDecoder().decode(c)}
+async function testerJeton(j){const r=await fetch(API+`/rows/table/${MODS.taches.t}/?user_field_names=true&size=1`,{headers:{Authorization:'Token '+j}});if(!r.ok)throw new Error('jeton refusé par Baserow ('+r.status+')')}
+function ecranConnexion(){
+  document.body.classList.add('deconnecte');
+  $('main').innerHTML=`<div class="card" id="cfg"><div class="marque" style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--accent);color:#fff;font-weight:700">A</span><h1>Akteev</h1></div>
+   <p class="mut">Connexion à l’interface de gestion KTE.</p>
+   <label>Identifiant</label><input id="cxL" autocomplete="username" autocapitalize="none">
+   <label>Mot de passe</label><input id="cxM" type="password" autocomplete="current-password">
+   <button class="btn p" id="cxOk" style="margin-top:16px;width:100%;justify-content:center">Se connecter</button>
+   <p style="margin-top:18px;font-size:12px"><a href="#" id="cxJ">Connexion avec un jeton Baserow (administrateur)</a></p></div>`;
+  const go=async()=>{const l=normLogin($('cxL').value),m=$('cxM').value;if(!l||!m)return;
+    const u=(ACCES?.utilisateurs||[]).find(x=>x.login===l);$('cxOk').disabled=true;$('cxOk').textContent='Vérification…';
+    try{if(!u)throw new Error('x');let j;try{j=await dechiffrer(u,m)}catch(e){throw new Error('x')}
+      await testerJeton(j);
+      JETON=j;SESSION={login:u.login,nom:u.nom,profil:u.profil,referent:u.referent||null};
+      try{localStorage.setItem(CLE,j);localStorage.setItem('akteev_session',JSON.stringify(SESSION))}catch(e){}
+      MOI=SESSION.referent||MOI;ls.set('moi',MOI);$('toast').innerHTML='';for(const t in S.prom)delete S.prom[t];location.hash='#/accueil';lancer()}
+    catch(e){toast(e.message==='x'?'Identifiant ou mot de passe incorrect':'Connexion impossible : '+e.message,true);$('cxOk').disabled=false;$('cxOk').textContent='Se connecter'}};
+  $('cxOk').onclick=go;$('cxM').onkeydown=e=>{if(e.key==='Enter')go()};$('cxL').focus();
+  $('cxJ').onclick=e=>{e.preventDefault();config()};
+}
+function deconnecter(){
+  if(SALE&&Object.keys(SALE.draft).length&&!confirm('Des modifications ne sont pas enregistrées. Se déconnecter quand même ?'))return;
+  try{localStorage.removeItem(CLE);localStorage.removeItem('akteev_session')}catch(e){}
+  location.href=location.pathname;
+}
+/* ---------- Page Utilisateurs (administrateur) ---------- */
+let BROUILLON_ACCES=null;
+const DROITS=[
+ ['Direction / Admin','Votre jeton actuel : tout (lecture, création, modification).'],
+ ['Commercial / ADV','Lecture : toutes les tables. Création + modification : Devis, Lignes de devis, Commandes, ARC, Lignes ARC, BL, Lignes BL, Clients, Tâches commande. Suppression : Lignes de devis, Lignes ARC, Lignes BL (l’éditeur supprime des lignes).'],
+ ['Atelier','Lecture : Tâches commande, Synthèse commande, Commandes, Clients, Référents, Tâches (catalogue). Modification : Tâches commande, Synthèse commande. Rien d’autre (pas Devis : les prix restent invisibles).'],
+ ['Achats','Lecture : Commandes, Clients, Tâches commande, Synthèse commande, Référents, Fournisseurs, Commandes fournisseurs, Lignes commande fournisseur, Tâches (catalogue). Création + modification : Commandes fournisseurs, Lignes commande fournisseur, Fournisseurs, Synthèse commande ; modification : Tâches commande.']];
+async function vueUtilisateurs(){
+  document.title='Akteev – Utilisateurs';
+  if(!BROUILLON_ACCES)BROUILLON_ACCES=JSON.parse(JSON.stringify(ACCES||{version:1,utilisateurs:[]}));
+  const A=BROUILLON_ACCES,modif=JSON.stringify(A)!==JSON.stringify(ACCES||{version:1,utilisateurs:[]});
+  const refs=await charger(MODS.referents.t).catch(()=>[]);
+  const nomRef=id=>txt(refs.find(r=>r.id===id)?.[sch(MODS.referents.t).prim])||'';
+  $('main').innerHTML=`<div class="entete"><h1>Utilisateurs</h1><span class="sous">${A.utilisateurs.length} compte(s)</span></div>
+  ${modif?`<div class="card" style="border-color:#F5D58A;background:#FFFBEB;margin-bottom:16px"><div style="padding:14px 16px"><b>Modifications à publier.</b> Elles ne prennent effet qu’une fois le fichier <code>${FICHIER_ACCES}</code> publié dans le dépôt GitHub de l’éditeur (ou demandez à Claude de le publier).
+   <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap"><button class="btn p" id="uCopie">Copier le fichier</button><button class="btn" id="uDl">${ico('dl')}Télécharger</button><a class="btn" target="_blank" href="https://github.com/MatthiasKTE/editeur/${ACCES?'edit':'new'}/main${ACCES?'/'+FICHIER_ACCES:'?filename='+FICHIER_ACCES}">${ico('ext')}Ouvrir sur GitHub</a><button class="btn d" id="uAnn">Annuler les modifications</button></div></div></div>`:''}
+  <div class="card"><div class="tw"><table class="l"><thead><tr><th>Identifiant</th><th>Nom</th><th>Profil</th><th>Référent</th><th></th></tr></thead><tbody>
+  ${A.utilisateurs.map((u,i)=>`<tr style="cursor:default"><td class="prim">${esc(u.login)}</td><td>${esc(u.nom)}</td><td>${esc(PROFILS[u.profil]?.nom||u.profil)}</td><td>${esc(nomRef(u.referent))||'<span class="mut">—</span>'}</td><td style="text-align:right;white-space:nowrap"><button class="btn" data-mdp="${i}">Nouveau mot de passe</button> <button class="btn d" data-ret="${i}">Retirer</button></td></tr>`).join('')||'<tr><td colspan="5" class="vide">Aucun compte. Créez d’abord le vôtre (profil Direction / Admin).</td></tr>'}
+  </tbody></table></div></div>
+  <div class="card" style="margin-top:16px"><h2 style="font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait)" id="uTitre">Ajouter un utilisateur</h2>
+   <div class="formU"><div><label>Identifiant</label><input id="uL" placeholder="ex. elodie" autocapitalize="none"></div><div><label>Nom affiché</label><input id="uN" placeholder="Elodie Xiang"></div>
+    <div><label>Profil</label><select id="uP">${Object.entries(PROFILS).map(([k,p])=>`<option value="${k}">${p.nom}</option>`).join('')}</select></div>
+    <div><label>Référent (pour « Mes tâches »)</label><select id="uR"><option value="">—</option>${refs.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('')}</select></div>
+    <div><label>Mot de passe (10 caractères min.)</label><input id="uM" type="password" autocomplete="new-password"></div><div><label>Confirmation</label><input id="uM2" type="password" autocomplete="new-password"></div>
+    <div style="grid-column:1/-1"><label>Jeton Baserow du profil (créé dans Baserow › Paramètres › Jetons de base de données, droits ci-dessous)</label><input id="uJ" type="password" autocomplete="off" placeholder="Il sera chiffré avec le mot de passe ; il n’est jamais affiché ni enregistré en clair"></div>
+    <div style="grid-column:1/-1;display:flex;gap:8px"><button class="btn p" id="uOk">Ajouter</button><button class="btn" id="uRaz" style="display:none">Annuler</button></div></div></div>
+  <div class="card droits" style="margin-top:16px"><h2 style="font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait)">Droits à donner au jeton Baserow de chaque profil</h2>
+   <table class="l"><tbody>${DROITS.map(d=>`<tr style="cursor:default"><td class="prim" style="width:170px">${d[0]}</td><td style="white-space:normal;max-width:none">${d[1]}</td></tr>`).join('')}</tbody></table>
+   <div class="c mut" style="padding:12px 16px;font-size:12.5px">Un jeton par profil suffit (tous les utilisateurs d’un profil partagent le même jeton, chiffré avec le mot de passe de chacun). Pour couper l’accès à quelqu’un : le retirer ici, publier, puis régénérer le jeton de son profil dans Baserow et redonner un mot de passe aux autres membres du profil.</div></div>`;
+  let edite=null;
+  const raz=()=>{edite=null;['uL','uN','uM','uM2','uJ'].forEach(i=>$(i).value='');$('uR').value='';$('uL').disabled=false;$('uTitre').textContent='Ajouter un utilisateur';$('uOk').textContent='Ajouter';$('uRaz').style.display='none'};
+  $('uRaz').onclick=raz;
+  document.querySelectorAll('[data-mdp]').forEach(b=>b.onclick=()=>{const u=A.utilisateurs[+b.dataset.mdp];edite=u.login;$('uL').value=u.login;$('uL').disabled=true;$('uN').value=u.nom;$('uP').value=u.profil;$('uR').value=u.referent||'';$('uTitre').textContent='Nouveau mot de passe pour '+u.login;$('uOk').textContent='Enregistrer';$('uRaz').style.display='';$('uM').focus()});
+  document.querySelectorAll('[data-ret]').forEach(b=>b.onclick=()=>{const u=A.utilisateurs[+b.dataset.ret];if(confirm(`Retirer ${u.nom} (${u.login}) ?`)){A.utilisateurs.splice(+b.dataset.ret,1);vueUtilisateurs()}});
+  $('uOk').onclick=async()=>{const l=normLogin($('uL').value),n=$('uN').value.trim(),p=$('uP').value,ref=+$('uR').value||null,m=$('uM').value,j=$('uJ').value.trim();
+    if(!l||!n)return toast('Identifiant et nom obligatoires',true);
+    if(!edite&&A.utilisateurs.some(u=>u.login===l))return toast('Cet identifiant existe déjà',true);
+    if(m.length<10)return toast('Mot de passe : 10 caractères minimum',true);if(m!==$('uM2').value)return toast('Les deux mots de passe sont différents',true);
+    if(!j)return toast('Collez le jeton Baserow du profil',true);
+    $('uOk').disabled=true;$('uOk').textContent='Chiffrement…';
+    try{await testerJeton(j);const c=await chiffrer(j,m);const u={login:l,nom:n,profil:p,referent:ref,...c};
+      const i=A.utilisateurs.findIndex(x=>x.login===l);if(i>=0)A.utilisateurs[i]=u;else A.utilisateurs.push(u);
+      A.maj=auj();toast(edite?'Mot de passe changé (à publier)':'Utilisateur ajouté (à publier)');vueUtilisateurs()}
+    catch(e){toast('Échec : '+e.message,true);$('uOk').disabled=false;$('uOk').textContent=edite?'Enregistrer':'Ajouter'}};
+  const contenu=()=>JSON.stringify(A,null,1)+'\n';
+  if($('uCopie'))$('uCopie').onclick=async()=>{try{await navigator.clipboard.writeText(contenu());toast('Fichier copié : collez-le sur GitHub puis « Commit changes »')}catch(e){toast('Copie impossible : utilisez Télécharger',true)}};
+  if($('uDl'))$('uDl').onclick=()=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([contenu()],{type:'application/json'}));a.download=FICHIER_ACCES;a.click()};
+  if($('uAnn'))$('uAnn').onclick=()=>{BROUILLON_ACCES=null;vueUtilisateurs()};
+}
+
+/* ---------- Jeton ---------- */
+function config(change){
+  $('main').innerHTML=`<div class="card" id="cfg"><h1>Connexion à Baserow</h1><p class="mut">Collez le jeton Baserow (le même que celui de l’éditeur). Il reste enregistré dans ce navigateur uniquement.</p>
+   <input id="cfgJ" type="password" placeholder="Jeton de base de données" value="${change&&JETON?esc(JETON):''}"><button class="btn p" id="cfgOk">Se connecter</button></div>`;
+  $('cfgOk').onclick=async()=>{const j=$('cfgJ').value.trim();if(!j)return;JETON=j;
+    try{await api(`/rows/table/${MODS.referents.t}/?user_field_names=true&size=1`);try{localStorage.setItem(CLE,j);localStorage.removeItem('akteev_session')}catch(e){}SESSION=null;for(const t in S.prom)delete S.prom[t];location.hash='#/accueil';lancer()}
+    catch(e){toast('Jeton refusé : '+e.message,true)}};
+}
+
+/* ---------- Démarrage ---------- */
+function lancer(){
+  document.body.classList.remove('deconnecte');GMODS=GMODS0.filter(peutVoir);
+  if(SESSION?.referent&&!MOI){MOI=SESSION.referent;ls.set('moi',MOI)}
+  dessinerMenu();route();charger(MODS.referents.t).catch(()=>{});
+  setTimeout(()=>['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{})),300)}
+(async()=>{
+  ACCES=await lireAcces();
+  const avecComptes=!!(ACCES&&ACCES.utilisateurs?.length);
+  if(JETON&&(SESSION||!avecComptes))return lancer(); // session ouverte, ou jeton administrateur saisi directement
+  if(avecComptes)return ecranConnexion();
+  document.body.classList.add('deconnecte');config();
+})();
+</script>
+</body>
+</html>
