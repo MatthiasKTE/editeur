@@ -105,7 +105,9 @@ input.ed.num{text-align:right}
   <button id="bEnr" disabled>Enregistrer</button>
   <button id="bValider" class="prim" disabled>Valider</button>
   <button id="bCde" class="prim" style="display:none">Commande reçue</button>
-  <button id="bPdf" disabled>Imprimer / PDF</button>
+  <button id="bPdfV" disabled title="Crée le PDF de la version validée et l'enregistre (SharePoint ou téléchargement)">📄 PDF</button>
+  <button id="bPdf" disabled>Imprimer</button>
+  <a id="lPdf" class="pill" target="_blank" rel="noopener" style="display:none;color:#fff">PDF enregistré ↗</a>
   <span class="pill" id="pStatut"></span>
   <span class="pill" id="pVersion"></span>
   <span id="msg"></span>
@@ -220,6 +222,8 @@ input.ed.num{text-align:right}
 </div>
 
 <script>
+// Fenêtre de connexion Microsoft (retour MSAL) : ne pas lancer l'éditeur, la page d'origine lit la réponse.
+const RETOUR_MS=!!window.opener&&/[#&?](code|error)=/.test(location.hash+location.search);
 const API='https://api.baserow.io/api/database';
 const T_CLIENTS=1260239,T_REF=1260243,T_AFF=1260240,T_TACHES=1261119,T_TC=1261600;
 const COND_DEF="100% à la livraison\nPar virement bancaire à 30 jours nets";
@@ -286,7 +290,7 @@ async function chargerListe(){
 }
 async function changerType(t){
   if(sale&&!confirm('Des modifications ne sont pas enregistrées. Continuer ?')){$('type').value=TYPE;return}
-  TYPE=t;cur=null;sale=false;$('page').style.display='none';['bEnr','bValider','bPdf'].forEach(b=>$(b).disabled=true);
+  TYPE=t;cur=null;sale=false;$('page').style.display='none';['bEnr','bValider','bPdf','bPdfV'].forEach(b=>$(b).disabled=true);$('lPdf').style.display='none';
   $('pStatut').textContent='';$('pVersion').textContent='';history.replaceState(null,'',location.pathname);
   await chargerListe();msg('');
 }
@@ -297,7 +301,7 @@ async function ouvrir(id){
   const ids=(cur[D().lien]||[]).map(x=>x.id);
   lignes=[];for(const i of ids){lignes.push(await ligne1(D().lt,i))}
   lignes.sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id);
-  supprimees=[];afficher();sale=false;$('bEnr').disabled=true;$('bValider').disabled=false;$('bPdf').disabled=false;
+  supprimees=[];afficher();sale=false;$('bEnr').disabled=true;$('bValider').disabled=false;$('bPdf').disabled=false;$('bPdfV').disabled=false;majLienPDF();
   $('bCde').style.display=TYPE==='devis'?'':'none';$('bCde').textContent=(cur.Commande||[]).length?'Commande : '+cur.Commande[0].value:'Commande reçue';
   history.replaceState(null,'',`?${TYPE}=${encodeURIComponent(cur[D().num])}`);
   const c=cur['Contrôle version']||'';msg(c,c.startsWith('⚠')?'warn':'ok');
@@ -410,8 +414,9 @@ async function valider(){
   if(!confirm(deja?`Le document a été modifié depuis sa validation. Il passe en v.${v}, daté d'aujourd'hui. Continuer ?`:`Valider en v.${v} ?`))return;
   await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(maj)});
   cur=await ligne1(D().table,cur.id);await chargerListe();$('choix').value=cur.id;afficher();
-  const dos=TYPE==='devis'?'04_Offre':TYPE==='arc'?'05_Commande':'06_Livraison';
-  msg(`Validé en v.${v}. Utilisez « Imprimer / PDF » pour enregistrer le PDF dans ${dos}.`,'ok');
+  msg(`Validé en v.${v}.`,'ok');
+  try{const r=await publierPDF();msg(`Validé en v.${v}. `+r.texte,r.ok?'ok':'warn')}
+  catch(e){console.error(e);msg(`Validé en v.${v}, mais le PDF n'a pas pu être créé (${e.message}). Utilisez « 📄 PDF » pour réessayer.`,'err')}
 }
 async function affaireDe(n){return (await tout(T_AFF,`&filter__N° affaire__equal=${encodeURIComponent(n)}`))[0]}
 const ids=a=>(a||[]).map(x=>x.id);
@@ -558,8 +563,284 @@ window.addEventListener('beforeprint',()=>{
   document.querySelectorAll('.page .opt').forEach(o=>{const e=[...o.querySelectorAll('.ed')];o.classList.toggle('vide',e.length>0&&e.every(x=>!String(x.value).trim()))});
   if(TYPE==='bl'){const p=partiel();$('tLignes').classList.toggle('complet',!p);$('thLiv').textContent=p?'Livré':'Quantité'}
 });
+/* ---------- PDF vectoriel (jsPDF) + enregistrement SharePoint (Microsoft Graph) ----------
+   À la validation d'un devis : le PDF est construit à partir de la page (texte vectoriel, police Carlito),
+   déposé dans <Dossier SharePoint>/04_Offre/Devis_<n°>_v<v>.pdf et son lien écrit dans le champ « PDF ».
+   Sans configuration Microsoft (MS_CLIENT vide) ou sans dossier SharePoint : le PDF est téléchargé. */
+const MS_CLIENT='',MS_TENANT='';   // ID d'application (client) et ID d'annuaire (locataire) Entra « Akteev »
+const LIB_JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const LIB_MSAL=['https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js','https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js'];
+const POLICE_URL='https://raw.githubusercontent.com/google/fonts/main/ofl/carlito/Carlito-';
+const DOSSIER_PDF={devis:'04_Offre',arc:'05_Commande',bl:'06_Livraison'};
+function chargerScript(u){return new Promise((ok,ko)=>{if(document.querySelector(`script[data-src="${u}"]`))return ok();const s=document.createElement('script');s.src=u;s.dataset.src=u;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('chargement impossible : '+u))};document.head.appendChild(s)})}
+let POLICE=null;
+async function policePDF(doc){
+  if(POLICE===null){try{POLICE={};for(const st of ['Regular','Bold']){const r=await fetch(POLICE_URL+st+'.ttf');if(!r.ok)throw new Error(r.status);
+      const b=new Uint8Array(await r.arrayBuffer());let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));POLICE[st]=btoa(s)}}
+    catch(e){console.warn('Police Carlito indisponible, Helvetica utilisée',e);POLICE=false}}
+  if(!POLICE)return 'helvetica';
+  for(const st of ['Regular','Bold']){doc.addFileToVFS('Carlito-'+st+'.ttf',POLICE[st]);doc.addFont('Carlito-'+st+'.ttf','Carlito',st==='Bold'?'bold':'normal')}
+  return 'Carlito';
+}
+const blobVersData=b=>new Promise((ok,ko)=>{const f=new FileReader();f.onload=()=>ok(f.result);f.onerror=ko;f.readAsDataURL(b)});
+function dimsImage(src){return new Promise(ok=>{const i=new Image();i.onload=()=>ok({w:i.naturalWidth,h:i.naturalHeight});i.onerror=()=>ok(null);i.src=src})}
+async function imageData(url){
+  if(!url)return null;
+  try{const r=await fetch(url,{mode:'cors'});if(!r.ok)throw 0;const d=await blobVersData(await r.blob());const t=await dimsImage(d);return t?{d,...t}:null}
+  catch(e){ // repli : image chargée en crossOrigin puis recopiée dans un canvas
+    try{const i=await new Promise((ok,ko)=>{const x=new Image();x.crossOrigin='anonymous';x.onload=()=>ok(x);x.onerror=ko;x.src=url});
+      const c=document.createElement('canvas');c.width=i.naturalWidth;c.height=i.naturalHeight;c.getContext('2d').drawImage(i,0,0);
+      return {d:c.toDataURL('image/png'),w:c.width,h:c.height}}catch(e2){return null}}
+}
+const frDate=v=>v?new Date(String(v).slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR'):'';
+
+async function construirePDF(){
+  await chargerScript(LIB_JSPDF);
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4',compress:true});
+  const F=await policePDF(doc);
+  const PT=0.3528,W=210,H=297,G=16,DR=W-G,HAUT=12,BAS=275;
+  const BLEU=[43,76,126],GRIS=[107,107,107],TRAIT=[208,208,208],NOIR=[0,0,0],JAUNE=[255,242,0];
+  const n=cur[D().num],v=+cur.Version||1,titre=D().titre;
+  const style=(taille,gras,coul)=>{doc.setFont(F,gras?'bold':'normal');doc.setFontSize(taille);doc.setTextColor(...(coul||NOIR))};
+  const larg=(t,taille,gras)=>{style(taille,gras);return doc.getTextWidth(t)};
+  const ecrire=(t,x,y,opt={})=>doc.text(String(t).replace(/ /g,' '),x,y,{baseline:'top',...opt});
+  const trait=(x1,y1,x2,y2,c)=>{doc.setDrawColor(...(c||TRAIT));doc.setLineWidth(0.26);doc.line(x1,y1,x2,y2)};
+  const cadre=(x,y,w,h)=>{doc.setDrawColor(...TRAIT);doc.setLineWidth(0.26);doc.roundedRect(x,y,w,h,3,3,'S')};
+
+  /* Texte riche : lisible() (espaces insécables) + ==surligné== ; découpé en lignes de largeur w */
+  function decouper(texte,w,taille,gras){
+    const lignes=[];
+    for(const brut of lisible(texte).split('\n')){
+      let parts=brut.split('==');if(parts.length%2===0){const d=parts.pop();parts[parts.length-1]+='=='+d}
+      const mots=[[]];
+      parts.forEach((p,i)=>{const m=i%2===1;p.split(' ').forEach((bout,k)=>{if(k>0)mots.push([]);if(bout)mots[mots.length-1].push({t:bout,m})})});
+      const ms=mots.filter(x=>x.length);
+      if(!ms.length){lignes.push([]);continue}
+      const esp=larg(' ',taille,gras);let l=[],lw=0;
+      for(const mo of ms){const mw=mo.reduce((s,p)=>s+larg(p.t,taille,gras),0);
+        if(l.length&&lw+esp+mw>w){lignes.push(l);l=[];lw=0}
+        lw+=(l.length?esp:0)+mw;l.push(mo)}
+      lignes.push(l);
+    }
+    return lignes;
+  }
+  function hauteurTexte(texte,w,taille,gras,lh){return decouper(texte,w,taille,gras).length*taille*PT*lh}
+  // Écrit un paragraphe ; renvoie le y du bas. align : 'left' | 'right' | 'center'
+  function para(texte,x,y,w,{taille=9.75,gras=false,coul=NOIR,lh=1.35,align='left'}={}){
+    const L=decouper(texte,w,taille,gras),hl=taille*PT*lh,esp=larg(' ',taille,gras);
+    L.forEach((l,i)=>{
+      const ty=y+i*hl+(hl-taille*PT)/2;
+      const tw=l.reduce((s,mo,k)=>s+(k?esp:0)+mo.reduce((a,p)=>a+larg(p.t,taille,gras),0),0);
+      let cx=align==='right'?x+w-tw:align==='center'?x+(w-tw)/2:x;
+      l.forEach((mo,k)=>{
+        if(k){const prec=l[k-1][l[k-1].length-1].m&&mo[0].m;if(prec){doc.setFillColor(...JAUNE);doc.rect(cx,ty-0.15,esp,taille*PT+0.3,'F')}cx+=esp}
+        for(const p of mo){const pw=larg(p.t,taille,gras);
+          if(p.m){doc.setFillColor(...JAUNE);doc.rect(cx,ty-0.15,pw,taille*PT+0.3,'F')}
+          style(taille,gras,coul);ecrire(p.t,cx,ty);cx+=pw}
+      });
+    });
+    return y+L.length*hl;
+  }
+
+  /* ---- Données de la page ---- */
+  const val=id=>$(id)?$(id).value:'';
+  const cli=clients.find(x=>x.id==val('fClient'));
+  const ref=refs.find(x=>x.id==val('fRef'));
+  const adrCli=cli?[cli['Raison sociale (Axonaut)']&&cli['Raison sociale (Axonaut)']!==cli.Entreprise?cli['Raison sociale (Axonaut)']:'',...(cli.Adresse||'').split(', '),`${cli['Code postal']||''} ${cli.Ville||''}`,cli.Pays&&cli.Pays!=='France'?cli.Pays:''].filter(x=>x&&x.trim()):[];
+  const logo={d:LOGO,...(await dimsImage(LOGO)||{w:137,h:140})};
+  const vign=await Promise.all(lignes.map(l=>{const im=(l.Vignette||[])[0];return imageData(im&&(im.url||im.thumbnails?.card_cover?.url))}));
+
+  /* ---- En-tête / pied de chaque page ---- */
+  let y=0;
+  function entete(){
+    style(8.25,false,GRIS);ecrire(`KTE - ${titre} ${n} v.${v}`,G,HAUT);
+    trait(G,HAUT+4.6,DR,HAUT+4.6);
+    const ph=7.125*PT*1.5;trait(G,H-8-2*ph-0.8,DR,H-8-2*ph-0.8);
+    style(7.125,false,GRIS);
+    ecrire('KTE - Eurl au capital de 10 000 € / IBAN: FR76.3000.3000.8100.0201.7065.622 - BIC: SOGEFRPP',W/2,H-8-2*ph+(ph-7.125*PT)/2,{align:'center'});
+    ecrire('N° Siret : 53865123300016 - R.C.S. Angers 538 651 233 - Code APE : 2573 - TVA intracommunautaire : FR59 538 651 233',W/2,H-8-ph+(ph-7.125*PT)/2,{align:'center'});
+    y=HAUT+4.6+8;
+  }
+  function nouvellePage(){doc.addPage();entete()}
+  entete();
+
+  /* ---- Haut : logo + titre ---- */
+  const y0=y,lw=24,lh=lw*logo.h/logo.w;
+  doc.addImage(logo.d,'JPEG',G,y0,lw,lh);
+  let yt=y0;
+  style(TYPE==='arc'?16.5:21,false,BLEU);ecrire(titre,DR,yt,{align:'right'});yt+=(TYPE==='arc'?16.5:21)*PT*1.2+1;
+  style(15,true,BLEU);ecrire(`${n} v.${v}`,DR,yt,{align:'right'});yt+=15*PT*1.2+2;
+  const lt=9.75*PT*1.5;
+  const ligneT=(segs)=>{let tw=segs.reduce((s,[t,b])=>s+larg(t,9.75,b),0),cx=DR-tw;for(const [t,b] of segs){style(9.75,b);ecrire(t,cx,yt+(lt-9.75*PT)/2);cx+=larg(t,9.75,b)}yt+=lt};
+  ligneT([[`Cholet, le ${frDate(val('fDate'))}`,false]]);
+  if(TYPE!=='devis'){
+    if($('lAff').textContent)ligneT([[$('lAff').textContent,false]]);
+    if(val('fCde').trim())ligneT([['Votre commande : ',false],[val('fCde').trim(),true],...(TYPE==='arc'&&val('fDateCde')?[[' du '+frDate(val('fDateCde')),false]]:[])]);
+    if(TYPE==='arc'&&$('lDevis').textContent)ligneT([[$('lDevis').textContent,false]]);
+  }
+  y=Math.max(y0+lh,yt)+4;
+
+  /* ---- Adresses ---- */
+  const la=9.75*PT*1.45;let ya=y;
+  for(const t of ['KTE','6 rue de la gatine','49300 Cholet','02-41-62-27-71','www.kte-fr.com',ref?.Nom||'',ref?.['E-mail']||''].filter(Boolean)){style(9.75);ecrire(t,G,ya+(la-9.75*PT)/2);ya+=la}
+  const cx0=DR-85,cw=85-8;let yc=y+4;
+  const lc=(t,b)=>{yc=para(t,cx0+4,yc,cw,{gras:b,lh:1.45})};
+  if(TYPE==='bl')lc('Adresse de livraison',true);
+  const autreAdr=TYPE==='bl'&&val('fAdrLivBL').trim();
+  if(!autreAdr){lc(cli?(cli.Entreprise||cli['Code client']):'',true);adrCli.forEach(t=>lc(t))}
+  else lc(val('fAdrLivBL').trim());
+  if(TYPE==='arc'&&val('fAdrLiv').trim()){yc+=2;yc=para('Livraison : '+val('fAdrLiv').trim(),cx0+4,yc,cw,{taille:9,lh:1.45})}
+  yc+=4;cadre(cx0,y,85,yc-y);
+  y=Math.max(ya,yc);
+
+  /* ---- Objet ---- */
+  if(TYPE==='devis'&&val('fObjet').trim()){
+    y+=8;const w0=larg('Objet : ',9.75);style(9.75,false,GRIS);ecrire('Objet : ',G,y+(9.75*PT*0.35)/2);
+    y=para(val('fObjet').trim(),G+w0,y,DR-G-w0,{});
+  }
+
+  /* ---- Tableau des lignes ---- */
+  y+=12;
+  const prix=D().prix,blPart=TYPE==='bl'&&partiel();
+  let cols; // [titre, largeur, valeur(l,i)]
+  if(prix)cols=[['Prix unitaire',24,l=>eur(l['Prix unitaire HT'])],['Quantité',16,l=>nb(l['Quantité'])],['Montant HT',24,l=>eur((+l['Prix unitaire HT']||0)*(+l['Quantité']||0))]];
+  else if(blPart)cols=[['Commandé',16,l=>nb(l['Quantité commandée'])],['Déjà livré',16,l=>nb(l['Déjà livré'])],['Livré',16,l=>nb(l['Quantité livrée'])],['Reste',24,l=>nb(Math.max(0,(+l['Quantité commandée']||0)-(+l['Déjà livré']||0)-(+l['Quantité livrée']||0)))]];
+  else cols=[['Quantité',16,l=>nb(l['Quantité livrée'])]];
+  const xV=G,wV=18,xD=G+wV,wD=DR-G-wV-cols.reduce((s,c)=>s+c[1],0);
+  function teteTableau(){
+    const h=9.75*PT*1.2+3.2;style(9.75,true,BLEU);
+    ecrire('Description',xD+1,y+1.6);
+    let x=xD+wD;for(const c of cols){x+=c[1];style(9.75,true,BLEU);ecrire(c[0],x-1,y+1.6,{align:'right'})}
+    y+=h;trait(G,y,DR,y);
+  }
+  teteTableau();
+  lignes.forEach((l,i)=>{
+    const tD=String(l.Description||'').trim(),tP=String(l['Précisions']||'').trim();
+    const hD=tD?hauteurTexte(tD,wD-2,9.75,true,1.35):0,hP=tP?hauteurTexte(tP,wD-2,9,false,1.35):0;
+    const hTxt=hD+hP+2.2,hImg=vign[i]?18:0,h=Math.max(hTxt,hImg,9.75*PT*1.35+2.2);
+    if(y+h>BAS){nouvellePage();teteTableau()}
+    if(vign[i]){const im=vign[i],k=Math.min(16/im.w,16/im.h),iw=im.w*k,ih=im.h*k;
+      const fmt=/^data:image\/(jpe?g)/i.test(im.d)?'JPEG':'PNG';
+      try{doc.addImage(im.d,fmt,xV+1+(16-iw)/2,y+(h-ih)/2,iw,ih)}catch(e){console.warn('vignette',e)}}
+    let yy=y+(h-hD-hP)/2;
+    if(tD)yy=para(tD,xD+1,yy,wD-2,{gras:true});
+    if(tP)para(tP,xD+1,yy,wD-2,{taille:9,coul:[34,34,34]});
+    let x=xD+wD;for(const c of cols){x+=c[1];style(9.75);ecrire(c[2](l,i),x-1,y+(h-9.75*PT)/2,{align:'right'})}
+    y+=h;trait(G,y,DR,y);
+  });
+  if(TYPE==='bl'){y+=2;const t=nb(lignes.reduce((s,l)=>s+(+l['Quantité livrée']||0),0));const wb=larg(t,9.75,true);
+    style(9.75);ecrire("Total d'articles : ",DR-wb,y,{align:'right'});style(9.75,true);ecrire(t,DR,y,{align:'right'});y+=9.75*PT*1.35}
+
+  /* ---- Bas : conditions + totaux (jamais coupé) ---- */
+  const wc=85-8,tc=9,lhc=1.5,lgc=tc*PT*lhc;
+  const blocs=[]; // [texte, gras] ; '' = ligne vide
+  if(TYPE==='devis'){blocs.push(['Délai: '+val('fDelai'),false],['',false],['Modalités et conditions de règlement :',true],[val('fCond'),false],[`Ce devis est valable ${val('fValid')||10} jours.`,false])}
+  else if(TYPE==='arc'){
+    if(val('fDateLiv'))blocs.push(['Date de livraison confirmée : '+frDate(val('fDateLiv')),true]);
+    if(val('fDelaiArc').trim())blocs.push(['Délai de livraison confirmé : '+val('fDelaiArc').trim(),true]);
+    if(val('fCondLiv').trim())blocs.push(['Livraison : '+val('fCondLiv').trim(),false]);
+    blocs.push(['',false],['Modalités et conditions de règlement :',true],[val('fCondArc'),false]);
+    if(val('fObsArc').trim())blocs.push(['Observations :',true],[val('fObsArc').trim(),false]);
+    blocs.push(['Nous vous remercions de votre commande. Merci de nous signaler tout écart avec votre commande sous 48 heures.',false]);
+  }else{
+    blocs.push(['Colisage :',true],['Nombre de colis : '+(val('fColis')!==''?nb(val('fColis')):'……'),false],['Poids total : '+(val('fPoids')!==''?nb(val('fPoids')):'……')+' kg',false]);
+    if(val('fTransp').trim())blocs.push(['Transporteur : '+val('fTransp').trim(),false]);
+    if(val('fSuivi').trim())blocs.push(['N° de suivi : '+val('fSuivi').trim(),false]);
+    if(val('fObsBL').trim())blocs.push(['',false],['Observations :',true],[val('fObsBL').trim(),false]);
+  }
+  const hCond=8+blocs.reduce((s,[t,b])=>s+(t?hauteurTexte(t,wc,tc,b,lhc):lgc),0);
+  const lhT=9.75*PT*1.2+3.7;
+  const hTot=TYPE==='bl'?(12.75*PT*1.3+2+ 4*lgc+4*lgc+6+6):TYPE==='devis'?(3*lhT+4+lt+6+2*12.75*PT*1.3+2+26):3*lhT;
+  y+=12;
+  if(y+Math.max(hCond,hTot)>BAS){nouvellePage()}
+  const yb=y;let yy=yb+4;
+  for(const [t,b] of blocs){yy=t?para(t,G+4,yy,wc,{taille:tc,gras:b,lh:lhc}):yy+lgc}
+  cadre(G,yb,85,hCond);
+  const xt=DR-78;
+  if(TYPE!=='bl'){
+    const ht=lignes.reduce((s,l)=>s+(+l['Prix unitaire HT']||0)*(+l['Quantité']||0),0),htr=Math.round(ht*100)/100;
+    let yt2=yb;
+    [['Total HT',eur(htr)],['TVA 20,00%',eur(htr*0.2)],['Total TTC',eur(htr*1.2)]].forEach(([a,b],k)=>{
+      const c=k===2?BLEU:NOIR,g=k===2;style(9.75,g,c);
+      ecrire(a,xt+38,yt2+(lhT-9.75*PT)/2,{align:'right'});ecrire(b,DR-1,yt2+(lhT-9.75*PT)/2,{align:'right'});
+      yt2+=lhT;trait(xt,yt2,DR,yt2)});
+    if(TYPE==='devis'){
+      yt2+=4;const d=new Date((val('fDate')||aujourd())+'T12:00:00');d.setDate(d.getDate()+(+val('fValid')||10));
+      style(9.75);ecrire("Offre valable jusqu'au "+d.toLocaleDateString('fr-FR'),xt+39,yt2+(lt-9.75*PT)/2,{align:'center'});yt2+=lt+6;
+      const lb=12.75*PT*1.3;style(12.75,false,BLEU);ecrire('Bon pour accord',xt+39,yt2,{align:'center'});ecrire('et signature',xt+39,yt2+lb,{align:'center'});yt2+=2*lb+2;
+      cadre(xt,yt2,78,26);style(9.75);ecrire('Fait à :',xt+3,yt2+3);ecrire('Le :',DR-3-20-larg('Le :',9.75),yt2+3);
+    }
+  }else{
+    let yt2=yb;const lb=12.75*PT*1.3;style(12.75,false,BLEU);ecrire('Réception client',xt+39,yt2,{align:'center'});yt2+=lb+2;
+    const hr=3+4*lgc+4*lgc+4*lgc+3;cadre(xt,yt2,78,hr);let yr=yt2+3;style(tc);
+    ecrire('Reçu le :',xt+3,yr);ecrire('Par :',xt+3+larg('Reçu le :',tc)+30,yr);yr+=2*lgc;
+    style(tc);ecrire('Réserves éventuelles :',xt+3,yr);yr+=4*lgc;style(tc);ecrire('Signature et cachet :',xt+3,yr);
+  }
+
+  /* ---- Numéros de page ---- */
+  const np=doc.getNumberOfPages();
+  for(let p=1;p<=np;p++){doc.setPage(p);style(8.25,false,GRIS);ecrire(`Page ${p}/${np}`,DR,HAUT,{align:'right'})}
+  doc.setProperties({title:`${titre} ${n} v.${v}`,author:'KTE',creator:'Éditeur KTE'});
+  return {blob:doc.output('blob'),nom:(String(n).startsWith(D().court)?'':D().court+'_')+`${n}_v${v}.pdf`,pages:np};
+}
+function telecharger(blob,nom){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
+
+/* ---- Microsoft Graph (connexion MSAL, fenêtre surgissante) ---- */
+let MSAL=null;
+async function jetonGraph(){
+  if(!MS_CLIENT)throw new Error('connexion Microsoft non configurée');
+  if(!MSAL){let ok=false;for(const u of LIB_MSAL){try{await chargerScript(u);ok=true;break}catch(e){}}if(!ok)throw new Error('bibliothèque Microsoft indisponible');
+    MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+(MS_TENANT||'organizations'),redirectUri:location.origin+location.pathname.replace(/index\.html$/,'')},cache:{cacheLocation:'localStorage'}});
+    await MSAL.initialize()}
+  const sc={scopes:['Files.ReadWrite.All']};
+  let compte=MSAL.getActiveAccount()||MSAL.getAllAccounts()[0];
+  if(compte){try{return (await MSAL.acquireTokenSilent({...sc,account:compte})).accessToken}catch(e){}}
+  const r=await MSAL.acquireTokenPopup({...sc,prompt:compte?undefined:'select_account'});MSAL.setActiveAccount(r.account);return r.accessToken;
+}
+async function graph(jeton,chemin,opt={}){
+  const r=await fetch('https://graph.microsoft.com/v1.0'+chemin,{...opt,headers:{Authorization:'Bearer '+jeton,...(opt.headers||{})}});
+  if(!r.ok){const t=await r.text();throw new Error('Microsoft '+r.status+' '+t.slice(0,160))}
+  return r.status===204?null:r.json();
+}
+const b64url=s=>btoa(unescape(encodeURIComponent(s))).replace(/=+$/,'').replace(/\//g,'_').replace(/\+/g,'-');
+async function dossierSP(jeton,url){
+  try{return await graph(jeton,'/shares/u!'+b64url(url)+'/driveItem?$select=id,name,webUrl,parentReference')}
+  catch(e){ // repli : site + chemin dans la bibliothèque « Documents partagés »
+    const u=new URL(url),seg=decodeURIComponent(u.pathname).split('/').filter(Boolean);   // sites, <site>, <bibliothèque>, …
+    const site=await graph(jeton,`/sites/${u.hostname}:/${seg[0]}/${seg[1]}`);
+    const it=await graph(jeton,`/sites/${site.id}/drive/root:/${seg.slice(3).map(encodeURIComponent).join('/')}`);
+    return it}
+}
+async function deposerSP(blob,nom,sous){
+  const url=(cur['Dossier SharePoint']||'').trim();if(!url)throw new Error('pas de « Dossier SharePoint » sur la fiche');
+  const j=await jetonGraph();
+  const dos=await dossierSP(j,url);const drive=dos.parentReference.driveId;
+  const f=await graph(j,`/drives/${drive}/items/${dos.id}:/${encodeURIComponent(sous)}/${encodeURIComponent(nom)}:/content?@microsoft.graph.conflictBehavior=replace`,{method:'PUT',headers:{'Content-Type':'application/pdf'},body:blob});
+  return f.webUrl;
+}
+/* Construit le PDF, le dépose dans SharePoint et renseigne le champ PDF (repli : téléchargement) */
+async function publierPDF(){
+  msg('Création du PDF…');
+  const {blob,nom,pages}=await construirePDF();
+  if(TYPE==='devis'&&MS_CLIENT&&(cur['Dossier SharePoint']||'').trim()){
+    try{msg('Enregistrement du PDF dans SharePoint…');
+      const lien=await deposerSP(blob,nom,DOSSIER_PDF[TYPE]);
+      await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({PDF:lien})});
+      cur.PDF=lien;majLienPDF();
+      return {ok:true,texte:`PDF ${nom} (${pages} p.) enregistré dans ${DOSSIER_PDF[TYPE]} et lié au devis.`}}
+    catch(e){console.error(e);telecharger(blob,nom);return {ok:false,texte:`PDF ${nom} téléchargé (SharePoint : ${e.message}).`}}
+  }
+  telecharger(blob,nom);
+  return {ok:true,texte:`PDF ${nom} (${pages} p.) téléchargé`+(TYPE!=='devis'?'.':!MS_CLIENT?' (enregistrement SharePoint pas encore configuré).':' (pas de « Dossier SharePoint » sur la fiche).')};
+}
+function majLienPDF(){const a=$('lPdf');if(!a)return;const u=cur&&cur.PDF;a.style.display=u?'':'none';if(u)a.href=u}
+$('bPdfV').onclick=async()=>{if(sale){msg('Enregistrez d\'abord les modifications.','warn');return}
+  if(!cur['Validé le']||(cur['Contrôle version']||'').startsWith('⚠')){msg('Validez d\'abord le document : le PDF correspond toujours à une version validée.','warn');return}
+  $('bPdfV').disabled=true;try{const r=await publierPDF();msg(r.texte,r.ok?'ok':'warn')}catch(e){msg('PDF : '+e.message,'err')}finally{$('bPdfV').disabled=false}};
+
 window.addEventListener('afterprint',()=>{document.querySelectorAll('.po').forEach(x=>x.remove());document.querySelectorAll('.vide').forEach(x=>x.classList.remove('vide'));if($('thLiv'))$('thLiv').textContent='Livré'});
-init();
+if(RETOUR_MS)document.body.innerHTML='<p style="font-family:sans-serif;padding:20px">Connexion Microsoft…</p>';else init();
 </script>
 </body>
 </html>
