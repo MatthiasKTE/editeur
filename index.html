@@ -304,8 +304,21 @@ async function ouvrir(id){
   supprimees=[];afficher();sale=false;$('bEnr').disabled=true;$('bValider').disabled=false;$('bPdf').disabled=false;$('bPdfV').disabled=false;majLienPDF();
   $('bCde').style.display=TYPE==='devis'?'':'none';$('bCde').textContent=(cur.Commande||[]).length?'Commande : '+cur.Commande[0].value:'Commande reçue';
   history.replaceState(null,'',`?${TYPE}=${encodeURIComponent(cur[D().num])}`);
-  const c=cur['Contrôle version']||'';msg(c,c.startsWith('⚠')?'warn':'ok');
+  const c=txtControle();msg(c,c.startsWith('⚠')?'warn':'ok');
 }
+/* ---- Modifié depuis la validation ? ----
+   La formule Baserow « Contrôle version » tolère 120 s entre « Validé le » et « Modifié le » : une modification faite
+   moins de 2 min après une validation (ou après « 📄 PDF », qui réécrit « Validé le ») passait inaperçue.
+   L'éditeur note donc l'heure de chaque enregistrement (par document, dans ce navigateur) et la compare à « Validé le ». */
+const cleModif=()=>`kte_modif_${TYPE}_${cur&&cur.id}`;
+function noterModif(){try{localStorage.setItem(cleModif(),new Date().toISOString())}catch(e){}}
+function modifie(){
+  if((cur['Contrôle version']||'').startsWith('⚠'))return true;
+  if(!cur['Validé le'])return false;
+  let t=null;try{t=localStorage.getItem(cleModif())}catch(e){}
+  return !!t&&Date.parse(t)>Date.parse(cur['Validé le']);
+}
+function txtControle(){return modifie()&&!(cur['Contrôle version']||'').startsWith('⚠')?'⚠ Modifié depuis la validation : nouvelle version à éditer':(cur['Contrôle version']||'')}
 function afficher(){
   $('page').style.display='block';
   const v=+cur.Version||1,n=cur[D().num];
@@ -396,9 +409,9 @@ async function enregistrer(){
     if(l._new){const n=await api(`/rows/table/${D().lt}/?user_field_names=true`,{method:'POST',body:JSON.stringify({...c,[D().retour]:[cur.id]})});Object.assign(l,n);delete l._new;delete l._m}
     else if(l._m||+l.Ordre!==i+1){await api(`/rows/table/${D().lt}/${l.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)});delete l._m}}
   for(const id of supprimees){await api(`/rows/table/${D().lt}/${id}/`,{method:'DELETE'})}
-  supprimees=[];sale=false;$('bEnr').disabled=true;
+  supprimees=[];sale=false;$('bEnr').disabled=true;noterModif();
   cur=await ligne1(D().table,cur.id);
-  const c=cur['Contrôle version']||'';
+  const c=txtControle();
   await chargerListe();$('choix').value=cur.id;afficher();msg('Enregistré. '+c,c.startsWith('⚠')?'warn':'ok');
 }
 async function valider(){
@@ -406,12 +419,13 @@ async function valider(){
   if(!lignes.length){msg('Aucune ligne : impossible de valider.','err');return}
   if(sale)await enregistrer();
   cur=await ligne1(D().table,cur.id);
-  let v=+cur.Version||1;const deja=!!cur['Validé le'];const modif=(cur['Contrôle version']||'').startsWith('⚠');
+  let v=+cur.Version||1;const deja=!!cur['Validé le'];let modif=modifie(),force=false;
+  // Rien de détecté : on laisse quand même la main (ex. modification faite depuis un autre navigateur)
+  if(deja&&!modif){if(!confirm(`Aucune modification détectée depuis la validation de la v.${v}.\n\nSi vous avez modifié le document (prix, délai, lignes…), cliquez OK pour créer la v.${v+1}, datée d'aujourd'hui.\nSinon, Annuler : le document reste en v.${v}.`)){msg(`Le document reste en v.${v}.`,'ok');return}modif=force=true}
   const maj={'Statut':'Validé','Validé le':new Date().toISOString()};
   if(deja&&modif){v+=1;maj.Version=v;maj['Date de version']=aujourd();maj.Date=aujourd()}
-  else if(!deja){maj.Version=v;maj['Date de version']=$('fDate').value||aujourd()}
-  else{msg(`Aucune modification depuis la validation : le document reste en v.${v}.`,'ok');return}
-  if(!confirm(deja?`Le document a été modifié depuis sa validation. Il passe en v.${v}, daté d'aujourd'hui. Continuer ?`:`Valider en v.${v} ?`))return;
+  else{maj.Version=v;maj['Date de version']=$('fDate').value||aujourd()}
+  if(!force&&!confirm(deja?`Le document a été modifié depuis sa validation. Il passe en v.${v}, daté d'aujourd'hui. Continuer ?`:`Valider en v.${v} ?`))return;
   await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(maj)});
   cur=await ligne1(D().table,cur.id);await chargerListe();$('choix').value=cur.id;afficher();
   msg(`Validé en v.${v}.`,'ok');
@@ -889,7 +903,7 @@ async function publierPDF(){
 }
 function majLienPDF(){const a=$('lPdf');if(!a)return;const u=cur&&cur.PDF;a.style.display=u?'':'none';if(u)a.href=u}
 $('bPdfV').onclick=async()=>{if(sale){msg('Enregistrez d\'abord les modifications.','warn');return}
-  if(!cur['Validé le']||(cur['Contrôle version']||'').startsWith('⚠')){msg('Validez d\'abord le document : le PDF correspond toujours à une version validée.','warn');return}
+  if(!cur['Validé le']||modifie()){msg('Validez d\'abord le document : le PDF correspond toujours à une version validée.','warn');return}
   $('bPdfV').disabled=true;try{const r=await publierPDF();msg(r.texte,r.ok?'ok':'warn')}catch(e){msg('PDF : '+e.message,'err')}finally{$('bPdfV').disabled=false}};
 
 window.addEventListener('afterprint',()=>{document.querySelectorAll('.po').forEach(x=>x.remove());document.querySelectorAll('.vide').forEach(x=>x.classList.remove('vide'));if($('thLiv'))$('thLiv').textContent='Livré'});
