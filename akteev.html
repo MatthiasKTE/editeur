@@ -634,7 +634,7 @@ async function comparerSST(dv){
   ouvrirModal('Comparer les SST – '+txt(dv['N° devis']),'<div class="charge">Chargement des offres…</div>','<button class="btn" onclick="fermerModal()">Fermer</button>');
   $('modal').querySelector('.box').style.width='min(1280px,97vw)';$('modal').querySelector('.box').style.maxHeight='88vh';$('modal').style.paddingTop='4vh';
   let P;
-  try{await Promise.all([charger(T_LDV),charger(MODS.consult.t)]);P=await charger(T_PSST)}
+  try{await Promise.all([charger(T_LDV,true),charger(MODS.consult.t,true)]);P=await charger(T_PSST,true)}
   catch(e){$('mCorps').innerHTML=`<div class="vide">Impossible de lire la table « Prix SST » (${esc(e.message)}).<br>Vérifiez que le jeton Baserow donne accès à cette table.</div>`;return}
   dessinerComparatif(dv);
 }
