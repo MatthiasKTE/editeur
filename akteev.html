@@ -181,6 +181,12 @@ table.cmp td.cmpRet{box-shadow:inset 0 0 0 2px #16A34A}
 table.cmp .cmpEc{font-size:11px;color:var(--mut);font-weight:400}
 table.cmp tfoot td{border-top:2px solid var(--trait);vertical-align:top;padding-top:8px}
 .btn.mini{padding:2px 8px;font-size:11.5px;margin-top:4px;min-height:0;height:auto}
+table.cmp th.cmpPV,table.cmp td.cmpPV{background:#FFF1DE}
+table.cmp td.cmpPV input{width:96px;text-align:right;border:1px solid #F3C98B;border-radius:6px;padding:4px 6px;font:inherit;background:#fff}
+table.cmp td.cmpPV input:focus{outline:2px solid #F59E0B;border-color:#F59E0B}
+.cmpOutils{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#FFF1DE;border:1px solid #F3C98B;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:13px}
+.cmpOutils input,.cmpOutils select{font:inherit;border:1px solid #F3C98B;border-radius:6px;padding:3px 6px;background:#fff}
+.cmpOutils .btn.mini{margin-top:0}
 #modal .box h3{margin:0;padding:16px 18px;border-bottom:1px solid var(--trait);font-size:15px;display:flex;align-items:center}
 #modal .box h3 button{margin-left:auto;border:0;background:none;font-size:20px;color:var(--mut)}
 #modal .box .corps{padding:14px 18px;overflow:auto;flex:1}
@@ -630,6 +636,10 @@ function dessinerDDP(){
    « Retenir » : coût unitaire (interne) de la ligne de devis = PU du sous-traitant, et case « Retenu » cochée. */
 const T_PSST=1278828;
 const estEUR=d=>!d||/^(eur|€)$/i.test(String(d).trim());
+let CMPC=Object.assign({coef:1.3,pas:1,sens:'sup'},ls.get('cmpc',{}));
+const vide=v=>v==null||v==='';
+function arrondiPV(c){const x=+c*(+CMPC.coef||0),p=+CMPC.pas||1;return CMPC.sens==='inf'?Math.floor(x/p+1e-9)*p:Math.ceil(x/p-1e-9)*p}
+const margeTxt=(pv,c)=>!vide(pv)&&+pv>0&&!vide(c)?Math.round((pv-c)/pv*100)+' %':'';
 async function comparerSST(dv){
   ouvrirModal('Comparer les SST – '+txt(dv['N° devis']),'<div class="charge">Chargement des offres…</div>','<button class="btn" onclick="fermerModal()">Fermer</button>');
   $('modal').querySelector('.box').style.width='min(1280px,97vw)';$('modal').querySelector('.box').style.maxHeight='88vh';$('modal').style.paddingTop='4vh';
@@ -660,9 +670,13 @@ function dessinerComparatif(dv){
   if(!cols.length){$('mCorps').innerHTML=h+'<div class="vide">Aucune offre reçue pour ce devis pour l’instant.</div>';return}
   if(!lignes.length){$('mCorps').innerHTML=h+'<div class="vide">Ce devis n’a pas encore de lignes (à créer dans l’éditeur).</div>';return}
   const tot={},nbL={};cols.forEach(x=>{tot[x.c.id]=0;nbL[x.c.id]=0});
+  if(ecr)h+=`<div class="cmpOutils"><b>Prix de vente</b> = coût retenu × <input id="cCoef" type="number" step="0.01" min="0" value="${esc(CMPC.coef)}" style="width:70px">
+    arrondi <select id="cPas"><option value="1" ${+CMPC.pas===1?'selected':''}>à l’euro</option><option value="10" ${+CMPC.pas===10?'selected':''}>à la dizaine</option></select>
+    <select id="cSens"><option value="sup" ${CMPC.sens!=='inf'?'selected':''}>supérieur</option><option value="inf" ${CMPC.sens==='inf'?'selected':''}>inférieur</option></select>
+    <button class="btn mini p" id="cApp" title="Remplit le PV unitaire des lignes qui ont un coût retenu">Appliquer</button><span class="mut" style="font-size:12px">ou saisissez le PV à la main dans la colonne orange (enregistré dans le devis, visible dans l’éditeur)</span></div>`;
   h+=`<div class="tw"><table class="l cmp"><thead><tr><th style="cursor:default">Rep</th><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Qté</th>
    ${cols.map(x=>`<th class="n" style="cursor:default;min-width:118px"><a href="#/consult/${x.c.id}" onclick="fermerModal()" style="color:inherit">${esc(x.four)}</a>${x.c['Délai']?`<div class="mut" style="font-weight:400;font-size:11px">${esc(x.c['Délai'])}</div>`:''}${ecr?`<button class="btn mini" data-tout="${x.c.id}" title="Retenir ${esc(x.four)} pour toutes ses lignes chiffrées">Tout retenir</button>`:''}</th>`).join('')}
-   <th class="n" style="cursor:default" title="Coût unitaire (interne) de la ligne de devis">Coût retenu</th><th class="n" style="cursor:default" title="Prix unitaire HT de vente">PV unitaire</th></tr></thead><tbody>`;
+   <th class="n" style="cursor:default" title="Coût unitaire (interne) de la ligne de devis">Coût retenu</th><th class="n cmpPV" style="cursor:default" title="Prix unitaire HT de vente (lignes du devis)">PV unitaire</th></tr></thead><tbody>`;
   lignes.forEach((x,i)=>{
     const pe=cols.map(c=>x.par[c.c.id]).filter(p=>p&&p['PU HT']!=null&&p['PU HT']!==''&&estEUR(p.Devise||c.c.Devise)).map(p=>+p['PU HT']);
     const min=pe.length?Math.min(...pe):null,max=pe.length>1?Math.max(...pe):null;
@@ -675,16 +689,35 @@ function dessinerComparatif(dv){
       const tip=[p['Quantité']!=null&&p['Quantité']!==''?'Qté offre : '+nb(p['Quantité']):'',p['Délai']?'Délai : '+p['Délai']:'',txt(p.Source)?'Source : '+txt(p.Source):'',txt(p['Désignation SST'])?'Désignation SST : '+txt(p['Désignation SST']):'',txt(p.Commentaire)].filter(Boolean).join('\n');
       h+=`<td class="n ${best?'cmpMin':pire?'cmpMax':''} ${p.Retenu?'cmpRet':''}" title="${esc(tip)}">${eu?eur(pu):nb(pu)+' '+esc(dev)}${txt(p.Source)==='À vérifier'?' <span style="color:#C2410C" title="Prix à vérifier">●</span>':''}
         ${eu&&min&&pu>min?`<div class="cmpEc">+${Math.round((pu-min)/min*100)} %</div>`:''}${p.Retenu?'<div class="cmpEc" style="color:#15803D;font-weight:700">✓ retenu</div>':ecr&&x.l&&eu?`<button class="btn mini" data-ret="${p.id}" data-l="${x.l.id}">Retenir</button>`:''}</td>`}
-    h+=`<td class="n">${cout!=null&&cout!==''?eur(cout):'<span class="mut">—</span>'}</td><td class="n">${pv!=null&&pv!==''?eur(pv):'<span class="mut">—</span>'}</td></tr>`});
+    const prop=!vide(cout)&&+CMPC.coef>0?arrondiPV(cout):'';
+    h+=`<td class="n">${!vide(cout)?eur(cout):'<span class="mut">—</span>'}</td><td class="n cmpPV">${x.l&&ecr?`<input type="number" step="0.01" min="0" data-pv="${x.l.id}" value="${vide(pv)?'':+pv}" placeholder="${prop}" title="${prop!==''?'Proposition : '+eur(prop):''}">`:x.l&&!vide(pv)?eur(pv):'<span class="mut">—</span>'}${x.l&&margeTxt(pv,cout)?`<div class="cmpEc">marge ${margeTxt(pv,cout)}</div>`:''}</td></tr>`});
   const nL=lignes.filter(x=>x.l).length,tv=cols.filter(c=>nbL[c.c.id]===nL).map(c=>tot[c.c.id]),tmin=tv.length>1?Math.min(...tv):null;
   h+=`</tbody><tfoot><tr><td></td><td><b>Total HT</b> <span class="mut" style="font-size:11.5px">(PU × quantité du devis)</span></td><td></td>${cols.map(c=>{const t=tot[c.c.id],cplt=nbL[c.c.id]===nL;
-    return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}<td></td><td></td></tr></tfoot></table></div>
-  <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »).</div>`;
+    return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}<td></td><td class="n cmpPV">${(()=>{const LL=lignes.filter(x=>x.l),v=LL.reduce((s,x)=>s+(+x.l['Prix unitaire HT']||0)*q(x),0),c=LL.reduce((s,x)=>s+(+x.l['Coût unitaire (interne)']||0)*q(x),0),ok=LL.filter(x=>!vide(x.l['Prix unitaire HT'])).length;
+    return`<b>${v?eur(v):'—'}</b><div class="cmpEc">${ok}/${LL.length} lignes</div>${v&&c?`<div class="cmpEc">marge ${Math.round((v-c)/v*100)} % (${eur(v-c)})</div>`:''}`})()}</td></tr></tfoot></table></div>
+  <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »).</div>`;
   $('mCorps').innerHTML=h;
   $('mCorps').querySelectorAll('button[data-ret]').forEach(b=>b.onclick=()=>retenirSST(dv,[[+b.dataset.l,+b.dataset.ret]]));
+  $('mCorps').querySelectorAll('input[data-pv]').forEach(i=>{i.onkeydown=e=>{if(e.key==='Enter')i.blur()};i.onchange=()=>{const v=i.value.trim()===''?null:Math.round(+i.value.replace(',','.')*100)/100;
+    if(v!=null&&!(v>=0))return toast('Prix invalide',true);enregistrerPV(dv,[{id:+i.dataset.pv,'Prix unitaire HT':v}])}});
+  const prefs=()=>{CMPC={coef:+String($('cCoef').value).replace(',','.')||0,pas:+$('cPas').value,sens:$('cSens').value};ls.set('cmpc',CMPC);
+    $('mCorps').querySelectorAll('input[data-pv]').forEach(i=>{const l=(S.rows[T_LDV]||[]).find(r=>r.id==i.dataset.pv),c=l&&l['Coût unitaire (interne)'];i.placeholder=!vide(c)&&CMPC.coef>0?arrondiPV(c):''})};
+  if($('cCoef')){$('cCoef').oninput=prefs;$('cPas').onchange=prefs;$('cSens').onchange=prefs;
+    $('cApp').onclick=()=>{prefs();if(!(CMPC.coef>0))return toast('Coefficient invalide',true);
+      const L=lignes.filter(x=>x.l&&!vide(x.l['Coût unitaire (interne)']));if(!L.length)return toast('Aucune ligne avec un coût retenu',true);
+      const items=L.map(x=>({id:x.l.id,'Prix unitaire HT':arrondiPV(x.l['Coût unitaire (interne)'])})),rempl=L.filter((x,k)=>!vide(x.l['Prix unitaire HT'])&&+x.l['Prix unitaire HT']!==items[k]['Prix unitaire HT']).length;
+      if(rempl&&!confirm(`Remplacer ${rempl} prix de vente déjà saisi(s) ?`))return;
+      enregistrerPV(dv,items)}}
   $('mCorps').querySelectorAll('button[data-tout]').forEach(b=>b.onclick=()=>{const cid=+b.dataset.tout;
     const paires=lignes.filter(x=>x.l&&x.par[cid]&&x.par[cid]['PU HT']!=null&&x.par[cid]['PU HT']!==''&&estEUR(x.par[cid].Devise||cols.find(c=>c.c.id===cid).c.Devise)).map(x=>[x.l.id,x.par[cid].id]);
     if(!paires.length)return toast('Aucun prix en euros à retenir',true);retenirSST(dv,paires)});
+}
+async function enregistrerPV(dv,items){
+  $('mCorps').querySelectorAll('input,button.mini').forEach(b=>b.disabled=true);
+  try{const r=await api(`/rows/table/${T_LDV}/batch/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({items})});(r.items||[]).forEach(x=>majRow(T_LDV,x));
+    toast(items.length>1?items.length+' prix de vente enregistrés':'Prix de vente enregistré')}
+  catch(e){toast('Échec : '+e.message,true)}
+  dessinerComparatif(dv);
 }
 async function retenirSST(dv,paires){
   const {lignes}=comparatifDonnees(dv);
