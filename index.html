@@ -342,8 +342,8 @@ function dessinerLignes(){
   const tb=$('tb');tb.innerHTML='';
   lignes.forEach((l,i)=>{
     const tr=document.createElement('tr');
-    const img=(l.Vignette||[])[0];
-    tr.innerHTML=`<td class="v">${img?`<img src="${img.url||img.thumbnails?.card_cover?.url}">`:''}</td>
+    const img=(l.Vignette||[])[0]||(l['Vignette PDF']?{}:null);
+    tr.innerHTML=`<td class="v">${img||l['Vignette PDF']?`<img src="${l['Vignette PDF']||img.url||img.thumbnails?.card_cover?.url}">`:''}</td>
       <td><textarea class="ed desig" rows="1" placeholder="Référence + désignation"></textarea><textarea class="ed prec" rows="1" placeholder="Précisions : matière, traitements… (==texte== = surligné jaune)"></textarea></td>
       ${cols.map(c=>`<td class="${c[2]}"><input class="ed num" type="number" step="${c[3]}"></td>`).join('')}
       <td class="n mt ${prix?'':'q partiel'}"></td>
@@ -441,7 +441,7 @@ async function nouveau(){
       corps={...base,'N° ARC':'ARC-'+n,'Conditions de règlement':devis?.['Conditions de règlement']||COND_DEF,'Délai':devis?.['Délai']||'',
         'N° commande client':aff?.['N° Cde Client']||'','Date commande':aff?.['Date cde client']||null,'Date de livraison':aff?.['Date Livraison']||null};
       if(devis){corps.Devis=[devis.id];if(!corps.Client?.length)corps.Client=ids(devis.Client);if(!corps['Référent KTE']?.length)corps['Référent KTE']=ids(devis['Référent KTE']);
-        nouvLignes=(await lignesDe(DOCS.devis.lt,'Lignes de devis',devis)).map(l=>({Description:l.Description,'Précisions':l['Précisions']||'','Quantité':l['Quantité'],'Prix unitaire HT':l['Prix unitaire HT'],Rep:l.Rep,Vignette:fic(l.Vignette)}))}
+        nouvLignes=(await lignesDe(DOCS.devis.lt,'Lignes de devis',devis)).map(l=>({Description:l.Description,'Précisions':l['Précisions']||'','Quantité':l['Quantité'],'Prix unitaire HT':l['Prix unitaire HT'],Rep:l.Rep,Vignette:fic(l.Vignette),'Vignette PDF':l['Vignette PDF']||''}))}
     }else{
       const arc=(await tout(DOCS.arc.table,`&filter__N° ARC__equal=${encodeURIComponent('ARC-'+n)}`))[0];
       const precedents=liste.filter(b=>(b['N° BL']||'').startsWith('BL-'+n+'-'));
@@ -452,7 +452,7 @@ async function nouveau(){
       if(arc)corps.ARC=[arc.id];
       if(src){if(!corps.Client?.length)corps.Client=ids(src.Client);if(!corps['Référent KTE']?.length)corps['Référent KTE']=ids(src['Référent KTE']);
         const ls=arc?await lignesDe(DOCS.arc.lt,'Lignes ARC',arc):await lignesDe(DOCS.devis.lt,'Lignes de devis',devis);
-        nouvLignes=ls.map(l=>{const c=+l['Quantité']||0,d=deja[l.Description]||0;return{Description:l.Description,'Précisions':l['Précisions']||'',Rep:l.Rep,Vignette:fic(l.Vignette),'Quantité commandée':c,'Déjà livré':d,'Quantité livrée':Math.max(0,c-d)}}).filter(l=>l['Quantité livrée']>0||!precedents.length)}
+        nouvLignes=ls.map(l=>{const c=+l['Quantité']||0,d=deja[l.Description]||0;return{Description:l.Description,'Précisions':l['Précisions']||'',Rep:l.Rep,Vignette:fic(l.Vignette),'Vignette PDF':l['Vignette PDF']||'','Quantité commandée':c,'Déjà livré':d,'Quantité livrée':Math.max(0,c-d)}}).filter(l=>l['Quantité livrée']>0||!precedents.length)}
     }
   }
   const d=await api(`/rows/table/${D().table}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
@@ -595,9 +595,9 @@ async function imageData(url){
 const frDate=v=>v?new Date(String(v).slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR'):'';
 
 /* ---- Vignettes du PDF ----
-   Baserow stocke les fichiers sur Amazon S3, qui refuse la lecture depuis une autre page (CORS) : l'image s'affiche
-   à l'écran mais ne peut pas être recopiée dans le PDF. On essaie S3, puis la copie de la vignette rangée dans
-   SharePoint (<Dossier SharePoint>/02_Chiffrage/Vignettes/, même nom de fichier que dans Baserow), lue par Microsoft Graph. */
+   Source principale : champ texte « Vignette PDF » de la ligne (image en data:…;base64, ~3 Ko), indépendant de S3.
+   Baserow stocke les fichiers (champ Vignette) sur Amazon S3, qui refuse la lecture depuis cette page (CORS).
+   Secours : S3, puis la copie rangée dans SharePoint (<Dossier SharePoint>/02_Chiffrage/Vignettes/), lue par Microsoft Graph. */
 const DOSSIER_VIGN='02_Chiffrage/Vignettes';
 function numAffaire(){const n=String(cur&&cur[D().num]||'');const m=n.match(/D\d{6}/);return m?m[0]:n}
 async function dossierDoc(){
@@ -634,8 +634,11 @@ async function vignettesSP(manquantes){
   return out;
 }
 async function vignettesPDF(){
-  const vign=await Promise.all(lignes.map(l=>{const im=(l.Vignette||[])[0];return imageData(im&&(im.url||im.thumbnails?.card_cover?.url))}));
-  let manq=lignes.map((l,i)=>(l.Vignette||[]).length&&!vign[i]?i:-1).filter(i=>i>=0);
+  const vign=await Promise.all(lignes.map(async l=>{
+    const b=String(l['Vignette PDF']||'').trim();
+    if(/^data:image\//.test(b)){const t=await dimsImage(b);if(t)return {d:b,...t}}
+    const im=(l.Vignette||[])[0];return imageData(im&&(im.url||im.thumbnails?.card_cover?.url))}));
+  let manq=lignes.map((l,i)=>((l.Vignette||[]).length||l['Vignette PDF'])&&!vign[i]?i:-1).filter(i=>i>=0);
   let raison='';
   if(manq.length&&MS_CLIENT){try{const sp=await vignettesSP(manq);for(const i in sp)vign[i]=sp[i]}catch(e){console.warn(e);raison=e.message}
     manq=manq.filter(i=>!vign[i])}
