@@ -243,6 +243,7 @@ const ls={get(k,d){try{const v=localStorage.getItem('akteev_'+k);return v==null?
 
 /* ---------- Icônes ---------- */
 const I={
+ mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
  accueil:'<path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/>',
  devis:'<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
  commandes:'<path d="M3 4h2l2.4 11.2a1 1 0 0 0 1 .8h9.2a1 1 0 0 0 1-.8L21 8H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/>',
@@ -1055,6 +1056,7 @@ function dessinerFiche(){
     <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
     <div class="act">${lienEditeur?`<a class="btn p" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>`).join(''):''}
+    ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn p" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
     ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
     ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
@@ -1067,6 +1069,7 @@ function dessinerFiche(){
   </div><div class="cote">${cote(k,row,nouveau)}</div></div>`;
   $('main').innerHTML=h;
   brancherChamps();
+  if($('bRep')){$('bRep').onclick=()=>repondreClient(SALE.row);prechargerMSAL()}
   if($('bBL'))$('bBL').onclick=()=>fenetreBL(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if($('selSt'))$('selSt').onchange=async e=>{const o=stF.select_options.find(x=>x.id==e.target.value);try{const r=await changerStatut(k,SALE.row,o.id,o.value);SALE.row=r;delete SALE.draft[m.statut];dessinerFiche()}catch(er){toast('Échec : '+er.message,true)}};
   if(!nouveau&&m.liees)dessinerLiees(0);
@@ -1343,6 +1346,93 @@ async function toutTelecharger(L){
 /* PDF des tâches de l'affaire (jsPDF chargé à la demande). */
 let JSPDF=null;
 function chargerScript(src){return new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ko(new Error('chargement impossible : '+src));document.head.appendChild(s)})}
+/* ---------- Réponse au client sous Outlook (Microsoft Graph) ----------
+   Fiche devis › « Répondre au client » : brouillon de réponse au mail d'origine (champ « Mail source »)
+   ou nouveau mail à l'adresse du client, texte type + PDF du devis (champ « PDF », SharePoint) en pièce jointe.
+   Rien n'est envoyé : le brouillon s'ouvre dans Outlook pour relecture. Application Entra « Akteev ». */
+const MS_CLIENT='df485947-9a53-4c7f-a009-6a40dbe2ebe2',MS_TENANT='46f9fddb-e4bc-4978-bc72-0b45ac34c145';
+const MS_RETOUR=location.origin+'/editeur/';   // URI de redirection déclarée dans Entra (page de l'éditeur)
+const LIB_MSAL=['https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js','https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js'];
+let MSAL=null;
+async function prechargerMSAL(){try{if(!MSAL){for(const u of LIB_MSAL){try{await chargerScript(u);break}catch(e){}}if(window.msal){MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+MS_TENANT,redirectUri:MS_RETOUR},cache:{cacheLocation:'localStorage'}});await MSAL.initialize()}}}catch(e){MSAL=null}}
+async function jetonGraph(scopes){
+  if(!MSAL){let ok=false;for(const u of LIB_MSAL){try{await chargerScript(u);ok=true;break}catch(e){}}if(!ok)throw new Error('bibliothèque Microsoft indisponible');
+    MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+MS_TENANT,redirectUri:MS_RETOUR},cache:{cacheLocation:'localStorage'}});
+    await MSAL.initialize()}
+  const sc={scopes};const compte=MSAL.getActiveAccount()||MSAL.getAllAccounts()[0];
+  if(compte){try{return (await MSAL.acquireTokenSilent({...sc,account:compte})).accessToken}catch(e){}}
+  const r=await MSAL.acquireTokenPopup({...sc,prompt:compte?undefined:'select_account'});MSAL.setActiveAccount(r.account);return r.accessToken;
+}
+async function graph(jeton,chemin,opt={}){
+  const r=await fetch(/^https:/.test(chemin)?chemin:'https://graph.microsoft.com/v1.0'+chemin,{...opt,headers:{Authorization:'Bearer '+jeton,...(opt.body&&typeof opt.body==='string'?{'Content-Type':'application/json'}:{}),...(opt.headers||{})}});
+  if(!r.ok){const t=await r.text();const e=new Error('Microsoft '+r.status+' '+t.slice(0,200));e.status=r.status;throw e}
+  return r.status===204||r.status===202?null:r.json();
+}
+const b64url=s=>btoa(unescape(encodeURIComponent(s))).replace(/=+$/,'').replace(/\//g,'_').replace(/\+/g,'-');
+const versB64=b=>new Promise((ok,ko)=>{const f=new FileReader();f.onload=()=>ok(String(f.result).split(',')[1]);f.onerror=ko;f.readAsDataURL(b)});
+/* Identifiant du mail d'origine : lien OWA (…?ItemID=…) ou identifiant brut */
+function idMailSource(v){const s=txt(v).trim();if(!s)return null;
+  try{const u=new URL(s);const p=u.searchParams.get('ItemID')||u.searchParams.get('itemid');if(p)return p;const m=u.pathname.match(/\/id\/([^/?#]+)/);if(m)return decodeURIComponent(m[1])}catch(e){}
+  return /^[A-Za-z0-9+/=_-]{60,}$/.test(s)?s:null}
+async function retrouverMail(j,ews){
+  const rest=ews.replace(/\//g,'-').replace(/\+/g,'_');
+  try{return await graph(j,`/me/messages/${encodeURIComponent(rest)}?$select=id,subject,from,toRecipients`)}catch(e){if(e.status!==404&&e.status!==400)throw e}
+  const t=await graph(j,'/me/translateExchangeIds',{method:'POST',body:JSON.stringify({inputIds:[ews],sourceIdType:'ewsId',targetIdType:'restId'})});
+  const id=t?.value?.[0]?.targetId;if(!id)return null;
+  try{return await graph(j,`/me/messages/${encodeURIComponent(id)}?$select=id,subject,from,toRecipients`)}catch(e){if(e.status===404)return null;throw e}
+}
+function texteReponse(row,cli,ref){
+  const num=txt(row['N° devis']),objet=txt(row.Objet),v=+row['Validité (jours)']||10;
+  const L=[`<p>Bonjour,</p>`,
+    `<p>Suite à votre demande, veuillez trouver ci-joint notre offre <b>${esc(num)}</b>${objet?` pour : ${esc(objet)}`:''}.</p>`,
+    `<p>Montant total : <b>${eur(row['Total HT'])} HT</b>${txt(row['Délai'])?`<br>Délai : ${esc(txt(row['Délai']))}`:''}<br>Offre valable ${v} jours.</p>`,
+    `<p>Nous restons à votre disposition pour tout complément d'information.</p>`,
+    `<p>Cordialement,</p>`,
+    `<p>${esc(ref?txt(ref.Nom):'')}${ref?'<br>':''}<b>KTE</b><br>6 rue de la gatine – 49300 Cholet<br>${esc(txt(ref?.['Téléphone'])||'02-41-62-27-71')}${ref&&txt(ref['E-mail'])?' – '+esc(txt(ref['E-mail'])):''}<br>www.kte-fr.com</p>`];
+  return `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${L.join('')}</div>`;
+}
+async function repondreClient(row){
+  const num=txt(row['N° devis']);
+  if(!row.PDF){toast(`Pas de PDF pour ${num} : ouvrez le devis dans l’éditeur et cliquez sur « 📄 PDF » (ou validez-le).`,true);return}
+  if(String(txt(row['Contrôle version'])).startsWith('⚠')){toast(`${num} a été modifié depuis sa validation : validez la nouvelle version dans l’éditeur avant de l’envoyer.`,true);return}
+  const b=$('bRep');if(b){b.disabled=true;b.textContent='Préparation du mail…'}
+  try{
+    const j=await jetonGraph(['Mail.ReadWrite','Files.ReadWrite.All']);
+    await Promise.all([charger(MODS.clients.t).catch(()=>[]),charger(MODS.referents.t).catch(()=>[])]);
+    const cli=(S.rows[MODS.clients.t]||[]).find(r=>r.id===row.Client?.[0]?.id);
+    const ref=(S.rows[MODS.referents.t]||[]).find(r=>r.id===row['Référent KTE']?.[0]?.id);
+    const mailCli=txt(cli?.['E-mail']).split(/[;, ]+/).filter(x=>/@/.test(x));
+    // 1. PDF du devis depuis SharePoint
+    const it=await graph(j,'/shares/u!'+b64url(txt(row.PDF))+'/driveItem');
+    const dl=it['@microsoft.graph.downloadUrl'];if(!dl)throw new Error('PDF introuvable dans SharePoint');
+    const pdf=await (await fetch(dl)).blob();
+    // 2. Brouillon : réponse au mail d'origine, sinon nouveau mail au client
+    let brouillon=null,mode='nouveau';
+    const ews=idMailSource(row['Mail source']);
+    if(ews){try{const orig=await retrouverMail(j,ews);if(orig){brouillon=await graph(j,`/me/messages/${encodeURIComponent(orig.id)}/createReply`,{method:'POST',body:'{}'});mode='réponse'}}
+      catch(e){console.warn('Mail source',e)}}
+    if(brouillon){
+      const internes=(brouillon.toRecipients||[]).every(r=>/@kte-fr\.com$/i.test(r.emailAddress?.address||''));
+      const d=await graph(j,`/me/messages/${brouillon.id}?$select=body,subject`);
+      const html=d.body.contentType==='html'?d.body.content:`<pre>${esc(d.body.content)}</pre>`;
+      const corps=/<body[^>]*>/i.test(html)?html.replace(/<body[^>]*>/i,m=>m+texteReponse(row,cli,ref)):texteReponse(row,cli,ref)+html;
+      const maj={body:{contentType:'HTML',content:corps}};
+      if(!/D\d{6}/.test(d.subject||''))maj.subject=`${d.subject||'RE:'} – Offre KTE ${num}`;
+      if(internes&&mailCli.length)maj.toRecipients=mailCli.map(a=>({emailAddress:{address:a}}));
+      await graph(j,`/me/messages/${brouillon.id}`,{method:'PATCH',body:JSON.stringify(maj)});
+    }else{
+      brouillon=await graph(j,'/me/messages',{method:'POST',body:JSON.stringify({subject:`Offre KTE ${num}${txt(row.Objet)?' – '+txt(row.Objet):''}`,
+        body:{contentType:'HTML',content:texteReponse(row,cli,ref)},toRecipients:mailCli.map(a=>({emailAddress:{address:a}}))})});
+    }
+    // 3. Pièce jointe
+    await graph(j,`/me/messages/${brouillon.id}/attachments`,{method:'POST',body:JSON.stringify({'@odata.type':'#microsoft.graph.fileAttachment',name:it.name||`Devis_${num}.pdf`,contentType:'application/pdf',contentBytes:await versB64(pdf)})});
+    const w=await graph(j,`/me/messages/${brouillon.id}?$select=webLink,toRecipients`);
+    const dest=(w.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean).join(', ')||'(destinataire à compléter)';
+    const ouvert=window.open(w.webLink,'_blank');
+    if(b){b.disabled=false;b.innerHTML=`${ico('ext')}Ouvrir le brouillon`;b.onclick=()=>window.open(w.webLink,'_blank')}
+    toast(`Brouillon ${mode==='réponse'?'de réponse ':''}prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}.${ouvert?'':' Cliquez sur « Ouvrir le brouillon ».'} Après l’envoi, passez le devis à « Envoyé ».`);
+  }catch(e){console.error(e);toast('Réponse au client : '+e.message,true);if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}}
+}
 async function pdfTaches(cde,TT){
   if(!JSPDF){await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');JSPDF=window.jspdf.jsPDF}
   const p=s=>String(s??'').replace(/[–—]/g,'-').replace(/[‘’]/g,"'").replace(/[“”«»]/g,'"').replace(/…/g,'...').replace(/ | /g,' ').replace(/[^\x00-\xff€]/g,'');
