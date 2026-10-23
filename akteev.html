@@ -1517,13 +1517,36 @@ function texteReponse(row,cli,ref){
     `<p>${esc(ref?txt(ref.Nom):'')}${ref?'<br>':''}<b>KTE</b><br>6 rue de la gatine – 49300 Cholet<br>${esc(txt(ref?.['Téléphone'])||'02-41-62-27-71')}${ref&&txt(ref['E-mail'])?' – '+esc(txt(ref['E-mail'])):''}<br>www.kte-fr.com</p>`];
   return `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${L.join('')}</div>`;
 }
-async function repondreClient(row){
+/* Brouillon déjà préparé pour ce devis (mémorisé dans le navigateur) : s'il existe encore dans Outlook (pas supprimé,
+   pas envoyé), on propose de l'ouvrir ou d'en créer un nouveau ; s'il a été supprimé ou envoyé, on en recrée un. */
+const brouillonsRep=()=>ls.get('brouillons_rep',{});
+function memoBrouillon(id,v){const B=brouillonsRep();if(v)B[id]=v;else delete B[id];ls.set('brouillons_rep',B)}
+async function brouillonValide(j,mem){
+  if(!mem?.id)return null;
+  try{const m=await graph(j,`/me/messages/${encodeURIComponent(mem.id)}?$select=id,isDraft,webLink,parentFolderId`);if(!m||m.isDraft===false)return null;
+    let corb=null;try{corb=(await graph(j,'/me/mailFolders/deleteditems?$select=id')).id}catch(e){}
+    return m.parentFolderId&&m.parentFolderId===corb?null:m}
+  catch(e){if(e.status===404||e.status===400)return null;throw e}
+}
+function choixBrouillon(num,mem){return new Promise(ok=>{
+  ouvrirModal('Répondre au client – '+num,`<div style="padding:6px 0;line-height:1.5">Un brouillon de réponse existe déjà dans Outlook pour <b>${esc(num)}</b>${mem.t?` (préparé le ${esc(dtfr(mem.t))})`:''}.<br>Voulez-vous l’ouvrir ou en préparer un nouveau ?<div class="mut" style="font-size:12.5px;margin-top:6px">Le nouveau brouillon n’efface pas l’ancien : supprimez-le dans Outlook si besoin.</div></div>`,
+    `<button class="btn" id="brAnn">Annuler</button><button class="btn" id="brNouv">${ico('plus')}Nouveau brouillon</button><button class="btn p" id="brOuv">${ico('ext')}Ouvrir le brouillon</button>`);
+  $('brAnn').onclick=()=>{fermerModal();ok(null)};$('brNouv').onclick=()=>{fermerModal();ok('nouveau')};$('brOuv').onclick=()=>{fermerModal();ok('ouvrir')}})}
+async function repondreClient(row,forcer){
   const num=txt(row['N° devis']);
   if(!row.PDF){toast(`Pas de PDF pour ${num} : ouvrez le devis dans l’éditeur et cliquez sur « 📄 PDF » (ou validez-le).`,true);return}
   if(String(txt(row['Contrôle version'])).startsWith('⚠')||modifLocale(MODS.devis.t,row)){toast(`${num} a été modifié depuis sa validation : validez la nouvelle version dans l’éditeur avant de l’envoyer.`,true);return}
   const b=$('bRep');if(b){b.disabled=true;b.textContent='Préparation du mail…'}
   try{
     const j=await jetonGraph(['Mail.ReadWrite','Files.ReadWrite.All']);
+    const mem=brouillonsRep()[row.id];
+    if(mem&&!forcer){const ex=await brouillonValide(j,mem);
+      if(!ex)memoBrouillon(row.id,null);
+      else{if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}
+        const c=await choixBrouillon(num,mem);
+        if(c==='ouvrir'){window.open(ex.webLink,'_blank')||toast('Autorisez les fenêtres surgissantes pour ouvrir le brouillon.',true);return}
+        if(c!=='nouveau')return;
+        if(b){b.disabled=true;b.textContent='Préparation du mail…'}}}
     await Promise.all([charger(MODS.clients.t).catch(()=>[]),charger(MODS.referents.t).catch(()=>[])]);
     const cli=(S.rows[MODS.clients.t]||[]).find(r=>r.id===row.Client?.[0]?.id);
     const ref=(S.rows[MODS.referents.t]||[]).find(r=>r.id===row['Référent KTE']?.[0]?.id);
@@ -1554,9 +1577,10 @@ async function repondreClient(row){
     await graph(j,`/me/messages/${brouillon.id}/attachments`,{method:'POST',body:JSON.stringify({'@odata.type':'#microsoft.graph.fileAttachment',name:it.name||`Devis_${num}.pdf`,contentType:'application/pdf',contentBytes:await versB64(pdf)})});
     const w=await graph(j,`/me/messages/${brouillon.id}?$select=webLink,toRecipients`);
     const dest=(w.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean).join(', ')||'(destinataire à compléter)';
+    memoBrouillon(row.id,{id:brouillon.id,t:new Date().toISOString()});
     const ouvert=window.open(w.webLink,'_blank');
-    if(b){b.disabled=false;b.innerHTML=`${ico('ext')}Ouvrir le brouillon`;b.onclick=()=>window.open(w.webLink,'_blank')}
-    toast(`Brouillon ${mode==='réponse'?'de réponse ':''}prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}.${ouvert?'':' Cliquez sur « Ouvrir le brouillon ».'} Après l’envoi, passez le devis à « Envoyé ».`);
+    if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}
+    toast(`Brouillon ${mode==='réponse'?'de réponse ':''}prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}.${ouvert?'':' Recliquez sur « Répondre au client » pour l’ouvrir.'} Après l’envoi, passez le devis à « Envoyé ».`);
   }catch(e){console.error(e);toast('Réponse au client : '+e.message,true);if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}}
 }
 async function pdfTaches(cde,TT){
