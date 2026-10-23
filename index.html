@@ -826,8 +826,9 @@ async function publierPDF(){
   if(TYPE==='devis'&&MS_CLIENT&&(cur['Dossier SharePoint']||'').trim()){
     try{msg('Enregistrement du PDF dans SharePoint…');
       const lien=await deposerSP(blob,nom,DOSSIER_PDF[TYPE]);
-      await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({PDF:lien})});
-      cur.PDF=lien;majLienPDF();
+      // « Validé le » suit l'écriture du lien : sinon la formule « Contrôle version » croirait le devis modifié
+      const vl=new Date().toISOString();await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({PDF:lien,'Validé le':vl})});
+      cur.PDF=lien;cur['Validé le']=vl;majLienPDF();
       return {ok:true,texte:`PDF ${nom} (${pages} p.) enregistré dans ${DOSSIER_PDF[TYPE]} et lié au devis.`}}
     catch(e){console.error(e);telecharger(blob,nom);return {ok:false,texte:`PDF ${nom} téléchargé (SharePoint : ${e.message}).`}}
   }
