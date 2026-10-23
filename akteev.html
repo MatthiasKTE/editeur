@@ -1300,7 +1300,7 @@ async function documentsAffaire(cde){
   if(D.taches){const TT=D.taches.filter(r=>lie(r,'Commande')&&!/annul/i.test(txt(r.Statut)));
     const FA=[],vus=new Set();let dosFA='';
     for(const r of TT)for(const x of fichesNotes(r.Notes)){if(vus.has(x.url))continue;vus.add(x.url);if(!dosFA&&/sharepoint\.com/i.test(x.url))dosFA=x.url.split(/[?#]/)[0].replace(/\/[^\/]*$/,'');
-      FA.push(doc({ico:'pdf',lab:x.fichier,sous:txt(r['Type de tâche'])||'',url:x.url,nom:x.fichier}))}
+      FA.push(doc({ico:'pdf',lab:x.value==='RC'?'Rapport de contrôle':x.value==='Plan contrôle'?'Plan de contrôle':'Fiche '+x.value,gras:true,sous:x.fichier,url:x.url,nom:x.fichier}))}
     if(FA.length)G.push(['Fiches atelier',dosFA?[{ico:'dossier',lab:'Dossier « Fiches atelier »',sous:'',titre:true,lienDossier:dosFA},...FA]:FA]);
     if(TT.length)G.push(['Tâches',[doc({ico:'taches',lab:`Tâches ${n}`,sous:`${TT.length} tâche(s) – PDF généré`,gen:()=>pdfTaches(cde,TT),nom:`Taches_${n}.pdf`})]])}
   /* 5. Synthèse */
@@ -1310,7 +1310,7 @@ async function documentsAffaire(cde){
   if(sy.length)G.push(['Synthèse',sy]);
   DOCS_AFF=docs;
   const btn=(d,i)=>d.gen?`<button class="btn" style="padding:3px 9px" data-dl="${i}" title="Générer et télécharger le PDF">${ico('dl')}PDF</button>`
-    :d.url?`<span style="display:flex;gap:4px"><a class="btn" style="padding:3px 7px" href="${esc(d.url)}" target="_blank" title="Ouvrir">${ico('ext')}</a><a class="btn" style="padding:3px 9px" href="${esc(urlDl(d.url))}" data-dl="${i}" title="Télécharger">${ico('dl')}${esc(extDe(d.url)||'Fichier')}</a></span>`
+    :d.url?`<span style="display:flex;gap:4px;flex:none"><a class="btn" style="padding:3px 9px" href="${esc(d.url)}" target="_blank" title="Ouvrir ${esc(d.nom||d.lab)}">${ico('pdf')}${esc(extDe(d.url)||'Ouvrir')}</a><a class="btn" style="padding:3px 7px" href="${esc(urlDl(d.url))}" data-dl="${i}" title="Télécharger">${ico('dl')}</a></span>`
     :d.ed?`<a class="btn" style="padding:3px 9px" href="${d.ed}" target="_blank" title="Pas encore de PDF enregistré : ouvrir dans l’éditeur pour l’imprimer">${ico('ext')}Éditeur</a>`:'<span class="mut" style="font-size:12px">pas de PDF</span>';
   let h=docs.length||cde['Dossier SharePoint']?`<div style="display:flex;gap:6px;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #F0F2F6">
     ${docs.length?`<button class="btn p" id="dlTout" style="padding:4px 10px" title="Télécharge chaque fichier l’un après l’autre (le navigateur peut demander d’autoriser les téléchargements multiples)">${ico('dl')}Tout télécharger (${docs.length})</button>`:''}
@@ -1320,6 +1320,7 @@ async function documentsAffaire(cde){
       if(d.lienDossier){h+=`<a class="lien" href="${esc(d.lienDossier)}" target="_blank">${ico('dossier')}<span>${esc(d.lab)}</span></a>`;continue}
       if(d.titre){h+=`<div class="lien" style="justify-content:space-between"><a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous)}</span></a>${d.dossier?`<a class="btn" style="padding:3px 7px" href="${esc(d.dossier)}" target="_blank" title="Dossier des réponses">${ico('dossier')}</a>`:''}</div>`;continue}
       const lab=d.k?`<a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous||'')}</span></a>`
+        :d.url?`<a href="${esc(d.url)}" target="_blank" style="color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Ouvrir ${esc(d.nom||d.lab)}">${ico(d.ico)}<span style="margin-left:6px">${d.gras?`<b>${esc(d.lab)}</b>`:esc(d.lab)}</span> <span class="mut">${esc(d.sous||'')}</span></a>`
         :`<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.lab)}">${ico(d.ico)}<span style="margin-left:6px">${esc(d.lab)}</span> <span class="mut">${esc(d.sous||'')}</span></span>`;
       h+=`<div class="lien" style="justify-content:space-between;${d.ind?'padding-left:34px':''}">${lab}${btn(d,i)}</div>`}}
   $('docsAff').innerHTML=h||'<div class="c mut">Aucun document pour cette affaire.</div>';
