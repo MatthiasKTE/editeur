@@ -567,7 +567,7 @@ window.addEventListener('beforeprint',()=>{
    À la validation d'un devis : le PDF est construit à partir de la page (texte vectoriel, police Carlito),
    déposé dans <Dossier SharePoint>/04_Offre/Devis_<n°>_v<v>.pdf et son lien écrit dans le champ « PDF ».
    Sans configuration Microsoft (MS_CLIENT vide) ou sans dossier SharePoint : le PDF est téléchargé. */
-const MS_CLIENT='',MS_TENANT='';   // ID d'application (client) et ID d'annuaire (locataire) Entra « Akteev »
+const MS_CLIENT='df485947-9a53-4c7f-a009-6a40dbe2ebe2',MS_TENANT='46f9fddb-e4bc-4978-bc72-0b45ac34c145';   // ID d'application (client) et ID d'annuaire (locataire) Entra « Akteev »
 const LIB_JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const LIB_MSAL=['https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js','https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js'];
 const POLICE_URL='https://raw.githubusercontent.com/google/fonts/main/ofl/carlito/Carlito-';
