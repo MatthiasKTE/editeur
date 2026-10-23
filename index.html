@@ -305,6 +305,7 @@ async function ouvrir(id){
   $('bCde').style.display=TYPE==='devis'?'':'none';$('bCde').textContent=(cur.Commande||[]).length?'Commande : '+cur.Commande[0].value:'Commande reçue';
   history.replaceState(null,'',`?${TYPE}=${encodeURIComponent(cur[D().num])}`);
   const c=txtControle();msg(c,c.startsWith('⚠')?'warn':'ok');
+  completerAuto();
 }
 /* ---- Modifié depuis la validation ? ----
    La formule Baserow « Contrôle version » tolère 120 s entre « Validé le » et « Modifié le » : une modification faite
@@ -426,6 +427,8 @@ async function valider(){
   if(deja&&modif){v+=1;maj.Version=v;maj['Date de version']=aujourd();maj.Date=aujourd()}
   else{maj.Version=v;maj['Date de version']=$('fDate').value||aujourd()}
   if(!force&&!confirm(deja?`Le document a été modifié depuis sa validation. Il passe en v.${v}, daté d'aujourd'hui. Continuer ?`:`Valider en v.${v} ?`))return;
+  try{msg('Vignettes…');await completerVignettes(false);await ecrireVignettes()}catch(e){console.warn('vignettes',e)}
+  maj['Validé le']=new Date().toISOString();
   await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(maj)});
   cur=await ligne1(D().table,cur.id);await chargerListe();$('choix').value=cur.id;afficher();
   msg(`Validé en v.${v}.`,'ok');
@@ -614,48 +617,132 @@ const frDate=v=>v?new Date(String(v).slice(0,10)+'T12:00:00').toLocaleDateString
    Secours : S3, puis la copie rangée dans SharePoint (<Dossier SharePoint>/02_Chiffrage/Vignettes/), lue par Microsoft Graph. */
 const DOSSIER_VIGN='02_Chiffrage/Vignettes';
 function numAffaire(){const n=String(cur&&cur[D().num]||'');const m=n.match(/D\d{6}/);return m?m[0]:n}
-async function dossierDoc(){
-  if((cur['Dossier SharePoint']||'').trim())return cur['Dossier SharePoint'].trim();
-  for(const a of cur.Affaire||[]){try{const r=await ligne1(T_AFF,a.id);if((r['Dossier SharePoint']||'').trim())return r['Dossier SharePoint'].trim()}catch(e){}}
-  const n=numAffaire();if(!n)return '';
-  try{const a=await affaireDe(n);if(a&&(a['Dossier SharePoint']||'').trim())return a['Dossier SharePoint'].trim()}catch(e){}
-  try{const d=(await tout(DOCS.devis.table,`&filter__N° devis__equal=${encodeURIComponent(n)}`))[0];if(d&&(d['Dossier SharePoint']||'').trim())return d['Dossier SharePoint'].trim()}catch(e){}
+async function dossierDe(k,row){
+  const d=x=>String(x||'').trim();
+  if(d(row['Dossier SharePoint']))return d(row['Dossier SharePoint']);
+  for(const a of row.Affaire||[]){try{const r=await ligne1(T_AFF,a.id);if(d(r['Dossier SharePoint']))return d(r['Dossier SharePoint'])}catch(e){}}
+  const m=String(row[DOCS[k].num]||'').match(/D\d{6}/),n=m?m[0]:'';if(!n)return '';
+  try{const a=await affaireDe(n);if(a&&d(a['Dossier SharePoint']))return d(a['Dossier SharePoint'])}catch(e){}
+  try{const x=(await tout(DOCS.devis.table,`&filter__N° devis__equal=${encodeURIComponent(n)}`))[0];if(x&&d(x['Dossier SharePoint']))return d(x['Dossier SharePoint'])}catch(e){}
   return '';
 }
+const dossierDoc=()=>dossierDe(TYPE,cur);
 const sansAccent=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
-async function vignettesSP(manquantes){
-  const url=await dossierDoc();if(!url)throw new Error('pas de « Dossier SharePoint »');
-  const j=await jetonGraph();
+const aVignette=l=>/^data:image\//.test(String(l['Vignette PDF']||'').trim());
+/* Image trop lourde (> 12 Ko en texte) : ramenée à 160 px */
+async function reduireVignette(d){
+  if(d.length<=12000)return d;
+  const im=await new Promise((ok,ko)=>{const x=new Image();x.onload=()=>ok(x);x.onerror=ko;x.src=d});
+  const k=Math.min(1,160/Math.max(im.naturalWidth,im.naturalHeight)),c=document.createElement('canvas');
+  c.width=Math.max(1,Math.round(im.naturalWidth*k));c.height=Math.max(1,Math.round(im.naturalHeight*k));
+  const g=c.getContext('2d');g.fillStyle='#fff';g.fillRect(0,0,c.width,c.height);g.drawImage(im,0,0,c.width,c.height);
+  let r=c.toDataURL('image/png');if(r.length>12000)r=c.toDataURL('image/jpeg',0.8);return r;
+}
+/* Fichiers du dossier <Dossier SharePoint>/02_Chiffrage/Vignettes (mis en cache par dossier) */
+const CACHE_VSP={};
+async function fichiersVignettes(url,silencieux){
+  if(CACHE_VSP[url])return CACHE_VSP[url];
+  const j=await jetonGraph(silencieux);
   const dos=await dossierSP(j,url);const drive=dos.parentReference.driveId;
-  let fichiers=[];
+  let f=[];
   try{let r=await graph(j,`/drives/${drive}/items/${dos.id}:/${DOSSIER_VIGN.split('/').map(encodeURIComponent).join('/')}:/children?$top=200`);
-    fichiers=r.value.filter(x=>x.file);
-    while(r['@odata.nextLink']){r=await (await fetch(r['@odata.nextLink'],{headers:{Authorization:'Bearer '+j}})).json();fichiers=fichiers.concat((r.value||[]).filter(x=>x.file))}}
-  catch(e){throw new Error('dossier '+DOSSIER_VIGN+' introuvable')}
-  const out={};
-  for(const i of manquantes){
-    const l=lignes[i],im=(l.Vignette||[])[0],nomB=sansAccent(im&&im.visible_name);
-    const rep=String(l.Rep??'').trim(),re=rep?new RegExp('_rep0*'+rep.replace(/\D/g,'')+'(?:[_.-]|$)'):null;
-    let f=fichiers.find(x=>sansAccent(x.name)===nomB)                      // même nom que dans Baserow
-      ||(re&&fichiers.filter(x=>/\.(png|jpe?g)$/i.test(x.name)&&re.test(sansAccent(x.name)))[0]); // sinon par repère
-    if(!f)continue;
+    f=r.value.filter(x=>x.file&&/\.(png|jpe?g)$/i.test(x.name));
+    while(r['@odata.nextLink']){r=await (await fetch(r['@odata.nextLink'],{headers:{Authorization:'Bearer '+j}})).json();f=f.concat((r.value||[]).filter(x=>x.file&&/\.(png|jpe?g)$/i.test(x.name)))}}
+  catch(e){f=[]}
+  return CACHE_VSP[url]={j,drive,f};
+}
+/* Même nom que le fichier Baserow, sinon même repère (_RepNN_) */
+function trouverVignette(F,l){
+  const im=(l.Vignette||[])[0],nomB=sansAccent(im&&im.visible_name);
+  const rep=String(l.Rep??'').replace(/\D/g,''),re=rep?new RegExp('_rep0*'+rep+'(?:[_.-]|$)'):null;
+  return (nomB&&F.find(x=>sansAccent(x.name)===nomB))||(re&&F.find(x=>re.test(sansAccent(x.name))))||null;
+}
+/* Pour une liste de lignes : {position: data URL} trouvées dans SharePoint */
+async function vignettesSPLignes(url,L,silencieux){
+  const V=await fichiersVignettes(url,silencieux),out={};
+  for(let i=0;i<L.length;i++){const f=trouverVignette(V.f,L[i]);if(!f)continue;
     try{let u=f['@microsoft.graph.downloadUrl'];
-      if(!u){const it=await graph(j,`/drives/${drive}/items/${f.id}`);u=it['@microsoft.graph.downloadUrl']}
+      if(!u){const it=await graph(V.j,`/drives/${V.drive}/items/${f.id}`);u=it['@microsoft.graph.downloadUrl']}
       const r=await fetch(u);if(!r.ok)continue;
-      const d=await blobVersData(await r.blob());const t=await dimsImage(d);if(t)out[i]={d,...t}}
-    catch(e){console.warn('vignette SharePoint',f.name,e)}
-  }
+      const d=await reduireVignette(await blobVersData(await r.blob()));if(await dimsImage(d))out[i]=d}
+    catch(e){console.warn('vignette SharePoint',f.name,e)}}
   return out;
+}
+/* Complète en mémoire les lignes du document ouvert qui n'ont pas de « Vignette PDF » (marquées _vsp, à écrire) */
+async function completerVignettes(silencieux){
+  if(!MS_CLIENT)return 0;
+  const idx=lignes.map((l,i)=>!aVignette(l)?i:-1).filter(i=>i>=0);if(!idx.length)return 0;
+  const url=await dossierDoc();if(!url)return 0;
+  const sp=await vignettesSPLignes(url,idx.map(i=>lignes[i]),silencieux);let n=0;
+  idx.forEach((i,k)=>{if(sp[k]){lignes[i]['Vignette PDF']=sp[k];lignes[i]._vsp=1;n++}});
+  return n;
+}
+/* Écrit dans Baserow les vignettes trouvées (champ « Vignette PDF » seulement) */
+async function ecrireVignettes(){
+  const L=lignes.filter(l=>l._vsp&&l.id&&!l._new);if(!L.length)return 0;
+  await api(`/rows/table/${D().lt}/batch/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({items:L.map(l=>({id:l.id,'Vignette PDF':l['Vignette PDF']}))})});
+  L.forEach(l=>delete l._vsp);return L.length;
+}
+/* Écrit les vignettes d'un document validé et conforme sans le faire passer à ⚠ (« Validé le » réécrit juste après) */
+async function ecrireVignettesConforme(){
+  const n=await ecrireVignettes();
+  if(n&&cur['Validé le']){const vl=new Date().toISOString();await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Validé le':vl})});cur['Validé le']=vl}
+  return n;
+}
+/* À l'ouverture : vignettes manquantes reprises de SharePoint, sans fenêtre de connexion */
+async function completerAuto(){
+  const id=cur&&cur.id,t=TYPE;
+  try{const n=await completerVignettes(true);if(!n||!cur||cur.id!==id||TYPE!==t)return;
+    if(!sale)dessinerLignes();
+    let txt=`${n} vignette(s) reprise(s) de SharePoint`;
+    if(!cur['Validé le'])await ecrireVignettes();
+    else if(!modifie()){await ecrireVignettesConforme();txt+=' – cliquez « 📄 PDF » pour refaire le PDF avec les vignettes'}
+    else txt+=' (enregistrées à la prochaine validation)';
+    const c=txtControle();msg((c?c+' · ':'')+txt+'.',c.startsWith('⚠')?'warn':'ok')}
+  catch(e){console.warn('vignettes SharePoint',e)}
+}
+/* Rattrapage (lancé à la main, ex. balayageVignettes(true) dans la console) : complète « Vignette PDF » de tous les devis / ARC / BL récents (D265000 et suivants) */
+async function balayageVignettes(force){
+  if(!MS_CLIENT)return;
+  const lire=k=>{try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}},ecrire=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+  const der=lire('kte_vign_balayage');if(!force&&der&&Date.now()-der<20*3600e3)return;
+  try{await jetonGraph(true)}catch(e){return}           // pas de session Microsoft : on réessaiera
+  ecrire('kte_vign_balayage',Date.now());
+  const rien=lire('kte_vign_rien')||{};let total=0;
+  for(const k of ['devis','arc','bl']){const X=DOCS[k];
+    let P,L;try{[P,L]=await Promise.all([tout(X.table),tout(X.lt)])}catch(e){continue}
+    const parId=new Map(P.map(r=>[r.id,r])),groupes=new Map();
+    for(const l of L){if(aVignette(l))continue;const p=parId.get((l[X.retour]||[])[0]?.id);if(!p)continue;
+      const m=String(p[X.num]||'').match(/D(\d{6})/);if(!m||+m[1]<265000)continue;
+      const cle=k+p.id;if(!force&&rien[cle]&&Date.now()-rien[cle]<7*86400e3)continue;
+      if(!groupes.has(p.id))groupes.set(p.id,[]);groupes.get(p.id).push(l)}
+    for(const [pid,ls] of groupes){const p=parId.get(pid);
+      try{const url=await dossierDe(k,p);if(!url){rien[k+pid]=Date.now();continue}
+        const sp=await vignettesSPLignes(url,ls,true),items=ls.map((l,i)=>sp[i]?{id:l.id,'Vignette PDF':sp[i]}:null).filter(Boolean);
+        if(!items.length){rien[k+pid]=Date.now();continue}
+        const conforme=p['Validé le']&&!String(p['Contrôle version']||'').startsWith('⚠')&&!(()=>{try{const t=localStorage.getItem(`kte_modif_${k}_${pid}`);return t&&Date.parse(t)>Date.parse(p['Validé le'])}catch(e){return false}})();
+        await api(`/rows/table/${X.lt}/batch/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({items})});
+        if(conforme)await api(`/rows/table/${X.table}/${pid}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Validé le':new Date().toISOString()})});
+        total+=items.length}
+      catch(e){console.warn('balayage vignettes',k,p[X.num],e)}}
+  }
+  ecrire('kte_vign_rien',rien);
+  if(total)console.info(`Vignettes : ${total} ligne(s) complétée(s) depuis SharePoint`);
+  return total;
 }
 async function vignettesPDF(){
   const vign=await Promise.all(lignes.map(async l=>{
     const b=String(l['Vignette PDF']||'').trim();
     if(/^data:image\//.test(b)){const t=await dimsImage(b);if(t)return {d:b,...t}}
     const im=(l.Vignette||[])[0];return imageData(im&&(im.url||im.thumbnails?.card_cover?.url))}));
-  let manq=lignes.map((l,i)=>((l.Vignette||[]).length||l['Vignette PDF'])&&!vign[i]?i:-1).filter(i=>i>=0);
-  let raison='';
-  if(manq.length&&MS_CLIENT){try{const sp=await vignettesSP(manq);for(const i in sp)vign[i]=sp[i]}catch(e){console.warn(e);raison=e.message}
-    manq=manq.filter(i=>!vign[i])}
+  // Lignes sans image : SharePoint (02_Chiffrage/Vignettes), y compris celles qui n'ont jamais eu de vignette dans Baserow
+  let manq=lignes.map((l,i)=>!vign[i]?i:-1).filter(i=>i>=0),raison='';
+  if(manq.length&&MS_CLIENT){try{const url=await dossierDoc();if(!url)throw new Error('pas de « Dossier SharePoint »');
+      const sp=await vignettesSPLignes(url,manq.map(i=>lignes[i]),false);
+      for(const k in sp){const i=manq[k],t=await dimsImage(sp[k]);if(t){vign[i]={d:sp[k],...t};lignes[i]['Vignette PDF']=sp[k];lignes[i]._vsp=1}}}
+    catch(e){console.warn(e);raison=e.message}}
+  // Alerte seulement pour les lignes qui avaient une vignette dans Baserow
+  manq=manq.filter(i=>!vign[i]&&((lignes[i].Vignette||[]).length||lignes[i]['Vignette PDF']));
   vign.manque=manq.length?{n:manq.length,reps:manq.map(i=>lignes[i].Rep||i+1),raison}:null;
   return vign;
 }
@@ -853,7 +940,7 @@ function telecharger(blob,nom){const a=document.createElement('a');a.href=URL.cr
 
 /* ---- Microsoft Graph (connexion MSAL, fenêtre surgissante) ---- */
 let MSAL=null;
-async function jetonGraph(){
+async function jetonGraph(silencieux){
   if(!MS_CLIENT)throw new Error('connexion Microsoft non configurée');
   if(!MSAL){let ok=false;for(const u of LIB_MSAL){try{await chargerScript(u);ok=true;break}catch(e){}}if(!ok)throw new Error('bibliothèque Microsoft indisponible');
     MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+(MS_TENANT||'organizations'),redirectUri:location.origin+location.pathname.replace(/index\.html$/,'')},cache:{cacheLocation:'localStorage'}});
@@ -861,7 +948,11 @@ async function jetonGraph(){
   const sc={scopes:['Files.ReadWrite.All']};
   let compte=MSAL.getActiveAccount()||MSAL.getAllAccounts()[0];
   if(compte){try{return (await MSAL.acquireTokenSilent({...sc,account:compte})).accessToken}catch(e){}}
-  const r=await MSAL.acquireTokenPopup({...sc,prompt:compte?undefined:'select_account'});MSAL.setActiveAccount(r.account);return r.accessToken;
+  // Session Microsoft déjà ouverte dans le navigateur (SharePoint, Outlook…) : connexion sans fenêtre
+  let indice='';try{indice=localStorage.getItem('kte_ms_login')||''}catch(e){}
+  try{const r=await MSAL.ssoSilent({...sc,...(indice||compte?{loginHint:indice||compte.username}:{})});MSAL.setActiveAccount(r.account);try{localStorage.setItem('kte_ms_login',r.account.username)}catch(e){}return r.accessToken}catch(e){}
+  if(silencieux)throw new Error('connexion Microsoft requise');
+  const r=await MSAL.acquireTokenPopup({...sc,prompt:compte?undefined:'select_account'});MSAL.setActiveAccount(r.account);try{localStorage.setItem('kte_ms_login',r.account.username)}catch(e){}return r.accessToken;
 }
 async function graph(jeton,chemin,opt={}){
   const r=await fetch('https://graph.microsoft.com/v1.0'+chemin,{...opt,headers:{Authorization:'Bearer '+jeton,...(opt.headers||{})}});
@@ -904,7 +995,8 @@ async function publierPDF(){
 function majLienPDF(){const a=$('lPdf');if(!a)return;const u=cur&&cur.PDF;a.style.display=u?'':'none';if(u)a.href=u}
 $('bPdfV').onclick=async()=>{if(sale){msg('Enregistrez d\'abord les modifications.','warn');return}
   if(!cur['Validé le']||modifie()){msg('Validez d\'abord le document : le PDF correspond toujours à une version validée.','warn');return}
-  $('bPdfV').disabled=true;try{const r=await publierPDF();msg(r.texte,r.ok?'ok':'warn')}catch(e){msg('PDF : '+e.message,'err')}finally{$('bPdfV').disabled=false}};
+  $('bPdfV').disabled=true;try{try{await completerVignettes(false);await ecrireVignettesConforme()}catch(e){console.warn('vignettes',e)}
+    const r=await publierPDF();msg(r.texte,r.ok?'ok':'warn')}catch(e){msg('PDF : '+e.message,'err')}finally{$('bPdfV').disabled=false}};
 
 window.addEventListener('afterprint',()=>{document.querySelectorAll('.po').forEach(x=>x.remove());document.querySelectorAll('.vide').forEach(x=>x.classList.remove('vide'));if($('thLiv'))$('thLiv').textContent='Livré'});
 if(RETOUR_MS)document.body.innerHTML='<p style="font-family:sans-serif;padding:20px">Connexion Microsoft…</p>';else init();
