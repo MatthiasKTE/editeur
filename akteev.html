@@ -339,12 +339,17 @@ async function api(path,opt={},essai=0){
   return r.status===204?null:r.json();
 }
 const S={sch:{},rows:{},prom:{}};
+/* Contrôle version : la formule Baserow tolère 120 s entre « Validé le » et la dernière modification. L'éditeur (même
+   origine) note l'heure de chaque enregistrement dans localStorage.kte_modif_<type>_<id> ; on en tient compte ici. */
+const DOC_T={1261170:'devis',1261374:'arc',1261382:'bl'};
+function modifLocale(t,r){const k=DOC_T[t];if(!k||!r||!r['Validé le'])return false;let v=null;try{v=localStorage.getItem(`kte_modif_${k}_${r.id}`)}catch(e){}return !!v&&Date.parse(v)>Date.parse(r['Validé le'])}
+function ajusterControle(t,rows){if(!DOC_T[t])return;for(const r of rows||[])if(modifLocale(t,r)&&!String(r['Contrôle version']||'').startsWith('⚠'))r['Contrôle version']='⚠ Modifié depuis la validation : nouvelle version à éditer'}
 async function tout(t){let out=[],p=1;for(;;){const j=await api(`/rows/table/${t}/?user_field_names=true&size=200&page=${p}`);out=out.concat(j.results);if(!j.next)break;p++}return out}
 async function lireChamps(t){try{return await api(`/fields/table/${t}/`)}catch(e){return null}}
 function charger(t,force){
   if(force||!S.prom[t]){
     S.prom[t]=Promise.all([S.sch[t]&&!force?Promise.resolve(null):lireChamps(t),tout(t)]).then(([f,rows])=>{
-      S.rows[t]=rows;if(f)S.sch[t]=faireSchema(f,false);else if(!S.sch[t]||S.sch[t].deduit)S.sch[t]=deduireSchema(rows);
+      ajusterControle(t,rows);S.rows[t]=rows;if(f)S.sch[t]=faireSchema(f,false);else if(!S.sch[t]||S.sch[t].deduit)S.sch[t]=deduireSchema(rows);
       majCompteurs();return rows}).catch(e=>{delete S.prom[t];throw e});
   }
   return S.prom[t];
@@ -385,7 +390,7 @@ const titre=(t,r)=>{const p=sch(t).prim;const v=r?.[p];return txt(v)||('#'+r?.id
 function txt(v){if(v==null)return'';if(Array.isArray(v))return v.map(txt).filter(Boolean).join(', ');if(typeof v==='object')return v.value!=null?txt(v.value):(v.name||v.visible_name||'');return String(v)}
 const nouv=m=>(m.fem?'Nouvelle ':/^[aeéiouy]/i.test(m.un)?'Nouvel ':'Nouveau ')+m.un;
 const ids=v=>(v||[]).map(x=>x.id);
-function majRow(t,row){const L=S.rows[t];if(!L)return;const i=L.findIndex(r=>r.id===row.id);if(i>=0)L[i]=row;else L.push(row)}
+function majRow(t,row){ajusterControle(t,[row]);const L=S.rows[t];if(!L)return;const i=L.findIndex(r=>r.id===row.id);if(i>=0)L[i]=row;else L.push(row)}
 
 /* ---------- Rendu d'une valeur ---------- */
 function rendu(f,v,court){
@@ -1394,7 +1399,7 @@ function texteReponse(row,cli,ref){
 async function repondreClient(row){
   const num=txt(row['N° devis']);
   if(!row.PDF){toast(`Pas de PDF pour ${num} : ouvrez le devis dans l’éditeur et cliquez sur « 📄 PDF » (ou validez-le).`,true);return}
-  if(String(txt(row['Contrôle version'])).startsWith('⚠')){toast(`${num} a été modifié depuis sa validation : validez la nouvelle version dans l’éditeur avant de l’envoyer.`,true);return}
+  if(String(txt(row['Contrôle version'])).startsWith('⚠')||modifLocale(MODS.devis.t,row)){toast(`${num} a été modifié depuis sa validation : validez la nouvelle version dans l’éditeur avant de l’envoyer.`,true);return}
   const b=$('bRep');if(b){b.disabled=true;b.textContent='Préparation du mail…'}
   try{
     const j=await jetonGraph(['Mail.ReadWrite','Files.ReadWrite.All']);
