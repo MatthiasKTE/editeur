@@ -594,6 +594,54 @@ async function imageData(url){
 }
 const frDate=v=>v?new Date(String(v).slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR'):'';
 
+/* ---- Vignettes du PDF ----
+   Baserow stocke les fichiers sur Amazon S3, qui refuse la lecture depuis une autre page (CORS) : l'image s'affiche
+   à l'écran mais ne peut pas être recopiée dans le PDF. On essaie S3, puis la copie de la vignette rangée dans
+   SharePoint (<Dossier SharePoint>/02_Chiffrage/Vignettes/, même nom de fichier que dans Baserow), lue par Microsoft Graph. */
+const DOSSIER_VIGN='02_Chiffrage/Vignettes';
+function numAffaire(){const n=String(cur&&cur[D().num]||'');const m=n.match(/D\d{6}/);return m?m[0]:n}
+async function dossierDoc(){
+  if((cur['Dossier SharePoint']||'').trim())return cur['Dossier SharePoint'].trim();
+  for(const a of cur.Affaire||[]){try{const r=await ligne1(T_AFF,a.id);if((r['Dossier SharePoint']||'').trim())return r['Dossier SharePoint'].trim()}catch(e){}}
+  const n=numAffaire();if(!n)return '';
+  try{const a=await affaireDe(n);if(a&&(a['Dossier SharePoint']||'').trim())return a['Dossier SharePoint'].trim()}catch(e){}
+  try{const d=(await tout(DOCS.devis.table,`&filter__N° devis__equal=${encodeURIComponent(n)}`))[0];if(d&&(d['Dossier SharePoint']||'').trim())return d['Dossier SharePoint'].trim()}catch(e){}
+  return '';
+}
+const sansAccent=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+async function vignettesSP(manquantes){
+  const url=await dossierDoc();if(!url)throw new Error('pas de « Dossier SharePoint »');
+  const j=await jetonGraph();
+  const dos=await dossierSP(j,url);const drive=dos.parentReference.driveId;
+  let fichiers=[];
+  try{let r=await graph(j,`/drives/${drive}/items/${dos.id}:/${DOSSIER_VIGN.split('/').map(encodeURIComponent).join('/')}:/children?$top=200`);
+    fichiers=r.value.filter(x=>x.file);
+    while(r['@odata.nextLink']){r=await (await fetch(r['@odata.nextLink'],{headers:{Authorization:'Bearer '+j}})).json();fichiers=fichiers.concat((r.value||[]).filter(x=>x.file))}}
+  catch(e){throw new Error('dossier '+DOSSIER_VIGN+' introuvable')}
+  const out={};
+  for(const i of manquantes){
+    const l=lignes[i],im=(l.Vignette||[])[0],nomB=sansAccent(im&&im.visible_name);
+    const rep=String(l.Rep??'').trim(),re=rep?new RegExp('_rep0*'+rep.replace(/\D/g,'')+'(?:[_.-]|$)'):null;
+    let f=fichiers.find(x=>sansAccent(x.name)===nomB)                      // même nom que dans Baserow
+      ||(re&&fichiers.filter(x=>/\.(png|jpe?g)$/i.test(x.name)&&re.test(sansAccent(x.name)))[0]); // sinon par repère
+    if(!f)continue;
+    try{let u=f['@microsoft.graph.downloadUrl'];
+      if(!u){const it=await graph(j,`/drives/${drive}/items/${f.id}`);u=it['@microsoft.graph.downloadUrl']}
+      const r=await fetch(u);if(!r.ok)continue;
+      const d=await blobVersData(await r.blob());const t=await dimsImage(d);if(t)out[i]={d,...t}}
+    catch(e){console.warn('vignette SharePoint',f.name,e)}
+  }
+  return out;
+}
+async function vignettesPDF(){
+  const vign=await Promise.all(lignes.map(l=>{const im=(l.Vignette||[])[0];return imageData(im&&(im.url||im.thumbnails?.card_cover?.url))}));
+  let manq=lignes.map((l,i)=>(l.Vignette||[]).length&&!vign[i]?i:-1).filter(i=>i>=0);
+  let raison='';
+  if(manq.length&&MS_CLIENT){try{const sp=await vignettesSP(manq);for(const i in sp)vign[i]=sp[i]}catch(e){console.warn(e);raison=e.message}
+    manq=manq.filter(i=>!vign[i])}
+  vign.manque=manq.length?{n:manq.length,reps:manq.map(i=>lignes[i].Rep||i+1),raison}:null;
+  return vign;
+}
 async function construirePDF(){
   await chargerScript(LIB_JSPDF);
   const {jsPDF}=window.jspdf;
@@ -649,7 +697,7 @@ async function construirePDF(){
   const ref=refs.find(x=>x.id==val('fRef'));
   const adrCli=cli?[cli['Raison sociale (Axonaut)']&&cli['Raison sociale (Axonaut)']!==cli.Entreprise?cli['Raison sociale (Axonaut)']:'',...(cli.Adresse||'').split(', '),`${cli['Code postal']||''} ${cli.Ville||''}`,cli.Pays&&cli.Pays!=='France'?cli.Pays:''].filter(x=>x&&x.trim()):[];
   const logo={d:LOGO,...(await dimsImage(LOGO)||{w:137,h:140})};
-  const vign=await Promise.all(lignes.map(l=>{const im=(l.Vignette||[])[0];return imageData(im&&(im.url||im.thumbnails?.card_cover?.url))}));
+  const vign=await vignettesPDF();
 
   /* ---- En-tête / pied de chaque page ---- */
   let y=0;
@@ -782,7 +830,7 @@ async function construirePDF(){
   const np=doc.getNumberOfPages();
   for(let p=1;p<=np;p++){doc.setPage(p);style(8.25,false,GRIS);ecrire(`Page ${p}/${np}`,DR,HAUT,{align:'right'})}
   doc.setProperties({title:`${titre} ${n} v.${v}`,author:'KTE',creator:'Éditeur KTE'});
-  return {blob:doc.output('blob'),nom:(String(n).startsWith(D().court)?'':D().court+'_')+`${n}_v${v}.pdf`,pages:np};
+  return {blob:doc.output('blob'),nom:(String(n).startsWith(D().court)?'':D().court+'_')+`${n}_v${v}.pdf`,pages:np,manque:vign.manque};
 }
 function telecharger(blob,nom){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)}
 
@@ -822,18 +870,19 @@ async function deposerSP(blob,nom,sous){
 /* Construit le PDF, le dépose dans SharePoint et renseigne le champ PDF (repli : téléchargement) */
 async function publierPDF(){
   msg('Création du PDF…');
-  const {blob,nom,pages}=await construirePDF();
+  const {blob,nom,pages,manque}=await construirePDF();
+  const alerte=manque?` ⚠ ${manque.n} vignette(s) absente(s) du PDF (rep. ${manque.reps.join(', ')}${manque.raison?' – '+manque.raison:''} : vérifiez ${DOSSIER_VIGN} dans SharePoint puis « 📄 PDF »).`:'';
   if(TYPE==='devis'&&MS_CLIENT&&(cur['Dossier SharePoint']||'').trim()){
     try{msg('Enregistrement du PDF dans SharePoint…');
       const lien=await deposerSP(blob,nom,DOSSIER_PDF[TYPE]);
       // « Validé le » suit l'écriture du lien : sinon la formule « Contrôle version » croirait le devis modifié
       const vl=new Date().toISOString();await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({PDF:lien,'Validé le':vl})});
       cur.PDF=lien;cur['Validé le']=vl;majLienPDF();
-      return {ok:true,texte:`PDF ${nom} (${pages} p.) enregistré dans ${DOSSIER_PDF[TYPE]} et lié au devis.`}}
-    catch(e){console.error(e);telecharger(blob,nom);return {ok:false,texte:`PDF ${nom} téléchargé (SharePoint : ${e.message}).`}}
+      return {ok:!alerte,texte:`PDF ${nom} (${pages} p.) enregistré dans ${DOSSIER_PDF[TYPE]} et lié au devis.`+alerte}}
+    catch(e){console.error(e);telecharger(blob,nom);return {ok:false,texte:`PDF ${nom} téléchargé (SharePoint : ${e.message}).`+alerte}}
   }
   telecharger(blob,nom);
-  return {ok:true,texte:`PDF ${nom} (${pages} p.) téléchargé`+(TYPE!=='devis'?'.':!MS_CLIENT?' (enregistrement SharePoint pas encore configuré).':' (pas de « Dossier SharePoint » sur la fiche).')};
+  return {ok:!alerte,texte:`PDF ${nom} (${pages} p.) téléchargé`+(TYPE!=='devis'?'.':!MS_CLIENT?' (enregistrement SharePoint pas encore configuré).':' (pas de « Dossier SharePoint » sur la fiche).')+alerte};
 }
 function majLienPDF(){const a=$('lPdf');if(!a)return;const u=cur&&cur.PDF;a.style.display=u?'':'none';if(u)a.href=u}
 $('bPdfV').onclick=async()=>{if(sale){msg('Enregistrez d\'abord les modifications.','warn');return}
