@@ -247,7 +247,10 @@ body.deconnecte #side,body.deconnecte #top{display:none}
    Règles : aucune suppression de ligne (on passe le statut à « Annulée ») ;
    devis / ARC / BL se créent et se mettent en page dans l'éditeur.
    ===================================================================== */
-const API='https://api.baserow.io/api/database';
+/* Passerelle d'accès (Scaleway, Paris) : vérifie la connexion Microsoft KTE et applique les droits du profil
+   (tables, colonnes, fournisseurs Chine). Vide = ancien mode (jeton Baserow saisi dans le navigateur). */
+const PASSERELLE='https://akteev5ytqabln-passerelle.functions.fnc.fr-par.scw.cloud';
+const API=PASSERELLE?PASSERELLE.replace(/\/+$/,'')+'/api/database':'https://api.baserow.io/api/database';
 const EDITEUR='./';
 const CLE='kte_baserow_jeton';
 let JETON=null;try{JETON=localStorage.getItem(CLE)}catch(e){}
@@ -305,7 +308,8 @@ const MODS={
    liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'}]},
  referents:{t:1260243,nom:'Référents',un:'référent',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Téléphone',"Référent d'affaire"],
    liees:[{nom:'Tâches',mod:'taches',lien:'Référent'},{nom:'Commandes',mod:'commandes',lien:'Référent KTE'}]},
- catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']}
+ catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']},
+ utilisateurs:{t:1281481,nom:'Utilisateurs',un:'utilisateur',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Profil','Actif','Dernière connexion','Commentaire']}
 };
 for(const k in MODS)MODS[k].k=k;
 const MOD_DE_TABLE={};for(const k in MODS)MOD_DE_TABLE[MODS[k].t]=k;
@@ -345,9 +349,12 @@ const badge=o=>{if(!o||o.value==null||o.value==='')return'';const [bg,fg]=coul(o
 let ENCOURS=0;const FILE=[];
 async function api(path,opt={},essai=0){
   if(ENCOURS>=4)await new Promise(r=>FILE.push(r));ENCOURS++;let r;
-  try{r=await fetch(API+path,{...opt,headers:{Authorization:'Token '+JETON,'Content-Type':'application/json',...(opt.headers||{})}})}finally{ENCOURS--;FILE.length&&FILE.shift()()}
-  if((r.status===429||r.status>=500)&&essai<4){await new Promise(x=>setTimeout(x,800*(essai+1)));return api(path,opt,essai+1)}
-  if(!r.ok){const t=await r.text();let m=t;try{const j=JSON.parse(t);m=(j.error||'')+' '+(j.detail?JSON.stringify(j.detail):'')}catch(e){}throw new Error(r.status+' '+m.slice(0,300))}
+  const {_re,...o}=opt;
+  try{const auth=PASSERELLE?'Bearer '+await jetonAkteev(!!_re):'Token '+JETON;
+    r=await fetch(API+path,{...o,headers:{Authorization:auth,'Content-Type':'application/json',...(o.headers||{})}})}finally{ENCOURS--;FILE.length&&FILE.shift()()}
+  if(PASSERELLE&&r.status===401){if(!_re)return api(path,{...o,_re:true},essai);ecranConnexionMS('Votre session Microsoft a expiré : reconnectez-vous.');throw new Error('connexion requise')}
+  if((r.status===429||r.status>=500)&&essai<4){await new Promise(x=>setTimeout(x,800*(essai+1)));return api(path,o,essai+1)}
+  if(!r.ok){const t=await r.text();let m=t;try{const j=JSON.parse(t);m=j.error==='ACCES_REFUSE'?'Accès refusé : '+j.detail:(j.error||'')+' '+(j.detail?JSON.stringify(j.detail):'')}catch(e){}throw new Error(r.status+' '+m.slice(0,300))}
   return r.status===204?null:r.json();
 }
 const S={sch:{},rows:{},prom:{}};
@@ -433,17 +440,17 @@ function triVal(f,v){
 }
 
 /* ---------- Accès : profils et session ----------
-   La vraie protection = les droits du jeton Baserow de chaque profil (créé par l'administrateur).
-   Les profils ci-dessous adaptent seulement l'affichage (menus, boutons, montants). */
+   La vraie protection = la passerelle (droits par table, colonne et ligne ; fournisseurs Chine réservés à la
+   Direction et au Commercial). Les profils ci-dessous adaptent seulement l'affichage (menus, boutons). */
 const PROFILS={
  admin:{nom:'Direction / Admin',voir:'*',ecrire:'*',montants:true,admin:true},
- commercial:{nom:'Commercial / ADV',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','referents'],ecrire:['devis','commandes','arc','bl','clients','taches','consult'],montants:true},
- atelier:{nom:'Atelier',voir:['taches','synthese','commandes','referents'],ecrire:['taches','synthese'],montants:false},
- achats:{nom:'Achats',voir:['devis','consult','commandes','taches','synthese','cf','fournisseurs','referents'],ecrire:['cf','fournisseurs','synthese','taches','consult'],montants:true}
+ commercial:{nom:'Commercial',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','cf','fournisseurs','referents','catalogue'],ecrire:['devis','consult','commandes','arc','bl','clients','taches','synthese','cf','fournisseurs','referents','catalogue'],montants:true},
+ atelier:{nom:'Atelier',voir:['taches','synthese','commandes','bl','cf','consult','fournisseurs','referents','catalogue'],ecrire:['taches','synthese','cf','consult','catalogue'],montants:true}
 };
 let SESSION=null;try{SESSION=JSON.parse(localStorage.getItem('akteev_session')||'null')}catch(e){}
-const PR=()=>PROFILS[SESSION?.profil]||PROFILS.admin;
-const peutVoir=k=>PR().voir==='*'||PR().voir.includes(k);
+if(PASSERELLE)SESSION=null; // le profil est relu auprès de la passerelle à chaque ouverture
+const PR=()=>PROFILS[SESSION?.profil]||(SESSION||PASSERELLE?PROFILS.atelier:PROFILS.admin);
+const peutVoir=k=>k==='utilisateurs'?(!!PASSERELLE&&!!PR().admin):(PR().voir==='*'||PR().voir.includes(k));
 const peutEcrire=k=>PR().ecrire==='*'||PR().ecrire.includes(k);
 const montants=()=>PR().montants!==false;
 const estAdmin=()=>!!PR().admin;
@@ -457,7 +464,7 @@ function dessinerMenu(){
   if(STATS_ACTIF&&peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   let g='';
   for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`}
-  if(estAdmin()){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
+  if(estAdmin()&&!PASSERELLE){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
   h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
   $('side').innerHTML=h;
   if($('bJeton'))$('bJeton').onclick=e=>{e.preventDefault();config(true)};
@@ -488,7 +495,7 @@ async function route(){
   actif(k);$('main').scrollTop=0;
   try{
     if(k==='accueil')return await vueAccueil();
-    if(k==='utilisateurs'&&estAdmin())return await vueUtilisateurs();
+    if(k==='utilisateurs'&&estAdmin()&&!PASSERELLE)return await vueUtilisateurs();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
     if(k==='stats'&&STATS_ACTIF&&peutVoir('stats')&&montants())return await vueStats();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
@@ -1481,6 +1488,47 @@ const MS_RETOUR=location.origin+'/editeur/';   // URI de redirection déclarée 
 const LIB_MSAL=['https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js','https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js'];
 let MSAL=null;
 async function prechargerMSAL(){try{if(!MSAL){for(const u of LIB_MSAL){try{await chargerScript(u);break}catch(e){}}if(window.msal){MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+MS_TENANT,redirectUri:MS_RETOUR},cache:{cacheLocation:'localStorage'}});await MSAL.initialize()}}}catch(e){MSAL=null}}
+/* ---------- Connexion à la passerelle (jeton Microsoft « access_as_user ») ---------- */
+const MS_API='api://'+MS_CLIENT+'/access_as_user';
+let JETON_MS=null,JETON_MS_PROM=null;
+async function initMSAL(){
+  if(!MSAL){let ok=false;for(const u of LIB_MSAL){try{await chargerScript(u);ok=true;break}catch(e){}}if(!ok)throw new Error('bibliothèque Microsoft indisponible');
+    MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+MS_TENANT,redirectUri:MS_RETOUR},cache:{cacheLocation:'localStorage'}});
+    await MSAL.initialize()}
+  return MSAL}
+async function jetonAkteev(force){
+  if(!force&&JETON_MS&&JETON_MS.exp>Date.now()+120e3)return JETON_MS.v;
+  if(!JETON_MS_PROM)JETON_MS_PROM=(async()=>{
+    await initMSAL();const sc={scopes:[MS_API]};let r=null;
+    const compte=MSAL.getActiveAccount()||MSAL.getAllAccounts()[0];
+    let deco=false;try{deco=localStorage.getItem('akteev_deconnecte')==='1'}catch(e){}
+    if(compte&&!deco){try{r=await MSAL.acquireTokenSilent({...sc,account:compte,forceRefresh:!!force})}catch(e){}}
+    if(!r&&!deco){let indice='';try{indice=localStorage.getItem('kte_ms_login')||''}catch(e){}
+      if(indice||compte){try{r=await MSAL.ssoSilent({...sc,loginHint:indice||compte.username})}catch(e){}}}
+    if(!r)throw new Error('CONNEXION');
+    MSAL.setActiveAccount(r.account);JETON_MS={v:r.accessToken,exp:+r.expiresOn||Date.now()+30*60e3};return JETON_MS.v;
+  })().finally(()=>{JETON_MS_PROM=null});
+  return JETON_MS_PROM}
+async function ouvrirSession(){
+  const r=await fetch(PASSERELLE.replace(/\/+$/,'')+'/moi/',{headers:{Authorization:'Bearer '+await jetonAkteev()}});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(r.status===401?'CONNEXION':(j.detail||('erreur '+r.status)));
+  SESSION={login:j.email,nom:j.nom,profil:j.profil};
+  try{localStorage.setItem('akteev_session',JSON.stringify(SESSION));localStorage.removeItem('akteev_deconnecte')}catch(e){}
+  $('toast').innerHTML='';for(const t in S.prom)delete S.prom[t];if(!location.hash||location.hash==='#/')location.hash='#/accueil';lancer()}
+function ecranConnexionMS(message){
+  document.body.classList.add('deconnecte');SESSION=null;
+  $('main').innerHTML=`<div class="card" id="cfg"><div class="marque" style="display:flex;align-items:center;gap:10px;margin-bottom:6px"><span style="display:grid;place-items:center;width:34px;height:34px;border-radius:8px;background:var(--accent);color:#fff;font-weight:700">A</span><h1>Akteev</h1></div>
+   <p class="mut">Connexion à l’interface de gestion KTE avec votre compte Microsoft KTE (adresse @kte-fr.com et son mot de passe).</p>
+   ${message?`<p id="cxMsg" style="color:#B91C1C;font-size:13px">${esc(message)}</p>`:''}
+   <button class="btn p" id="cxMs" style="margin-top:12px;width:100%;justify-content:center">Se connecter avec Microsoft</button></div>`;
+  $('cxMs').onclick=async()=>{const b=$('cxMs');b.disabled=true;b.textContent='Connexion…';
+    try{await initMSAL();const r=await MSAL.acquireTokenPopup({scopes:[MS_API],prompt:'select_account'});
+      MSAL.setActiveAccount(r.account);try{localStorage.setItem('kte_ms_login',r.account.username)}catch(e){}
+      JETON_MS={v:r.accessToken,exp:+r.expiresOn||Date.now()+30*60e3};await ouvrirSession()}
+    catch(e){const m=e.message==='CONNEXION'?'Connexion refusée par Microsoft.':/user_cancelled|popup_window/.test(e.errorCode||e.message)?'Fenêtre de connexion fermée ou bloquée : autorisez les fenêtres surgissantes pour ce site.':e.message;
+      ecranConnexionMS(m.startsWith('le compte')||m.startsWith('aucun profil')?'Accès refusé : '+m+'. Demandez l’accès à l’administrateur.':m)}};
+}
 async function jetonGraph(scopes){
   if(!MSAL){let ok=false;for(const u of LIB_MSAL){try{await chargerScript(u);ok=true;break}catch(e){}}if(!ok)throw new Error('bibliothèque Microsoft indisponible');
     MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+MS_TENANT,redirectUri:MS_RETOUR},cache:{cacheLocation:'localStorage'}});
@@ -1738,7 +1786,9 @@ function ecranConnexion(){
 }
 function deconnecter(){
   if(SALE&&Object.keys(SALE.draft).length&&!confirm('Des modifications ne sont pas enregistrées. Se déconnecter quand même ?'))return;
-  try{localStorage.removeItem(CLE);localStorage.removeItem('akteev_session')}catch(e){}
+  try{localStorage.removeItem(CLE);localStorage.removeItem('akteev_session');
+    if(PASSERELLE){localStorage.setItem('akteev_deconnecte','1');localStorage.removeItem('kte_ms_login');
+      Object.keys(localStorage).filter(k=>k.startsWith('msal.')||k.includes(MS_CLIENT)).forEach(k=>localStorage.removeItem(k))}}catch(e){}
   location.href=location.pathname;
 }
 /* ---------- Page Utilisateurs (administrateur) ---------- */
@@ -1804,9 +1854,10 @@ function config(change){
 function lancer(){
   document.body.classList.remove('deconnecte');GMODS=GMODS0.filter(peutVoir);
   if(SESSION?.referent&&!MOI){MOI=SESSION.referent;ls.set('moi',MOI)}
-  dessinerMenu();route();charger(MODS.referents.t).catch(()=>{});
+  dessinerMenu();route();charger(MODS.referents.t).then(R=>{if(!MOI&&SESSION?.login&&Array.isArray(R)){const r=R.find(x=>String(x['E-mail']||'').toLowerCase().trim()===SESSION.login);if(r){MOI=r.id;ls.set('moi',MOI);majMoi()}}}).catch(()=>{});
   setTimeout(()=>['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{})),300)}
 (async()=>{
+  if(PASSERELLE){try{await ouvrirSession()}catch(e){ecranConnexionMS(e.message==='CONNEXION'?'':'Accès refusé : '+e.message)}return}
   ACCES=await lireAcces();
   const avecComptes=!!(ACCES&&ACCES.utilisateurs?.length);
   if(JETON&&(SESSION||!avecComptes))return lancer(); // session ouverte, ou jeton administrateur saisi directement
