@@ -1189,7 +1189,8 @@ function dessinerFiche(){
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>`).join(''):''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn p" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn ${n>1?'p':''}" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
-    ${k==='cf'&&!nouveau?`<a class="btn p" href="#/affecter/${row.id}" title="Affecter la commande à une affaire, au stock, ou ligne par ligne">Affecter les lignes</a>`:''}
+    ${k==='cf'&&!nouveau?`<a class="btn" href="#/affecter/${row.id}" title="Affecter la commande à une affaire, au stock, ou ligne par ligne">Affecter les lignes</a>`:''}
+    ${k==='cf'&&!nouveau&&peutEcrire('cf')?`<button class="btn" id="bCfPdf" title="Crée le PDF de la commande et l’enregistre dans SharePoint (registre + dossier de chaque affaire)">${ico('pdf')}Éditer la commande</button><button class="btn p" id="bCfEnv" title="${row.PDF?'Mail au fournisseur avec la commande en pièce jointe':'Éditez d’abord la commande (PDF)'}" ${row.PDF?'':'disabled'}>${ico('mail')}Envoyer au fournisseur</button>`:''}
     ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
     ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
     ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
@@ -1205,6 +1206,8 @@ function dessinerFiche(){
   if($('bRep')){$('bRep').onclick=()=>repondreClient(SALE.row);prechargerMSAL()}
   if($('bCmp'))$('bCmp').onclick=()=>comparerSST(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if(k==='devis'&&!nouveau&&peutVoir('consult')&&!S.rows[MODS.consult.t])charger(MODS.consult.t).then(()=>{if(SALE&&SALE.k==='devis'&&SALE.id===row.id&&!Object.keys(SALE.draft).length)dessinerFiche()}).catch(()=>{});
+  if($('bCfPdf')){$('bCfPdf').onclick=()=>cfEditer(SALE.row);prechargerMSAL()}
+  if($('bCfEnv'))$('bCfEnv').onclick=()=>cfEnvoyer(SALE.row);
   if($('bBL'))$('bBL').onclick=()=>fenetreBL(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if($('selSt'))$('selSt').onchange=async e=>{const o=stF.select_options.find(x=>x.id==e.target.value);try{const r=await changerStatut(k,SALE.row,o.id,o.value);SALE.row=r;delete SALE.draft[m.statut];dessinerFiche()}catch(er){toast('Échec : '+er.message,true)}};
   if(!nouveau&&m.liees)dessinerLiees(0);
@@ -1481,6 +1484,239 @@ async function enregistrerAffectation(){
   const r=await api(`/rows/table/${MODS.cf.t}/${cf.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});majRow(MODS.cf.t,r);
   delete S.prom[MODS.commandes.t];
   toast('Affectation enregistrée – '+lib);location.hash=`#/cf/${cf.id}`;
+}
+
+/* ---------- Commande fournisseur : édition du PDF et envoi au fournisseur (26/10/2026) ----------
+   « Éditer la commande » : PDF au format simplifié KTE (bandeau délai / livraison / paiement / total, colonne Réf.,
+   n° d'affaire sous chaque ligne si multi-affaires, ligne Gravure si « Gravure : … » dans le Commentaire interne),
+   déposé dans SharePoint : registre _Commandes fournisseurs/<année>/CF-<n°>.pdf (lien écrit dans « PDF »),
+   + <Dossier de chaque affaire>/05_Commande/Achats/CF_<n°>.pdf, + _Achats stock/<année>/ s'il y a des lignes stock.
+   Statut Brouillon → Validée.
+   « Envoyer au fournisseur » : mail au contact de la fiche Fournisseurs (copie : champ Copie), PDF en pièce jointe,
+   texte court modifiable ; « Préparer le brouillon » (Outlook) ou « Envoyer maintenant » (statut → Envoyée). */
+const CF_LOGO='data:image/jpeg;base64,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';
+const CF_PIED=['KTE - Eurl au capital de 10 000 € / IBAN: FR76.3000.3000.8100.0201.7065.622 - BIC: SOGEFRPP',
+  'N° Siret : 53865123300016 - R.C.S. Angers 538 651 233 - Code APE : 2573 - TVA intracommunautaire : FR59 538 651 233'];
+const CF_JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+const CF_POLICE='https://raw.githubusercontent.com/google/fonts/main/ofl/carlito/Carlito-';
+let CF_FONTE=null;
+async function cfPolice(doc){
+  if(CF_FONTE===null){try{CF_FONTE={};for(const st of ['Regular','Bold']){const r=await fetch(CF_POLICE+st+'.ttf');if(!r.ok)throw new Error(r.status);
+      const b=new Uint8Array(await r.arrayBuffer());let s='';for(let i=0;i<b.length;i+=0x8000)s+=String.fromCharCode.apply(null,b.subarray(i,i+0x8000));CF_FONTE[st]=btoa(s)}}
+    catch(e){console.warn('Police Carlito indisponible',e);CF_FONTE=false}}
+  if(!CF_FONTE)return'helvetica';
+  for(const st of ['Regular','Bold']){doc.addFileToVFS('Carlito-'+st+'.ttf',CF_FONTE[st]);doc.addFont('Carlito-'+st+'.ttf','Carlito',st==='Bold'?'bold':'normal')}
+  return'Carlito';
+}
+const cfEur=(x,dev)=>{const s=(Math.round((+x||0)*100)/100).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/ | /g,' ');return s+' '+({EUR:'€',USD:'$',CNY:'CNY'}[dev]||dev||'€')};
+/* Toutes les données d'une commande fournisseur, prêtes pour le PDF et le mail */
+async function cfDonnees(cf){
+  const tL=1263349;
+  await Promise.all([charger(tL),charger(MODS.commandes.t),charger(MODS.fournisseurs.t),charger(MODS.referents.t)]);
+  const scL=sch(tL);
+  const L=S.rows[tL].filter(r=>ids(r.Commande).includes(cf.id)).sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id);
+  const four=(S.rows[MODS.fournisseurs.t]||[]).find(r=>r.id===ids(cf.Fournisseur)[0])||{};
+  const dem=(S.rows[MODS.referents.t]||[]).find(r=>r.id===ids(cf.Demandeur)[0])||null;
+  const C=S.rows[MODS.commandes.t]||[];
+  const lignes=L.map(l=>{const v=affLue(l,scL);const fr=AFF_FRAIS.test(l.Description||'');
+    return{l,fr,v:v||(fr?'prorata':''),aff:/^\d+$/.test(String(v))?C.find(c=>c.id==v):null,q:+l['Quantité']||0,pu:+l['Prix unitaire']||0,
+      mt:Math.round((+l['Quantité']||0)*(+l['Prix unitaire']||0)*100)/100,
+      prec:String(l['Précisions']||'').split('\n').filter(x=>x.trim()&&!AFF_TAG.test(x)&&!/^prix brut/i.test(x.trim()))}});
+  const pieces=lignes.filter(x=>!x.fr&&x.mt>=0);
+  const vals=[...new Set(pieces.map(x=>x.v).filter(Boolean))];
+  const stockCf=/stock/i.test(txt(cf.Affectation));
+  const affsCf=ids(cf.Affaire).map(id=>C.find(c=>c.id===id)).filter(Boolean);
+  const multi=vals.length>1;
+  const sansAff=pieces.filter(x=>!x.v).length&&(multi||vals.length);   // affectation ligne par ligne incomplète
+  const affaires=[...new Map([...affsCf,...lignes.map(x=>x.aff).filter(Boolean)].map(c=>[c.id,c])).values()];
+  const pays=txt(four.Pays),fr=!pays||/france/i.test(pays);
+  const bil=/^en/i.test(txt(four.Langue))||!fr;
+  const grav=(String(cf['Commentaire interne']||'').match(/^Gravure\s*:\s*(Oui|Non)\s*(?:[–-]\s*(.+))?$/im)||null);
+  return{cf,lignes,four,dem,multi,stock:!multi&&(vals[0]==='stock'||(!vals.length&&stockCf)),affaires,sansAff,
+    unique:!multi&&vals.length===1&&vals[0]!=='stock'?C.find(c=>c.id==vals[0]):(affsCf.length===1?affsCf[0]:null),
+    tva:fr,bil,dev:txt(cf.Devise)||txt(four.Devise)||'EUR',total:Math.round(lignes.reduce((s,x)=>s+x.mt,0)*100)/100,
+    gravure:grav?{oui:/oui/i.test(grav[1]),precision:(grav[2]||'').trim()}:null,lesLignes:pieces.length};
+}
+async function cfConstruirePDF(D){
+  await chargerScript(CF_JSPDF);
+  const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4',compress:true}),F=await cfPolice(doc);
+  const PT=0.3528,W=210,H=297,G=16,DR=W-G,BLEU=[43,76,126],GRIS=[107,107,107],TRAIT=[208,208,208],NOIR=[0,0,0];
+  const {cf,bil,dev}=D,num=txt(cf['N° CF']),T=(f,e)=>bil?`${f} / ${e}`:f;
+  const st=(t,g,c)=>{doc.setFont(F,g?'bold':'normal');doc.setFontSize(t);doc.setTextColor(...(c||NOIR))};
+  const net=s=>String(s??'').replace(/[  ]/g,' ');
+  const txtA=(s,x,y,o={})=>doc.text(net(s),x,y,{baseline:'top',...o});
+  const trait=(x1,y1,x2,y2,c)=>{doc.setDrawColor(...(c||TRAIT));doc.setLineWidth(0.26);doc.line(x1,y1,x2,y2)};
+  const decoupe=(s,w,t,g)=>{st(t,g);return doc.splitTextToSize(net(s),w)};
+  const bloc=(s,x,y,w,{t=9.5,g=false,c=NOIR,lh=1.3,align='left'}={})=>{const L=decoupe(s,w,t,g);st(t,g,c);const hl=t*PT*lh;
+    L.forEach((l,i)=>txtA(l,align==='right'?x+w:x,y+i*hl,align==='right'?{align:'right'}:{}));return y+L.length*hl};
+  const hBloc=(s,w,t,g,lh=1.3)=>decoupe(s,w,t,g).length*t*PT*lh;
+  const titre=T('Commande','Purchase order');
+  const entete=()=>{st(8.5,false,GRIS);txtA(`KTE - ${titre} ${num}`,G,7.5);trait(G,12,DR,12);trait(G,280,DR,280);
+    st(7.5,false,GRIS);txtA(CF_PIED[0],W/2,282.5,{align:'center'});txtA(CF_PIED[1],W/2,286,{align:'center'})};
+  entete();
+  // En-tête : logo + titre
+  try{doc.addImage(CF_LOGO,'JPEG',G,17,24,24*800/781)}catch(e){}
+  let y=17;st(bil?20:22,false,BLEU);txtA(titre,DR,y,{align:'right'});y+=10;
+  st(10,true);txtA(num,DR,y,{align:'right'});y+=5;
+  const d0=cf.Date?new Date(cf.Date+'T12:00'):new Date();
+  st(10);txtA(`Cholet, ${bil?'':'le '}${d0.toLocaleDateString('fr-FR')}`,DR,y,{align:'right'});y+=5;
+  const aff=D.stock?T('Affectation : stock','Allocation: stock'):D.multi?T('Nos affaires : voir chaque ligne','Our jobs: see each line'):D.unique?`${T('Notre affaire','Our job')} : ${txt(D.unique['N° affaire'])}`:'';
+  if(aff){txtA(aff,DR,y,{align:'right'});y+=5}
+  if(cf['Réf. devis fournisseur']){const r=`${T('Votre devis','Your quotation')} : `,n=txt(cf['Réf. devis fournisseur']),dd=cf['Date devis fournisseur']?` ${T('du','dated')} ${frDate(cf['Date devis fournisseur'])}`:'';
+    st(10,false);const w1=doc.getTextWidth(net(dd));st(10,true);const w2=doc.getTextWidth(net(n));st(10,false);
+    txtA(dd,DR,y,{align:'right'});st(10,true);txtA(n,DR-w1,y,{align:'right'});st(10,false);txtA(r,DR-w1-w2,y,{align:'right'});y+=5}
+  // Adresses
+  y=Math.max(y,44)+3;const dem=D.dem;
+  const kte=['KTE','6 rue de la gatine','49300 Cholet',txt(dem?.['Téléphone'])||'02-41-62-27-71','www.kte-fr.com',txt(dem?.['Nom complet'])||txt(dem?.Nom)||'',txt(dem?.['E-mail'])].filter(Boolean);
+  st(10);kte.forEach((l,i)=>txtA(l,G,y+i*4.6));
+  const f=D.four,lf=[];const adr=String(f.Adresse||'').split('\n').map(s=>s.trim()).filter(Boolean);
+  const nomF=txt(f.Nom)||txt(cf.Fournisseur),dansAdr=adr.length&&nomF&&norm(adr[0]).includes(norm(nomF));
+  if(!dansAdr)lf.push({t:nomF,g:true});adr.forEach((a,i)=>lf.push({t:a,g:i===0&&dansAdr}));
+  if(f['N° TVA'])lf.push({t:`${T('N° de TVA','VAT No.')} : ${f['N° TVA']}`});if(f.Contact)lf.push({t:`${T('À l’attention de','Attn.')} : ${f.Contact}`});if(f['E-mail'])lf.push({t:f['E-mail']});
+  const bx=DR-85,bh=lf.length*4.6+6;doc.setDrawColor(...TRAIT);doc.setLineWidth(0.26);doc.roundedRect(bx,y-3,85,bh,3,3,'S');
+  lf.forEach((l,i)=>{st(10,l.g);txtA(l.t,bx+4,y+i*4.6)});
+  y=Math.max(y+kte.length*4.6,y-3+bh)+5;
+  // Gravure
+  if(D.gravure){const g=D.gravure;doc.setDrawColor(...(g.oui?BLEU:TRAIT));doc.setLineWidth(0.3);doc.rect(G,y,DR-G,9);
+    let x=G+2.5;st(10.5,true);txtA(T('Gravure','Engraving')+' :',x,y+2.3);x+=doc.getTextWidth(T('Gravure','Engraving')+' :')+4;
+    const cas=(c,lab)=>{doc.setDrawColor(...NOIR);doc.setLineWidth(0.28);doc.rect(x,y+2.7,3.6,3.6);if(c){doc.setLineWidth(0.42);doc.line(x+0.3,y+3,x+3.3,y+6);doc.line(x+0.3,y+6,x+3.3,y+3)}x+=5.5;st(10);txtA(lab,x,y+2.4);x+=doc.getTextWidth(lab)+5};
+    cas(!g.oui,T('Non','No'));cas(g.oui,T('Oui','Yes'));if(g.oui&&g.precision){st(10,true);const L=doc.splitTextToSize(net(g.precision),DR-x-2);txtA(L[0],x,y+2.4)}
+    y+=13}
+  // Bandeau
+  const liv=String(cf['Adresse de livraison']||'KTE\n6 rue de la gatine\n49300 Cholet').split('\n').map(s=>s.trim()).filter(s=>s&&!/^france$/i.test(s));
+  const cles=[[T('Délai','Lead time'),txt(cf['Délai'])||'—'],[T('Livraison','Delivery'),(/^kte$/i.test(liv[0])?liv.slice(1):liv).join(', ')],
+    [T('Paiement','Payment'),String(txt(cf['Conditions de paiement'])||'—').replace(/\s*\(.*?\)\s*$/,'')],[T('Total HT','Total excl. VAT'),cfEur(D.total,dev)]];
+  const cw=[38,52,DR-G-38-52-32,32];let hb=0;cles.forEach(([a,b],i)=>{hb=Math.max(hb,4+hBloc(b,cw[i]-5,10,true,1.25))});hb+=5;
+  doc.setFillColor(238,242,248);doc.rect(G,y,DR-G,hb,'F');
+  let cx=G;cles.forEach(([a,b],i)=>{st(7.5,false,GRIS);txtA(a,cx+2.5,y+2);bloc(b,cx+2.5,y+5.5,cw[i]-5,{t:10,g:true,lh:1.25});cx+=cw[i]});
+  y+=hb+7;
+  // Tableau
+  const c0=24,cQ=14,cP=28,cM=28,cD=DR-G-c0-cQ-cP-cM,xD=G+c0,xQ=xD+cD,xP=xQ+cQ,xM=xP+cP;
+  const tete=()=>{const E=[['Réf.','Ref.',G+1,0],['Désignation','Description',xD+1,0],['Qté','Qty',xQ+cQ-1,1],['P.U. HT','Unit price',xP+cP-1,1],['Montant HT','Amount',xM+cM-1,1]];
+    E.forEach(([f,e,x,r])=>{st(9.5,true,BLEU);txtA(f,x,y,r?{align:'right'}:{});if(bil){st(8,false,BLEU);txtA(e,x,y+4,r?{align:'right'}:{})}});y+=bil?9:5.5;trait(G,y,DR,y)};
+  const saut=h=>{if(y+h>272){doc.addPage();entete();y=18;tete();y+=1.5}};
+  tete();y+=1.5;
+  for(const x of D.lignes){if(x.fr||!x.mt&&x.mt!==0)continue;
+    const precs=x.prec.join('\n'),aL=D.multi&&x.v?(x.v==='stock'?'Stock':`${T('Affaire','Job')} ${txt(x.aff?.['N° affaire'])}`):'';
+    const h=hBloc(x.l.Description||'',cD-2,9.75,true)+(precs?hBloc(precs,cD-2,8.5,false):0)+(aL?4:0)+3;
+    saut(h);const y0=y;let yy=bloc(x.l.Description||'',xD+1,y0,cD-2,{t:9.75,g:true});
+    if(precs)yy=bloc(precs,xD+1,yy,cD-2,{t:8.5,c:[60,60,60]});if(aL){st(8.5,true,BLEU);txtA(aL,xD+1,yy+0.3);yy+=4}
+    bloc(txt(x.l['Réf. fournisseur']),G+1,y0+0.5,c0-2,{t:8.5,c:GRIS});
+    const q=Number.isInteger(x.q)?String(x.q):String(x.q).replace('.',',');
+    st(9.75);txtA(q,xQ+cQ-1,y0,{align:'right'});txtA(cfEur(x.pu,dev),xP+cP-1,y0,{align:'right'});txtA(cfEur(x.mt,dev),xM+cM-1,y0,{align:'right'});
+    y=Math.max(yy,y0+5)+1.5;trait(G,y,DR,y);y+=1.5}
+  for(const x of D.lignes){if(!x.fr||!x.mt)continue;saut(8);st(9.75,true);txtA(x.l.Description||'',xD+1,y);st(9.75);txtA(cfEur(x.mt,dev),xM+cM-1,y,{align:'right'});y+=5.5;trait(G,y,DR,y);y+=1.5}
+  // Bas de page : conditions + totaux + bon pour commande
+  const cond=[];if(cf['Incoterm / transport'])cond.push({t:`${T('Transport','Shipping')} : ${txt(cf['Incoterm / transport'])}`});
+  if(txt(cf.Observations))cond.push({t:`${T('Note','Note')} : ${txt(cf.Observations)}`});
+  cond.push({t:' '},{t:'Merci de confirmer par un ARC avec la date de livraison.',g:true},{t:`Rappelez ${num} sur l'ARC, le BL et la facture.`});
+  if(bil)cond.push({t:'Please confirm with an order acknowledgement and delivery date.',g:true},{t:`Quote ${num} on all documents.`});
+  const wg=DR-G-74,hc=cond.reduce((s,c)=>s+hBloc(c.t,wg-8,8.5,c.g),0)+8,ht=D.tva?3*9:9,hs=ht+6+24,hbas=Math.max(hc,hs);
+  if(y+8+hbas>275){doc.addPage();entete();y=18}
+  const yb=Math.max(y+8,275-hbas);
+  doc.setDrawColor(...TRAIT);doc.setLineWidth(0.26);doc.roundedRect(G,yb,wg,hc,3,3,'S');
+  let yc=yb+4;cond.forEach(c=>{yc=bloc(c.t,G+4,yc,wg-8,{t:8.5,g:c.g})});
+  const xt=DR-70,tva=Math.round(D.total*0.2*100)/100;
+  const rows=D.tva?[['Total HT',cfEur(D.total,dev),false],['TVA 20,00%',cfEur(tva,dev),false],['Total TTC',cfEur(D.total+tva,dev),true]]:[[T('Total HT','Total'),cfEur(D.total,dev),true]];
+  let yt=yb;rows.forEach(([a,b,g])=>{st(10,g,g?BLEU:NOIR);txtA(a,xt+40,yt+2.5,{align:'right'});txtA(b,DR,yt+2.5,{align:'right'});yt+=9;trait(xt,yt,DR,yt)});
+  yt+=6;doc.roundedRect(xt,yt,70,24,3,3,'S');st(8.5,true);txtA(T('Bon pour commande','Authorised by'),xt+3,yt+3);
+  st(8.5);txtA(`${txt(dem?.['Nom complet'])||txt(dem?.Nom)||'KTE'} – KTE`,xt+3,yt+7.5);
+  const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);st(8.5,false,GRIS);txtA(`Page ${i}/${n}`,DR,7.5,{align:'right'})}
+  doc.setProperties({title:`KTE - ${titre} ${num}`,author:'KTE'});
+  return{blob:doc.output('blob'),pages:n};
+}
+async function cfDeposer(j,blob,nom,cheminRacine,dossierAffaire){
+  if(dossierAffaire){const dos=await dossierSPA(j,dossierAffaire);
+    return graph(j,`/drives/${dos.parentReference.driveId}/items/${dos.id}:/05_Commande/Achats/${encodeURIComponent(nom)}:/content?@microsoft.graph.conflictBehavior=replace`,{method:'PUT',headers:{'Content-Type':'application/pdf'},body:blob})}
+  return graph(j,`/drives/${cheminRacine.drive}/root:/${cheminRacine.chemin.split('/').map(encodeURIComponent).join('/')}/${encodeURIComponent(nom)}:/content?@microsoft.graph.conflictBehavior=replace`,{method:'PUT',headers:{'Content-Type':'application/pdf'},body:blob});
+}
+async function dossierSPA(j,url){
+  try{return await graph(j,'/shares/u!'+b64url(url)+'/driveItem?$select=id,name,webUrl,parentReference')}
+  catch(e){const u=new URL(url),seg=decodeURIComponent(u.pathname).split('/').filter(Boolean);
+    const site=await graph(j,`/sites/${u.hostname}:/${seg[0]}/${seg[1]}`);
+    return graph(j,`/sites/${site.id}/drive/root:/${seg.slice(3).map(encodeURIComponent).join('/')}?$select=id,name,webUrl,parentReference`)}
+}
+async function cfEditer(row){
+  const b=$('bCfPdf'),lab=b?.innerHTML;const fin=()=>{if(b){b.disabled=false;b.innerHTML=lab}};
+  if(b){b.disabled=true;b.textContent='Création du PDF…'}
+  try{
+    const D=await cfDonnees(row),num=txt(row['N° CF']);
+    if(!D.lesLignes){toast(`${num} n’a aucune ligne.`,true);return fin()}
+    if(!txt(row.Fournisseur)){toast('Choisissez le fournisseur.',true);return fin()}
+    if(D.sansAff||(!D.multi&&!D.stock&&!D.unique&&!D.affaires.length)){toast('Affectation incomplète : cliquez sur « Affecter les lignes ».',true);return fin()}
+    const {blob,pages}=await cfConstruirePDF(D);
+    const nomReg=`${num}.pdf`,nomAff=nomReg,an=String((row.Date||auj()).slice(0,4));
+    let lien='',depots=[];
+    try{
+      if(b)b.textContent='Enregistrement dans SharePoint…';
+      const j=await jetonGraph(['Files.ReadWrite.All']);
+      const C=S.rows[MODS.commandes.t]||[];
+      const ref=(D.affaires.find(c=>txt(c['Dossier SharePoint']))||C.find(c=>/^https:\/\/.+sharepoint\.com/i.test(txt(c['Dossier SharePoint']))));
+      if(!ref)throw new Error('aucun « Dossier SharePoint » connu pour retrouver la bibliothèque');
+      const drive=(await dossierSPA(j,txt(ref['Dossier SharePoint']))).parentReference.driveId;
+      const reg=await cfDeposer(j,blob,nomReg,{drive,chemin:`_Commandes fournisseurs/${an}`});lien=reg.webUrl;depots.push('registre');
+      for(const a of D.affaires){const u=txt(a['Dossier SharePoint']);if(!u)continue;try{await cfDeposer(j,blob,nomAff,null,u);depots.push(txt(a['N° affaire']))}catch(e){console.warn(e);toast(`Dépôt dans ${txt(a['N° affaire'])} impossible : ${e.message}`,true)}}
+      if(D.stock||D.lignes.some(x=>x.v==='stock')){await cfDeposer(j,blob,nomAff,{drive,chemin:`_Achats stock/${an}`});depots.push('stock')}
+    }catch(e){console.warn(e);toast('SharePoint indisponible ('+e.message+') : PDF téléchargé seulement.',true)}
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nomReg;if(!lien)a.click();else window.open(a.href,'_blank');
+    if(lien){const corps={PDF:lien};const sv=sch(MODS.cf.t).par.Statut?.select_options||[];
+      if(/^brouillon$/i.test(txt(row.Statut))||!txt(row.Statut)){const o=sv.find(o=>/^valid/i.test(o.value));if(o)corps.Statut=o.id}
+      const r=await api(`/rows/table/${MODS.cf.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});majRow(MODS.cf.t,r);
+      if(SALE&&SALE.k==='cf'&&SALE.id===row.id){SALE.row=r;dessinerFiche()}
+      toast(`PDF ${num} (${pages} p., ${cfEur(D.total,D.dev)} HT) enregistré : ${depots.join(', ')}`)}
+  }catch(e){toast('Échec : '+e.message,true)}
+  fin();
+}
+function cfTexteMail(D,corps){
+  const {cf,bil}=D,num=txt(cf['N° CF']),dem=D.dem,prenom=String(txt(D.four.Contact)).trim().split(/\s+/)[0]||'';
+  const dv=txt(cf['Réf. devis fournisseur']),dd=cf['Date devis fournisseur']?frDate(cf['Date devis fournisseur']):'';
+  const sig=[txt(dem?.['Nom complet'])||txt(dem?.Nom),txt(dem?.Fonction),'KTE','6 rue de la gatine','49300 Cholet',txt(dem?.['Téléphone'])||'02-41-62-27-71','www.kte-fr.com'].filter(Boolean);
+  if(corps)return corps;
+  return bil?[`Hello ${prenom},`,'',`Please find attached our PO ${num}${dv?` (your quotation ${dv}${dd?' dated '+dd:''})`:''}.`,'**Please confirm the delivery date by return (order acknowledgement).**',
+      ...(D.gravure?.oui?['**Engraving required: see PO** (laser only, no dot-peen).']:[]),'','Best regards,','',...sig].join('\n')
+    :[`Bonjour ${prenom},`,'',`Ci-joint notre commande ${num}${dv?` (votre devis ${dv}${dd?' du '+dd:''})`:''}.`,'**Merci de nous confirmer la date de livraison par retour (ARC).**',
+      ...(D.gravure?.oui?['**Gravure demandée : voir commande** (laser uniquement, pas de micro-percussion).']:[]),'','Cordialement,','',...sig].join('\n');
+}
+const cfHtml=t=>`<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${esc(t).replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/\n/g,'<br>')}</div>`;
+async function cfEnvoyer(row){
+  const num=txt(row['N° CF']);
+  if(!row.PDF){toast(`Pas de PDF pour ${num} : cliquez d’abord sur « Éditer la commande ».`,true);return}
+  let D;try{D=await cfDonnees(row)}catch(e){toast('Erreur : '+e.message,true);return}
+  const a=txt(D.four['E-mail']),cc=txt(D.four.Copie),obj=D.bil?`PO ${num} – KTE`:`Commande ${num} – KTE`;
+  ouvrirModal('Envoyer la commande '+num,`<div class="form" style="padding:0;grid-template-columns:1fr">
+    <div class="ch"><label>À</label><input class="ed" id="mA" value="${esc(a)}"></div>
+    <div class="ch"><label>Copie</label><input class="ed" id="mCc" value="${esc(cc)}"></div>
+    <div class="ch"><label>Objet</label><input class="ed" id="mO" value="${esc(obj)}"></div>
+    <div class="ch"><label>Message <span class="mut" style="font-weight:400">(**texte** = gras)</span></label><textarea class="ed" id="mT" style="min-height:230px">${esc(cfTexteMail(D))}</textarea></div>
+    <div class="mut" style="font-size:12.5px">Pièce jointe : ${esc(num)}.pdf (PDF enregistré). Le mail part de votre boîte Outlook.</div></div>`,
+   `<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn" id="mBr">${ico('mail')}Préparer le brouillon</button><button class="btn p" id="mEnv">${ico('mail')}Envoyer maintenant</button>`);
+  const go=async envoyer=>{
+    const dest=$('mA').value.split(/[;, ]+/).filter(x=>/@/.test(x)),copie=$('mCc').value.split(/[;, ]+/).filter(x=>/@/.test(x));
+    if(!dest.length){toast('Adresse du fournisseur manquante',true);return}
+    if(envoyer&&!confirm(`Envoyer ${num} à ${dest.join(', ')}${copie.length?' (copie '+copie.join(', ')+')':''} ?`))return;
+    $('mBr').disabled=$('mEnv').disabled=true;
+    try{
+      const j=await jetonGraph(envoyer?['Mail.ReadWrite','Mail.Send','Files.ReadWrite.All']:['Mail.ReadWrite','Files.ReadWrite.All']);
+      const it=await graph(j,'/shares/u!'+b64url(txt(row.PDF))+'/driveItem');const dl=it['@microsoft.graph.downloadUrl'];if(!dl)throw new Error('PDF introuvable dans SharePoint');
+      const pdf=await (await fetch(dl)).blob();
+      const m=await graph(j,'/me/messages',{method:'POST',body:JSON.stringify({subject:$('mO').value,body:{contentType:'HTML',content:cfHtml($('mT').value)},
+        toRecipients:dest.map(x=>({emailAddress:{address:x}})),ccRecipients:copie.map(x=>({emailAddress:{address:x}}))})});
+      await graph(j,`/me/messages/${m.id}/attachments`,{method:'POST',body:JSON.stringify({'@odata.type':'#microsoft.graph.fileAttachment',name:`${num}.pdf`,contentType:'application/pdf',contentBytes:await versB64(pdf)})});
+      const qui=SESSION?.nom||txt((S.rows[MODS.referents.t]||[]).find(r=>r.id===MOI)?.Nom)||'';
+      if(envoyer){
+        await graph(j,`/me/messages/${m.id}/send`,{method:'POST'});
+        const o=(sch(MODS.cf.t).par.Statut?.select_options||[]).find(o=>/^envoy/i.test(o.value));
+        const com=[String(row['Commentaire interne']||'').trim(),`Envoyée au fournisseur le ${new Date().toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})}${qui?' par '+qui:''} (${dest.join(', ')}).`].filter(Boolean).join('\n');
+        const r=await api(`/rows/table/${MODS.cf.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({...(o?{Statut:o.id}:{}),'Commentaire interne':com})});majRow(MODS.cf.t,r);
+        fermerModal();toast(`${num} envoyée à ${dest.join(', ')} – statut « Envoyée »`);if(SALE&&SALE.k==='cf'&&SALE.id===row.id){SALE.row=r;dessinerFiche()}
+      }else{
+        const w=await graph(j,`/me/messages/${m.id}?$select=webLink`);fermerModal();
+        toast(`Brouillon prêt dans Outlook (Brouillons) pour ${dest.join(', ')}. Après l’envoi, passez la commande au statut « Envoyée ».`);
+        window.open(w.webLink,'_blank');
+      }
+    }catch(e){toast('Échec : '+e.message,true);if($('mBr')){$('mBr').disabled=$('mEnv').disabled=false}}
+  };
+  $('mBr').onclick=()=>go(false);$('mEnv').onclick=()=>go(true);
 }
 
 /* ---------- Documents de l'affaire : tous les PDF liés à une commande ----------
