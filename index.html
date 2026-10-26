@@ -224,7 +224,9 @@ input.ed.num{text-align:right}
 <script>
 // Fenêtre de connexion Microsoft (retour MSAL) : ne pas lancer l'éditeur, la page d'origine lit la réponse.
 const RETOUR_MS=!!window.opener&&/[#&?](code|error)=/.test(location.hash+location.search);
-const API='https://api.baserow.io/api/database';
+/* Passerelle d'accès Akteev (Scaleway) : connexion Microsoft KTE + droits du profil. Vide = jeton Baserow. */
+const PASSERELLE='https://akteev5ytqabln-passerelle.functions.fnc.fr-par.scw.cloud';
+const API=PASSERELLE?PASSERELLE.replace(/\/+$/,'')+'/api/database':'https://api.baserow.io/api/database';
 const T_CLIENTS=1260239,T_REF=1260243,T_AFF=1260240,T_TACHES=1261119,T_TC=1261600;
 const COND_DEF="100% à la livraison\nPar virement bancaire à 30 jours nets";
 const DOCS={
@@ -241,9 +243,11 @@ const eur=x=>(Math.round((+x||0)*100)/100).toLocaleString('fr-FR',{minimumFracti
 const nb=x=>{const n=+x||0;return n.toLocaleString('fr-FR',{maximumFractionDigits:2})};
 const aujourd=()=>new Date().toISOString().slice(0,10);
 function msg(t,c){$('msg').textContent=t||'';$('msg').className=c||''}
-async function api(path,opt={}){
-  const r=await fetch(API+path,{...opt,headers:{Authorization:'Token '+JETON,'Content-Type':'application/json',...(opt.headers||{})}});
-  if(!r.ok){const t=await r.text();throw new Error(r.status+' '+t.slice(0,200))}
+async function api(path,opt={},re=false){
+  const auth=PASSERELLE?'Bearer '+await jetonApi(re):'Token '+JETON;
+  const r=await fetch(API+path,{...opt,headers:{Authorization:auth,'Content-Type':'application/json',...(opt.headers||{})}});
+  if(PASSERELLE&&r.status===401&&!re)return api(path,opt,true);
+  if(!r.ok){const t=await r.text();let m=t;try{const j=JSON.parse(t);if(j.error==='ACCES_REFUSE')m='Accès refusé : '+j.detail}catch(e){}throw new Error(r.status+' '+m.slice(0,200))}
   return r.status===204?null:r.json();
 }
 async function tout(t,extra=''){let out=[],p=1;for(;;){const j=await api(`/rows/table/${t}/?user_field_names=true&size=200&page=${p}${extra}`);out=out.concat(j.results);if(!j.next)break;p++}return out}
@@ -265,7 +269,9 @@ function visible(e){for(let x=e;x&&x.id!=='page';x=x.parentElement){if(x.dataset
 
 async function init(){
   $('logo').src=LOGO;
-  if(!JETON){$('cfg').style.display='block';return}
+  if(PASSERELLE){try{await jetonApi()}catch(e){$('cfg').innerHTML='<h3>Connexion</h3><p>Connectez-vous avec votre compte Microsoft KTE.</p><p><button id="bMs">Se connecter avec Microsoft</button></p>';$('cfg').style.display='block';
+    $('bMs').onclick=async()=>{try{await jetonApi(false,true);$('cfg').style.display='none';init()}catch(x){msg('Connexion impossible : '+x.message,'err')}};return}}
+  else if(!JETON){$('cfg').style.display='block';return}
   try{
     msg('Chargement…');
     [clients,refs]=await Promise.all([tout(T_CLIENTS),tout(T_REF)]);
@@ -940,6 +946,23 @@ function telecharger(blob,nom){const a=document.createElement('a');a.href=URL.cr
 
 /* ---- Microsoft Graph (connexion MSAL, fenêtre surgissante) ---- */
 let MSAL=null;
+/* Jeton Microsoft pour la passerelle Akteev (scope access_as_user de l'application « Akteev »). */
+let JETON_API=null;
+async function jetonApi(force,fenetre){
+  if(!force&&!fenetre&&JETON_API&&JETON_API.exp>Date.now()+120e3)return JETON_API.v;
+  const sc={scopes:['api://'+MS_CLIENT+'/access_as_user']};
+  if(!MSAL){let ok=false;for(const u of LIB_MSAL){try{await chargerScript(u);ok=true;break}catch(e){}}if(!ok)throw new Error('bibliothèque Microsoft indisponible');
+    MSAL=new msal.PublicClientApplication({auth:{clientId:MS_CLIENT,authority:'https://login.microsoftonline.com/'+(MS_TENANT||'organizations'),redirectUri:location.origin+location.pathname.replace(/index\.html$/,'')},cache:{cacheLocation:'localStorage'}});
+    await MSAL.initialize()}
+  let compte=MSAL.getActiveAccount()||MSAL.getAllAccounts()[0],r=null;
+  let deco=false;try{deco=localStorage.getItem('akteev_deconnecte')==='1'}catch(e){}
+  if(compte&&!fenetre&&!deco){try{r=await MSAL.acquireTokenSilent({...sc,account:compte,forceRefresh:!!force})}catch(e){}}
+  if(!r&&!fenetre&&!deco){let indice='';try{indice=localStorage.getItem('kte_ms_login')||''}catch(e){}
+    if(indice||compte){try{r=await MSAL.ssoSilent({...sc,loginHint:indice||compte.username})}catch(e){}}}
+  if(!r&&fenetre){r=await MSAL.acquireTokenPopup({...sc,prompt:'select_account'});try{localStorage.setItem('kte_ms_login',r.account.username);localStorage.removeItem('akteev_deconnecte')}catch(e){}}
+  if(!r)throw new Error('connexion Microsoft requise');
+  MSAL.setActiveAccount(r.account);JETON_API={v:r.accessToken,exp:+r.expiresOn||Date.now()+30*60e3};return JETON_API.v;
+}
 async function jetonGraph(silencieux){
   if(!MS_CLIENT)throw new Error('connexion Microsoft non configurée');
   if(!MSAL){let ok=false;for(const u of LIB_MSAL){try{await chargerScript(u);ok=true;break}catch(e){}}if(!ok)throw new Error('bibliothèque Microsoft indisponible');
