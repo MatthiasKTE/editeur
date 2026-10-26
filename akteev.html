@@ -302,7 +302,7 @@ const MODS={
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
-   liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant'],ordre:'Ordre',ajout:true}],cacheStatuts:['Annulée']},
+   liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant','Affectation','Affaire'],ordre:'Ordre',ajout:true}],cacheStatuts:['Annulée']},
  consult:{t:1274941,nom:'Consultations SST',un:'consultation',fem:true,ico:'ddp',grp:'Achats',cols:['Réf','Devis','Fournisseur','Envoyée le','Réponse','Réponse le','Montant','Délai','Archivage','Dossier réponses'],statut:'Réponse',cacheStatuts:['Annulée']},
  fournisseurs:{t:1260241,nom:'Fournisseurs',un:'fournisseur',ico:'fournisseurs',grp:'Achats',cols:['Nom','Type','Pays','Contact','E-mail','Devise','Conditions de paiement'],
    liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'}]},
@@ -497,6 +497,7 @@ async function route(){
     if(k==='accueil')return await vueAccueil();
     if(k==='utilisateurs'&&estAdmin()&&!PASSERELLE)return await vueUtilisateurs();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
+    if(k==='affecter'&&id&&peutVoir('cf')){actif('cf');return await vueAffecter(id)}
     if(k==='stats'&&STATS_ACTIF&&peutVoir('stats')&&montants())return await vueStats();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
     if(id)return await vueFiche(k,id);
@@ -1188,6 +1189,7 @@ function dessinerFiche(){
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>`).join(''):''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn p" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn ${n>1?'p':''}" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
+    ${k==='cf'&&!nouveau?`<a class="btn p" href="#/affecter/${row.id}" title="Affecter la commande à une affaire, au stock, ou ligne par ligne">Affecter les lignes</a>`:''}
     ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
     ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
     ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
@@ -1387,6 +1389,98 @@ async function editerLigne(t,x,r){
     try{const n=r?await api(`/rows/table/${t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)}):await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});
       majRow(t,n);fermerModal();toast('Ligne enregistrée');delete S.prom[SALE.t];
       const p=await api(`/rows/table/${SALE.t}/${SALE.row.id}/?user_field_names=true`);majRow(SALE.t,p);SALE.row=p;dessinerFiche();dessinerLiees(ONG)}catch(e){toast('Échec : '+e.message,true)}};
+}
+
+/* ---------- Affectation d'une commande fournisseur (26/10/2026) ----------
+   #/affecter/<id CF> : choisir si la commande va en entier sur une affaire / au stock, ou ligne par ligne.
+   Menu déroulant = « Stock » + affaires enregistrées non encore livrées (Commandes hors Livrée / Soldée / Annulée / Perdu),
+   regroupées par client. Les frais (transport, port, emballage, remise…) sont « répartis au prorata du montant ».
+   Écrit : Lignes → champs « Affectation » + « Affaire » s'ils existent, sinon une ligne « Affectation : … » en fin de Précisions ;
+   Commande → Affectation (Affaire / Stock / Multi-affaires si l'option existe), lien Affaire = toutes les affaires choisies. */
+const AFF_FIN=/^(livr|sold|annul|perdu)/i, AFF_FRAIS=/^(transport|frais|port|emballage|remise|livraison|delivery)/i, AFF_TAG=/^Affectation\s*:/i;
+let AFFX=null;
+function affOptions(sel,frais){
+  const C=(S.rows[MODS.commandes.t]||[]).filter(c=>!AFF_FIN.test(txt(c.Statut))&&/^D\d/.test(txt(c['N° affaire'])));
+  const G={};C.forEach(c=>{const k=txt(c.Client)||txt(c['Client (code)'])||'(sans client)';(G[k]=G[k]||[]).push(c)});
+  const o=(v,l)=>`<option value="${esc(v)}" ${String(sel)===String(v)?'selected':''}>${esc(l)}</option>`;
+  return`<option value="">— choisir —</option>${frais?o('prorata','Réparti au prorata du montant'):''}${o('stock','STOCK – pas d’affaire')}`+
+    Object.keys(G).sort((a,b)=>a.localeCompare(b,'fr')).map(k=>`<optgroup label="${esc(k)}">${G[k].sort((a,b)=>txt(b['N° affaire']).localeCompare(txt(a['N° affaire']))).map(c=>o(c.id,`${txt(c['N° affaire'])} – ${String(txt(c.Objet)).slice(0,70)}`)).join('')}</optgroup>`).join('');
+}
+function affLue(l,scL){ // affectation actuelle d'une ligne : 'stock' | 'prorata' | id commande | ''
+  if(scL.par['Affaire']&&ids(l.Affaire).length)return ids(l.Affaire)[0];
+  if(scL.par['Affectation']&&/stock/i.test(txt(l.Affectation)))return'stock';
+  if(scL.par['Affectation']&&/r[ée]parti|prorata/i.test(txt(l.Affectation)))return'prorata';
+  const t=String(l['Précisions']||'').split('\n').reverse().find(x=>AFF_TAG.test(x));if(!t)return'';
+  const v=t.replace(AFF_TAG,'').trim();if(/^stock/i.test(v))return'stock';if(/prorata/i.test(v))return'prorata';
+  const c=(S.rows[MODS.commandes.t]||[]).find(c=>txt(c['N° affaire'])===v.split(/\s/)[0]);return c?c.id:'';
+}
+async function vueAffecter(id){
+  const tL=1263349;document.title='Akteev – Affectation';
+  if(!S.rows[MODS.cf.t])chargement();
+  await Promise.all([charger(MODS.cf.t),charger(tL),charger(MODS.commandes.t)]);
+  let cf=S.rows[MODS.cf.t].find(r=>r.id==id);
+  if(!cf){$('main').innerHTML='<div class="card vide">Commande fournisseur introuvable.</div>';return}
+  const scL=sch(tL),L=S.rows[tL].filter(r=>ids(r.Commande).includes(cf.id)).sort((a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id);
+  const val={};L.forEach(l=>{val[l.id]=affLue(l,scL)||(AFF_FRAIS.test(l.Description||'')?'prorata':'')});
+  const pieces=L.filter(l=>!AFF_FRAIS.test(l.Description||'')),v0=pieces.map(l=>val[l.id]).filter(Boolean);
+  const unique=v0.length===pieces.length&&new Set(v0).size<=1;
+  AFFX={cf,L,val,mode:AFFX?.cf?.id===cf.id?AFFX.mode:(L.length&&!unique?'ligne':'complete'),tout:unique?v0[0]||'':(ids(cf.Affaire).length===1&&!v0.length?ids(cf.Affaire)[0]:/stock/i.test(txt(cf.Affectation))?'stock':'')};
+  dessinerAffecter();
+}
+function dessinerAffecter(){
+  const {cf,L,val}=AFFX,ecr=peutEcrire('cf'),mt=l=>(+l['Quantité']||0)*(+l['Prix unitaire']||0);
+  let h=`<div class="entete"><a class="btn" href="#/cf/${cf.id}" title="Retour à la commande">${ico('retour')}</a><h1>Affectation – ${esc(txt(cf['N° CF']))}</h1>
+    <span class="sous">${esc(txt(cf.Fournisseur))}${cf['Réf. devis fournisseur']?' · devis '+esc(cf['Réf. devis fournisseur']):''} · ${badge(cf.Statut)}</span></div>
+  <div class="card" style="padding:16px 20px">
+   <div style="font-weight:600;margin-bottom:8px">Cette commande est-elle pour une seule affaire, ou faut-il affecter ligne par ligne ?</div>
+   <label style="margin-right:22px;cursor:pointer"><input type="radio" name="affm" value="complete" ${AFFX.mode==='complete'?'checked':''}> Affectation complète (une affaire ou le stock)</label>
+   <label style="cursor:pointer"><input type="radio" name="affm" value="ligne" ${AFFX.mode==='ligne'?'checked':''}> Ligne par ligne</label>
+   ${AFFX.mode==='complete'?`<div style="margin-top:14px;max-width:640px"><select id="affTout" class="ed" style="width:100%">${affOptions(AFFX.tout,false)}</select></div>`:''}
+  </div>
+  <div class="card" style="margin-top:16px"><div class="tw"><table class="l"><thead><tr><th style="cursor:default">#</th><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Qté</th>${montants()?'<th class="n" style="cursor:default">Montant HT</th>':''}<th style="cursor:default;min-width:300px">Affectation</th></tr></thead><tbody>
+   ${L.map((l,i)=>{const fr=AFF_FRAIS.test(l.Description||'');const prec=String(l['Précisions']||'').split('\n').filter(x=>x.trim()&&!AFF_TAG.test(x)).join(' · ');
+     return`<tr><td class="mut">${l.Ordre||i+1}</td><td><b>${esc(l.Description||'')}</b>${prec?`<div class="mut" style="font-size:12px">${esc(prec)}</div>`:''}</td><td class="n">${esc(String(l['Quantité']??''))}</td>${montants()?`<td class="n">${eur(mt(l))}</td>`:''}
+     <td>${AFFX.mode==='ligne'?`<select class="ed affL" data-id="${l.id}" style="width:100%">${affOptions(val[l.id],fr)}</select>`:`<span class="mut">${fr?'—':'selon le choix ci-dessus'}</span>`}</td></tr>`}).join('')}
+  </tbody></table></div>${L.length?'':'<div class="vide">Aucune ligne</div>'}
+  ${AFFX.mode==='ligne'&&L.length>1?`<div class="plus" style="text-align:left"><button class="btn" id="affCopie">Recopier la 1re affectation sur les lignes vides</button></div>`:''}
+  <div class="plus mut" style="font-size:12.5px;text-align:left">Liste = affaires enregistrées non encore livrées (hors Livrée, Soldée, Annulée, Perdu). Frais (transport…) : répartis entre les affaires au prorata du montant HT.</div></div>
+  ${ecr?`<div style="margin-top:16px;display:flex;gap:10px;justify-content:flex-end"><a class="btn" href="#/cf/${cf.id}">Annuler</a><button class="btn p" id="affOk">Enregistrer l’affectation</button></div>`:''}`;
+  $('main').innerHTML=h;
+  document.querySelectorAll('input[name=affm]').forEach(r=>r.onchange=()=>{AFFX.mode=r.value;dessinerAffecter()});
+  if($('affTout'))$('affTout').onchange=e=>AFFX.tout=e.target.value;
+  document.querySelectorAll('.affL').forEach(s=>s.onchange=()=>AFFX.val[s.dataset.id]=s.value);
+  if($('affCopie'))$('affCopie').onclick=()=>{const p=L.find(l=>val[l.id]&&val[l.id]!=='prorata');if(!p)return;L.forEach(l=>{if(!val[l.id])val[l.id]=val[p.id]});dessinerAffecter()};
+  if($('affOk'))$('affOk').onclick=()=>enregistrerAffectation().catch(e=>{toast('Échec : '+e.message,true);$('affOk').disabled=false});
+}
+async function enregistrerAffectation(){
+  const {cf,L}=AFFX,tL=1263349,scL=sch(tL),scC=sch(MODS.cf.t),C=S.rows[MODS.commandes.t]||[];
+  const choix={};L.forEach(l=>{const fr=AFF_FRAIS.test(l.Description||'');choix[l.id]=AFFX.mode==='complete'?(fr?'prorata':AFFX.tout):AFFX.val[l.id]});
+  if(AFFX.mode==='complete'&&!AFFX.tout){toast('Choisissez l’affaire (ou le stock)',true);return}
+  const manq=L.filter(l=>!choix[l.id]);if(manq.length){toast(`${manq.length} ligne(s) sans affectation : ${manq.map(l=>l.Ordre||'?').join(', ')}`,true);return}
+  if(L.length&&L.every(l=>choix[l.id]==='prorata')){toast('Affectez au moins une ligne à une affaire ou au stock',true);return}
+  $('affOk').disabled=true;
+  const nAff=v=>txt((C.find(c=>c.id==v)||{})['N° affaire']);
+  const optL=n=>(scL.par['Affectation']?.select_options||[]).find(o=>norm(o.value).startsWith(n));
+  for(const l of L){const v=choix[l.id],corps={};
+    if(scL.par['Affaire']&&scL.par['Affectation']){
+      corps.Affaire=/^\d+$/.test(v)?[+v]:[];const o=optL(v==='stock'?'stock':v==='prorata'?'repart':'affaire')||(v==='prorata'?null:optL(v==='stock'?'stock':'affaire'));corps.Affectation=o?o.id:null;
+    }else{
+      const lib=v==='stock'?'Stock':v==='prorata'?'réparti au prorata du montant':nAff(v);
+      corps['Précisions']=[...String(l['Précisions']||'').split('\n').filter(x=>x.trim()&&!AFF_TAG.test(x)),'Affectation : '+lib].join('\n');
+    }
+    const r=await api(`/rows/table/${tL}/${l.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});majRow(tL,r);
+  }
+  const affs=[...new Set(Object.values(choix).filter(v=>/^\d+$/.test(v)).map(Number))],stock=Object.values(choix).includes('stock');
+  const opts=scC.par['Affectation']?.select_options||[],op=n=>opts.find(o=>norm(o.value).startsWith(n));
+  const type=affs.length>1||(affs.length&&stock)?'multi':affs.length?'affaire':'stock';
+  const o=type==='multi'?(op('multi')||op('affaire')):op(type);
+  const lib=type==='stock'?'Stock':affs.map(nAff).join(', ')+(stock?' + stock':'');
+  const com=[String(cf['Commentaire interne']||'').split('\n').filter(x=>!/^Affectation (complète|ligne par ligne)/.test(x)).join('\n').trim(),
+    `Affectation ${AFFX.mode==='complete'?'complète':'ligne par ligne'} saisie dans Akteev le ${dfr(auj())} : ${lib}.`].filter(Boolean).join('\n');
+  const corps={Affaire:affs,'Commentaire interne':com};if(o)corps.Affectation=o.id;
+  const r=await api(`/rows/table/${MODS.cf.t}/${cf.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});majRow(MODS.cf.t,r);
+  delete S.prom[MODS.commandes.t];
+  toast('Affectation enregistrée – '+lib);location.hash=`#/cf/${cf.id}`;
 }
 
 /* ---------- Documents de l'affaire : tous les PDF liés à une commande ----------
