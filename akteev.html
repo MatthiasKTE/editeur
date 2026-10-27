@@ -126,6 +126,7 @@ table.l tfoot td{font-weight:600;padding:10px 12px;background:#FAFBFC}
 .bloc h2 a{margin-left:auto;font-size:12.5px;font-weight:500}
 .ligneDb{display:flex;align-items:center;gap:10px;padding:9px 16px;border-bottom:1px solid #F0F2F6;cursor:pointer}
 .ligneDb:hover{background:var(--hover)}
+tr[data-ax]{cursor:pointer}tr[data-ax].sel td{background:#E8F0FE;font-weight:600}
 .ligneDb .x{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ligneDb .x small{color:var(--mut);margin-left:6px}
 /* ---------- Fiche ---------- */
@@ -279,7 +280,8 @@ const I={
  retour:'<path d="M15 18l-6-6 6-6"/>',euro:'<path d="M17 6.5A6.5 6.5 0 1 0 17 17.5M4 10h9M4 14h9"/>',alerte:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
  loupe:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
- stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'
+ stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+ nc:'<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/><path d="M12 8v5M12 16h.01"/>'
 };
 const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${s}>${I[n]||''}</svg>`;
 
@@ -291,7 +293,7 @@ const MODS={
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé']},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
-   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
+   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
    liees:[{nom:'Lignes',t:1261373,lien:'ARC',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'}]},
  bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut','PDF'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
@@ -301,11 +303,14 @@ const MODS={
  taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Fiche','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
+ nc:{t:1284881,nom:'Non-conformités',un:'non-conformité',fem:true,ico:'nc',grp:'Qualité',cols:['N° NC','Date de détection','Affaire','Client','Origine','Secteur','Fournisseur','Repère / pièce','Décision','Coût direct','Responsable','Statut'],
+   statut:'Statut',date:'Date de détection',ref:'Responsable',num:'N° NC',virt:'nc',requis:['Affaire','Origine','Secteur','Description'],cacheStatuts:['Annulée'],faitLe:'Soldée le',faitRe:/^sold/i,
+   ordreForm:['N° NC','Affaire','Date de détection','Origine','Secteur','Fournisseur','Repère / pièce','Quantité','Description','Décision','Plan d\'action','Responsable','Échéance','Coût direct','Statut','Soldée le']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
    liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant','Affectation','Affaire'],ordre:'Ordre',ajout:true}],cacheStatuts:['Annulée']},
  consult:{t:1274941,nom:'Consultations SST',un:'consultation',fem:true,ico:'ddp',grp:'Achats',cols:['Réf','Devis','Fournisseur','Envoyée le','Réponse','Réponse le','Montant','Délai','Archivage','Dossier réponses'],statut:'Réponse',cacheStatuts:['Annulée']},
  fournisseurs:{t:1260241,nom:'Fournisseurs',un:'fournisseur',ico:'fournisseurs',grp:'Achats',cols:['Nom','Type','Pays','Contact','E-mail','Devise','Conditions de paiement'],
-   liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'}]},
+   liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'},{nom:'Non-conformités',mod:'nc',lien:'Fournisseur'}]},
  referents:{t:1260243,nom:'Référents',un:'référent',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Téléphone',"Référent d'affaire"],
    liees:[{nom:'Tâches',mod:'taches',lien:'Référent'},{nom:'Commandes',mod:'commandes',lien:'Référent KTE'}]},
  catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']},
@@ -316,7 +321,7 @@ const MOD_DE_TABLE={};for(const k in MODS)MOD_DE_TABLE[MODS[k].t]=k;
 /* Cibles des liens si l'API des champs n'est pas lisible avec le jeton (secours). */
 const LIENS_SECOURS={'Client':1260239,'Référent KTE':1260243,'Référent':1260243,'Demandeur':1260243,'Référent par défaut':1260243,'Commande':1260240,'Affaire':1260240,
  'Fournisseur':1260241,'Intervenant':1260241,'Type de tâche':1261119,'Devis':1261170,'ARC':1261374,'BL':1261382,'Commande fournisseur':1263348,'Tâche':1261600,
- 'Lignes de devis':1261171,'Consultations SST':1274941,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349};
+ 'Lignes de devis':1261171,'Consultations SST':1274941,'Non-conformités':1284881,'Responsable':1260243,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349};
 const RO_TYPES=new Set(['formula','lookup','rollup','count','created_on','last_modified','created_by','last_modified_by','autonumber','uuid','file','multiple_collaborators','ai','password']);
 
 /* ---------- Utilitaires ---------- */
@@ -444,8 +449,8 @@ function triVal(f,v){
    Direction et au Commercial). Les profils ci-dessous adaptent seulement l'affichage (menus, boutons). */
 const PROFILS={
  admin:{nom:'Direction / Admin',voir:'*',ecrire:'*',montants:true,admin:true},
- commercial:{nom:'Commercial',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','cf','fournisseurs','referents','catalogue'],ecrire:['devis','consult','commandes','arc','bl','clients','taches','synthese','cf','fournisseurs','referents','catalogue'],montants:true},
- atelier:{nom:'Atelier',voir:['taches','synthese','commandes','bl','cf','consult','fournisseurs','referents','catalogue'],ecrire:['taches','synthese','cf','consult','catalogue'],montants:true}
+ commercial:{nom:'Commercial',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','nc','cf','fournisseurs','referents','catalogue'],ecrire:['devis','consult','commandes','arc','bl','clients','taches','synthese','nc','cf','fournisseurs','referents','catalogue'],montants:true},
+ atelier:{nom:'Atelier',voir:['taches','synthese','nc','commandes','bl','cf','consult','fournisseurs','referents','catalogue'],ecrire:['taches','synthese','nc','cf','consult','catalogue'],montants:true}
 };
 let SESSION=null;try{SESSION=JSON.parse(localStorage.getItem('akteev_session')||'null')}catch(e){}
 if(PASSERELLE)SESSION=null; // le profil est relu auprès de la passerelle à chaque ouverture
@@ -463,7 +468,7 @@ function dessinerMenu(){
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
   if(STATS_ACTIF&&peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   let g='';
-  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`}
+  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`;if(k==='nc')h+=`<a class="it" data-m="ncsynth" href="#/ncsynth">${ico('stats')}Synthèse NC</a>`}
   if(estAdmin()&&!PASSERELLE){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
   h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
   $('side').innerHTML=h;
@@ -478,10 +483,13 @@ function majCompteurs(){
     e.textContent=n||'';e.title=k==='taches'?'tâches en retard':'en cours'}
   const eD=$('nb_ddp'),RD=S.rows[MODS.devis.t],RC=S.rows[MODS.consult.t];
   if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
+  const eN=$('nb_nc'),RN=S.rows[MODS.nc.t];if(eN&&RN){const n=RN.filter(ncOuverte).length;eN.textContent=n||'';eN.title=n+' non-conformité(s) à traiter'}
   majMoi();
 }
 const devisEnCours=r=>!/accept|refus|perdu|annul|sans suite|class/i.test(txt(r.Statut));
 const tacheOuverte=r=>!/^(fait|annul)/i.test(txt(r.Statut));
+const ncOuverte=r=>!/^(sold|annul)/i.test(txt(r.Statut));
+const faitRe=m=>m.faitRe||/^fait/i;
 function actif(k){document.querySelectorAll('#side a.it').forEach(a=>a.classList.toggle('on',a.dataset.m===k));document.body.classList.remove('menu')}
 
 /* ---------- Routage ---------- */
@@ -497,6 +505,7 @@ async function route(){
     if(k==='accueil')return await vueAccueil();
     if(k==='utilisateurs'&&estAdmin()&&!PASSERELLE)return await vueUtilisateurs();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
+    if(k==='ncsynth'&&peutVoir('nc'))return await vueNCSynth();
     if(k==='affecter'&&id&&peutVoir('cf')){actif('cf');return await vueAffecter(id)}
     if(k==='stats'&&STATS_ACTIF&&peutVoir('stats')&&montants())return await vueStats();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
@@ -511,7 +520,8 @@ async function vueAccueil(){
   document.title='Akteev – Tableau de bord';
   if(!S.rows[MODS.devis.t])chargement();
   const ch=k=>peutVoir(k)?charger(MODS[k].t).catch(()=>[]):Promise.resolve([]);
-  const [D,C,T,CS]=await Promise.all([ch('devis'),ch('commandes'),ch('taches'),ch('consult')]);
+  const [D,C,T,CS,NC]=await Promise.all([ch('devis'),ch('commandes'),ch('taches'),ch('consult'),ch('nc')]);
+  const ncO=NC.filter(ncOuverte),ncAn=NC.filter(r=>!/annul/i.test(txt(r.Statut))&&String(r['Date de détection']||'').startsWith(auj().slice(0,4)));
   const DDP=peutVoir('consult')?ddpListe(D,CS):[],dPr=DDP.filter(x=>x.etat==='complet').length,dPa=DDP.filter(x=>x.etat==='partiel').length;
   const vD=peutVoir('devis')&&montants(),vC=peutVoir('commandes'),vM=montants();
   const a=auj(),an=a.slice(0,4),mois=a.slice(0,7);
@@ -530,6 +540,7 @@ async function vueAccueil(){
    ${vC?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('commandes')}Commandes en cours</div><div class="val">${cEC.length}</div><div class="det">${vM?keur(cEC.reduce((s,r)=>s+(+r['Montant HT (€)']||0),0))+' HT à livrer':'à livrer'}</div></div>`:''}
    ${vC&&vM?`<div class="card kpi" onclick="location.hash='#/commandes'"><div class="lab">${ico('euro')}Commandé ce mois</div><div class="val">${keur(caMois)}</div><div class="det">${keur(caAn)} depuis le 1<sup>er</sup> janvier</div></div>`:''}
    ${peutVoir('consult')?`<div class="card kpi" onclick="location.hash='#/ddp'"><div class="lab">${ico('ddp')}DDP en cours</div><div class="val">${DDP.length}</div><div class="det">${dPr?`<b style="color:#15803D">${dPr} complète(s)</b>`:'0 complète'} · ${dPa} partielle(s)</div></div>`:''}
+   ${peutVoir('nc')?`<div class="card kpi" onclick="location.hash='#/ncsynth'"><div class="lab" style="${ncO.length?'color:#C2410C':''}">${ico('nc')}Non-conformités</div><div class="val">${ncO.length}</div><div class="det">à traiter · ${ncAn.length} en ${auj().slice(0,4)}${montants()?' · '+keur(ncAn.reduce((s,r)=>s+(+r['Coût direct']||0),0)):''}</div></div>`:''}
    <div class="card kpi" onclick="location.hash='#/taches?f=retard'"><div class="lab" style="${tRet.length?'color:var(--err)':''}">${ico('alerte')}Tâches en retard${MOI?' (moi)':''}</div><div class="val" style="${tRet.length?'color:var(--err)':''}">${tRet.length}</div><div class="det">${mesT.length} tâche(s) ouverte(s)</div></div>
    ${vD?`<div class="card kpi" onclick="location.hash='#/devis'"><div class="lab">${ico('arc')}Transformation ${an}</div><div class="val">${dAn.length?Math.round(dAcc/dAn.length*100):0} %</div><div class="det">${dAcc} accepté(s) / ${dAn.length} devis</div></div>`:''}
   </div>
@@ -635,6 +646,98 @@ function dessinerDDP(){
   document.querySelectorAll('.puce[data-e]').forEach(b=>b.onclick=()=>{DDPF=b.dataset.e;ls.set('ddpf',DDPF);dessinerDDP()});
   document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/devis/${tr.dataset.id}`);
   $('dMaj').onclick=async()=>{$('dMaj').disabled=true;try{await Promise.all([charger(MODS.devis.t,true),charger(MODS.consult.t,true)]);dessinerDDP();toast('DDP actualisées')}catch(e){toast('Échec : '+e.message,true);$('dMaj').disabled=false}};
+}
+
+/* ---------- Non-conformités ----------
+   Table « Non-conformités » 1284881 : une ligne par NC, reliée à une affaire (Commandes). Origine Client / Interne,
+   Secteur (Fraisage, Tournage, Fraisage fil, Montage, Contrôle, Sous-traitance, Traitement de surface, Fournisseur…),
+   Fournisseur (sous-traitant ou fournisseur en cause), Décision (Corriger / Refaire / Acceptée par le client),
+   Plan d'action, Coût direct, Statut Ouverte → En cours → Soldée (« Soldée le » rempli automatiquement).
+   N° NC-AA-NNN attribué à la création (compteur par année). Les NC « Annulée » sont exclues de la synthèse. */
+async function prochainNC(){
+  const R=await charger(MODS.nc.t,true),aa=auj().slice(2,4),re=new RegExp('^NC-'+aa+'-(\\d+)$');
+  const max=R.reduce((s,r)=>{const x=String(txt(r['N° NC'])).trim().match(re);return x?Math.max(s,+x[1]):s},0);
+  return`NC-${aa}-${String(max+1).padStart(3,'0')}`}
+let NCS=Object.assign({per:'an',orig:'',sel:null},ls.get('ncs',{}));
+async function vueNCSynth(){
+  document.title='Akteev – Synthèse NC';
+  if(!S.rows[MODS.nc.t])chargement();
+  await Promise.all([charger(MODS.nc.t),charger(MODS.commandes.t).catch(()=>[]),charger(MODS.fournisseurs.t).catch(()=>[])]);
+  enrichir('nc');dessinerNCSynth();
+}
+function ncDonnees(){
+  const a=auj(),an=a.slice(0,4),d12=(()=>{const d=new Date();d.setMonth(d.getMonth()-11,1);return new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,7)})();
+  return(S.rows[MODS.nc.t]||[]).filter(r=>!/annul/i.test(txt(r.Statut))).filter(r=>{const d=String(r['Date de détection']||'');
+    if(NCS.per==='an')return d.startsWith(an);if(NCS.per==='12m')return d.slice(0,7)>=d12;if(/^\d{4}$/.test(NCS.per))return d.startsWith(NCS.per);return true})
+    .filter(r=>!NCS.orig||txt(r.Origine)===NCS.orig)}
+function ncGroupes(L,cle,sansVide){
+  const m=new Map();
+  for(const r of L){let ks=cle(r);if(!ks.length){if(sansVide)continue;ks=['(non renseigné)']}
+    for(const k of ks){if(!m.has(k))m.set(k,{k,n:0,o:0,c:0,s:0,cout:0});const g=m.get(k);g.n++;const st=txt(r.Statut);
+      if(/^sold/i.test(st))g.s++;else if(/^en cours/i.test(st))g.c++;else g.o++;g.cout+=+r['Coût direct']||0}}
+  return[...m.values()].sort((x,y)=>y.n-x.n||y.cout-x.cout||x.k.localeCompare(y.k,'fr'))}
+const NC_AXES=[['client','Par client',r=>(r.Client||[]).map(txt)],['fournisseur','Par fournisseur / sous-traitant',r=>(r.Fournisseur||[]).map(txt),true],
+  ['secteur','Par secteur',r=>txt(r.Secteur)?[txt(r.Secteur)]:[]],['origine','Par origine',r=>txt(r.Origine)?[txt(r.Origine)]:[]],['decision','Par décision',r=>txt(r['Décision'])?[txt(r['Décision'])]:['(à décider)']]];
+function ncTableau(ax,titreBloc,L,cle,sansVide){
+  const G=ncGroupes(L,cle,sansVide),vm=montants();
+  return`<div class="card bloc"><h2>${ico('stats','width=17')}${titreBloc}<span class="mut" style="margin-left:auto;font-weight:400;font-size:12.5px">${G.length} ligne(s)</span></h2>
+   <div class="tw"><table class="l"><thead><tr><th style="cursor:default"></th><th class="n" style="cursor:default">NC</th><th class="n" style="cursor:default" title="Ouvertes">Ouv.</th><th class="n" style="cursor:default">En cours</th><th class="n" style="cursor:default">Soldées</th>${vm?'<th class="n" style="cursor:default">Coût direct</th>':''}</tr></thead><tbody>
+   ${G.map(g=>`<tr data-ax="${ax}" data-k="${esc(g.k)}" class="${NCS.sel&&NCS.sel.ax===ax&&NCS.sel.k===g.k?'sel':''}"><td>${esc(g.k)}</td><td class="n"><b>${g.n}</b></td><td class="n" style="${g.o?'color:#B91C1C;font-weight:600':''}">${g.o||'·'}</td><td class="n" style="${g.c?'color:#C2410C;font-weight:600':''}">${g.c||'·'}</td><td class="n" style="color:#15803D">${g.s||'·'}</td>${vm?`<td class="n">${g.cout?eur(g.cout):'·'}</td>`:''}</tr>`).join('')||`<tr><td colspan="6" class="mut" style="text-align:center;padding:18px">${sansVide?'Aucune NC liée à un fournisseur':'Aucune NC'}</td></tr>`}
+   </tbody></table></div></div>`}
+function ncGraphe(){
+  const R=(S.rows[MODS.nc.t]||[]).filter(r=>!/annul/i.test(txt(r.Statut))&&(!NCS.orig||txt(r.Origine)===NCS.orig)),ms=[];const d=new Date();d.setDate(1);
+  for(let i=11;i>=0;i--){const x=new Date(d.getFullYear(),d.getMonth()-i,1);ms.push(x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0'))}
+  const v=ms.map(m=>{const L=R.filter(r=>String(r['Date de détection']||'').startsWith(m));return[L.filter(r=>txt(r.Origine)==='Client').length,L.filter(r=>txt(r.Origine)!=='Client').length]});
+  const max=Math.max(1,...v.map(x=>x[0]+x[1])),W=560,H=150,b=W/12;
+  let s=`<svg viewBox="0 0 ${W} ${H+34}">`;[0,.5,1].forEach(p=>{const y=H-p*H*.9;s+=`<line x1="0" x2="${W}" y1="${y}" y2="${y}" stroke="#EEF0F4"/>`});
+  v.forEach(([c,i],j)=>{const hc=c/max*H*.9,hi=i/max*H*.9,X=j*b+b*.2,w=b*.6;
+    if(i)s+=`<rect x="${X}" y="${H-hi}" width="${w}" height="${hi}" rx="3" fill="#F59E0B"><title>${ms[j]} : ${i} interne(s)</title></rect>`;
+    if(c)s+=`<rect x="${X}" y="${H-hi-hc}" width="${w}" height="${hc}" rx="3" fill="#DC2626"><title>${ms[j]} : ${c} client(s)</title></rect>`;
+    if(c+i)s+=`<text x="${X+w/2}" y="${H-hi-hc-5}" text-anchor="middle" font-size="10.5" fill="#6B7385">${c+i}</text>`;
+    s+=`<text x="${X+w/2}" y="${H+16}" text-anchor="middle" font-size="11" fill="#6B7385">${new Date(ms[j]+'-01T00:00').toLocaleDateString('fr-FR',{month:'short'}).replace('.','')}</text>`});
+  return s+`</svg><div class="mut" style="font-size:12px;padding:0 16px 12px"><span style="display:inline-block;width:10px;height:10px;background:#DC2626;border-radius:2px"></span> Client &nbsp; <span style="display:inline-block;width:10px;height:10px;background:#F59E0B;border-radius:2px"></span> Interne</div>`}
+function dessinerNCSynth(){
+  const L=ncDonnees(),a=auj(),vm=montants();
+  const o=L.filter(r=>/^ouv/i.test(txt(r.Statut))||!txt(r.Statut)).length,c=L.filter(r=>/^en cours/i.test(txt(r.Statut))).length,s=L.filter(r=>/^sold/i.test(txt(r.Statut))),cout=L.reduce((x,r)=>x+(+r['Coût direct']||0),0);
+  const dl=s.filter(r=>r['Soldée le']&&r['Date de détection']).map(r=>(new Date(r['Soldée le'])-new Date(r['Date de détection']))/864e5),dm=dl.length?Math.round(dl.reduce((x,y)=>x+y,0)/dl.length):null;
+  const nCl=L.filter(r=>txt(r.Origine)==='Client').length;
+  const ans=[...new Set((S.rows[MODS.nc.t]||[]).map(r=>String(r['Date de détection']||'').slice(0,4)).filter(x=>/^\d{4}$/.test(x)))].sort().reverse();
+  const pers=[['an','Année '+a.slice(0,4)],['12m','12 derniers mois'],...ans.filter(x=>x!==a.slice(0,4)).map(x=>[x,'Année '+x]),['tout','Tout']];
+  // détail : NC du groupe choisi, sinon NC à traiter
+  const ax=NCS.sel&&NC_AXES.find(x=>x[0]===NCS.sel.ax);
+  const D=ax?L.filter(r=>{let k=ax[2](r);if(!k.length)k=[ax[0]==='decision'?'(à décider)':'(non renseigné)'];return k.includes(NCS.sel.k)}):(S.rows[MODS.nc.t]||[]).filter(r=>ncOuverte(r)&&(!NCS.orig||txt(r.Origine)===NCS.orig));
+  D.sort((x,y)=>String(y['Date de détection']||'').localeCompare(String(x['Date de détection']||''))||String(txt(y['N° NC'])).localeCompare(String(txt(x['N° NC']))));
+  let h=`<div class="entete"><h1>Synthèse des non-conformités</h1><span class="sous">${L.length} NC · ${pers.find(p=>p[0]===NCS.per)?.[1]||''}${NCS.orig?' · origine '+esc(NCS.orig):''}</span><div class="act">
+    <button class="btn" id="nMaj">${ico('cal')}Actualiser</button><a class="btn" href="#/nc">${ico('nc')}Toutes les NC</a>${peutEcrire('nc')?`<a class="btn p" href="#/nc/nouveau">${ico('plus')}Nouvelle NC</a>`:''}</div></div>
+  <div class="card" style="margin-bottom:16px"><div class="outils">
+    <div class="puces">${pers.map(([k,n])=>`<button class="puce ${NCS.per===k?'on':''}" data-p="${k}">${n}</button>`).join('')}</div>
+    <div class="puces">${[['','Toutes origines'],['Client','Client'],['Interne','Interne']].map(([k,n])=>`<button class="puce ${NCS.orig===k?'on':''}" data-or="${k}">${n}</button>`).join('')}</div>
+  </div></div>
+  <div class="kpis">
+   <div class="card kpi"><div class="lab">${ico('nc')}NC détectées</div><div class="val">${L.length}</div><div class="det">${nCl} client · ${L.length-nCl} interne</div></div>
+   <div class="card kpi" data-st="o"><div class="lab" style="${o?'color:#B91C1C':''}">${ico('alerte')}Ouvertes</div><div class="val" style="${o?'color:#B91C1C':''}">${o}</div><div class="det">plan d’action à définir</div></div>
+   <div class="card kpi"><div class="lab" style="${c?'color:#C2410C':''}">${ico('cal')}En cours de traitement</div><div class="val" style="${c?'color:#C2410C':''}">${c}</div><div class="det">${L.filter(r=>ncOuverte(r)&&r['Échéance']&&r['Échéance']<a).length} en retard sur l’échéance</div></div>
+   <div class="card kpi"><div class="lab" style="color:#15803D">${ico('taches')}Soldées</div><div class="val" style="color:#15803D">${s.length}</div><div class="det">${dm!=null?'traitement moyen '+dm+' j':'—'}</div></div>
+   ${vm?`<div class="card kpi"><div class="lab">${ico('euro')}Coût direct</div><div class="val">${keur(cout)}</div><div class="det">${L.length?'moyenne '+eur(cout/L.length)+' / NC':'—'}</div></div>`:''}
+  </div>
+  <div class="grille">
+   ${NC_AXES.map(x=>ncTableau(x[0],x[1],L,x[2],x[3])).join('')}
+   <div class="card bloc"><h2>${ico('stats','width=17')}NC par mois – 12 derniers mois</h2><div class="graph">${ncGraphe()}</div></div>
+  </div>
+  <div class="card" style="margin-top:16px"><div class="outils"><b style="font-size:14.5px">${ax?esc((x=>x[0].toUpperCase()+x.slice(1))(ax[1].replace(/^Par /,'')))+' : '+esc(NCS.sel.k)+` (${D.length})`:'NC à traiter (ouvertes et en cours) – '+D.length}</b>${ax?'<button class="btn" id="nTout" style="margin-left:auto">Revenir aux NC à traiter</button>':''}</div>
+   <div class="tw"><table class="l"><thead><tr>${['N° NC','Date','Affaire','Client','Origine','Secteur','Fournisseur','Description','Décision',...(vm?['Coût']:[]),'Échéance','Statut'].map(x=>`<th style="cursor:default" class="${x==='Coût'?'n':''}">${x}</th>`).join('')}</tr></thead><tbody>
+   ${D.map(r=>{const de=String(r.Description||'');return`<tr data-id="${r.id}"><td class="prim">${esc(txt(r['N° NC']))||'#'+r.id}</td><td>${dfr(r['Date de détection'])}</td><td>${esc(txt(r.Affaire))}</td><td>${esc(txt(r.Client))}</td><td>${badge(r.Origine)}</td><td>${badge(r.Secteur)}</td><td>${esc(txt(r.Fournisseur))}</td>
+     <td title="${esc(de)}">${esc(de.slice(0,60))}${de.length>60?'…':''}</td><td>${badge(r['Décision'])||'<span class="mut">—</span>'}</td>${vm?`<td class="n">${r['Coût direct']!=null&&r['Coût direct']!==''?eur(r['Coût direct']):'<span class="mut">—</span>'}</td>`:''}
+     <td class="${ncOuverte(r)&&r['Échéance']&&r['Échéance']<a?'retard':''}">${dfr(r['Échéance'])||'<span class="mut">—</span>'}</td><td>${badge(r.Statut)}</td></tr>`}).join('')}
+   </tbody></table></div>${D.length?'':'<div class="vide">Aucune NC</div>'}
+   <div class="plus mut" style="font-size:12.5px;text-align:left">Cliquez sur une ligne d’un tableau de synthèse pour afficher ses NC ci-dessus. Les NC annulées ne sont pas comptées. Client = client de l’affaire liée.</div></div>`;
+  $('main').innerHTML=h;
+  document.querySelectorAll('.puce[data-p]').forEach(b=>b.onclick=()=>{NCS.per=b.dataset.p;NCS.sel=null;ls.set('ncs',NCS);dessinerNCSynth()});
+  document.querySelectorAll('.puce[data-or]').forEach(b=>b.onclick=()=>{NCS.orig=b.dataset.or;NCS.sel=null;ls.set('ncs',NCS);dessinerNCSynth()});
+  document.querySelectorAll('tr[data-ax]').forEach(tr=>tr.onclick=()=>{const v={ax:tr.dataset.ax,k:tr.dataset.k};NCS.sel=NCS.sel&&NCS.sel.ax===v.ax&&NCS.sel.k===v.k?null:v;ls.set('ncs',NCS);dessinerNCSynth();$('nTout')?.scrollIntoView({behavior:'smooth',block:'center'})});
+  document.querySelectorAll('tr[data-id]').forEach(tr=>tr.onclick=()=>location.hash=`#/nc/${tr.dataset.id}`);
+  if($('nTout'))$('nTout').onclick=()=>{NCS.sel=null;ls.set('ncs',NCS);dessinerNCSynth()};
+  $('nMaj').onclick=async()=>{$('nMaj').disabled=true;try{await Promise.all([charger(MODS.nc.t,true),charger(MODS.commandes.t,true)]);enrichir('nc');dessinerNCSynth();toast('Synthèse actualisée')}catch(e){toast('Échec : '+e.message,true);$('nMaj').disabled=false}};
 }
 
 /* ---------- Comparatif des sous-traitants d'un devis (bouton « Comparer les SST » de la fiche devis) ----------
@@ -985,6 +1088,11 @@ const VIRT={taches(rows,sc){
     r['Délai']=r['Échéance']||null;
     r['Pièces']=piecesTache(r,cde,SY,DV,LD);
     r['Fiche']=fichesNotes(r.Notes)}
+},
+nc(rows,sc){
+  const C=new Map((S.rows[MODS.commandes.t]||[]).map(c=>[c.id,c]));
+  if(!sc.par['Client']){const x={id:'v_Client',name:'Client',virt:true,read_only:true,type:'link_row',link_row_table_id:MODS.clients.t};sc.fields.push(x);sc.par['Client']=x}
+  for(const r of rows){const cl=new Map();ids(r.Affaire).forEach(i=>(C.get(i)?.Client||[]).forEach(x=>cl.set(x.id,x)));r['Client']=[...cl.values()]}
 }};
 /* Fiches atelier d'une tâche : liens SharePoint écrits dans les Notes par la compétence « fiches atelier »
    (FA_<affaire>_<Métier>.pdf, RC_…, PC_…). Renvoie [{value:libellé court, url, fichier}]. */
@@ -1142,7 +1250,7 @@ function brancherKanban(k){
 }
 async function changerStatut(k,row,oid,val){
   const m=MODS[k],corps={[m.statut]:oid>0?oid:val};
-  if(m.faitLe&&sch(m.t).par[m.faitLe]&&/^fait/i.test(val)&&!row[m.faitLe])corps[m.faitLe]=auj();
+  if(m.faitLe&&sch(m.t).par[m.faitLe]&&faitRe(m).test(val)&&!row[m.faitLe])corps[m.faitLe]=auj();
   const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
   majRow(m.t,r);majCompteurs();toast(`${titre(m.t,r)} → ${val}`);return r;
 }
@@ -1167,6 +1275,8 @@ async function vueFiche(k,id){
       if(f.type==='link_row'){const cible=S.rows[f.link_row_table_id]||await charger(f.link_row_table_id).catch(()=>[]);const x=cible.find(r=>r.id==v);SALE.draft[n]=[{id:+v,value:x?titre(f.link_row_table_id,x):'#'+v}]}
       else SALE.draft[n]=v}
     if(m.statut&&sc.par[m.statut]&&!SALE.draft[m.statut]){const o=sc.par[m.statut].select_options?.[0];if(o)SALE.draft[m.statut]=o}
+    if(k==='nc'){if(!SALE.draft['Date de détection'])SALE.draft['Date de détection']=auj();
+      if(MOI&&!SALE.draft['Responsable']){const me=(S.rows[MODS.referents.t]||[]).find(r=>r.id===MOI);if(me)SALE.draft['Responsable']=[{id:MOI,value:titre(MODS.referents.t,me)}]}}
     if(k==='taches'&&MOI&&!SALE.draft['Référent']){const R=S.rows[MODS.referents.t]||[];const me=R.find(r=>r.id===MOI);if(me)SALE.draft['Référent']=[{id:MOI,value:titre(MODS.referents.t,me)}]}
   }
   dessinerFiche();
@@ -1178,6 +1288,7 @@ function dessinerFiche(){
   document.title='Akteev – '+nom;
   const ecr=peutEcrire(k);
   const ed=ecr?sc.fields.filter(f=>!f.virt&&!masque(f.name)&&!RO_TYPES.has(f.type)&&!f.read_only):[];
+  if(m.ordreForm){const o=n=>{const i=m.ordreForm.indexOf(n);return i<0?999:i};ed.sort((x,y)=>o(x.name)-o(y.name))}
   const ro=sc.fields.filter(f=>!f.virt&&!masque(f.name)&&(!ecr||RO_TYPES.has(f.type)||f.read_only));
   const stF=m.statut&&sc.par[m.statut];
   const lienEditeur=m.editeur&&!nouveau&&row[m.num]?`${EDITEUR}?${m.editeur}=${encodeURIComponent(txt(row[m.num]))}`:null;
@@ -1215,7 +1326,7 @@ function dessinerFiche(){
   barre();
 }
 function cote(k,row,nouveau){
-  if(nouveau)return`<div class="card"><h3>Création</h3><div class="c mut">Renseignez les champs puis « Enregistrer ».${MODS[k].requis?'<br><br>Obligatoires : '+MODS[k].requis.join(', ')+'.':''}</div></div>`;
+  if(nouveau)return`<div class="card"><h3>Création</h3><div class="c mut">Renseignez les champs puis « Enregistrer ».${MODS[k].requis?'<br><br>Obligatoires : '+MODS[k].requis.join(', ')+'.':''}${k==='nc'?'<br><br>Le N° NC (NC-'+auj().slice(2,4)+'-001…) est attribué automatiquement à l’enregistrement s’il est laissé vide. Photos et documents : champ « Pièces jointes », dans Baserow.':''}</div></div>`;
   const liens=[];
   for(const [n,v] of Object.entries(row)){if(k==='commandes'&&/pdf|excel/i.test(n))continue;if(typeof v==='string'&&/^https?:\/\//.test(v)){const lab=/sharepoint|dossier/i.test(n)?['dossier',n]:/pdf/i.test(n)?['pdf',n]:['ext',n];liens.push(`<a class="lien" href="${esc(v)}" target="_blank">${ico(lab[0])}${esc(lab[1])}</a>`)}}
   let h=k==='commandes'?`<div class="card"><h3>Documents de l’affaire</h3><div id="docsAff"><div class="c mut">Recherche des documents…</div></div></div>`:'';
@@ -1332,7 +1443,8 @@ async function enregistrer(){
   const manq=(m.requis||[]).filter(n=>sc.par[n]&&!txt(val(n)));
   if(manq.length){toast('Champs obligatoires : '+manq.join(', '),true);return}
   const corps={};for(const [n,v] of Object.entries(SALE.draft)){const f=sc.par[n];if(f)corps[n]=versApi(f,v)}
-  if(m.faitLe&&sc.par[m.faitLe]&&m.statut in SALE.draft&&/^fait/i.test(txt(SALE.draft[m.statut]))&&!val(m.faitLe))corps[m.faitLe]=auj();
+  if(m.faitLe&&sc.par[m.faitLe]&&m.statut in SALE.draft&&faitRe(m).test(txt(SALE.draft[m.statut]))&&!val(m.faitLe))corps[m.faitLe]=auj();
+  if(k==='nc'&&!SALE.id&&!txt(corps['N° NC']))corps['N° NC']=await prochainNC();
   $('beEnr').disabled=true;
   try{
     const r=SALE.id?await api(`/rows/table/${t}/${SALE.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)})
