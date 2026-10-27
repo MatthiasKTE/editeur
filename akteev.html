@@ -2004,6 +2004,14 @@ const versB64=b=>new Promise((ok,ko)=>{const f=new FileReader();f.onload=()=>ok(
 function idMailSource(v){const s=txt(v).trim();if(!s)return null;
   try{const u=new URL(s);const p=u.searchParams.get('ItemID')||u.searchParams.get('itemid');if(p)return p;const m=u.pathname.match(/\/id\/([^/?#]+)/);if(m)return decodeURIComponent(m[1])}catch(e){}
   return /^[A-Za-z0-9+/=_-]{60,}$/.test(s)?s:null}
+/* « Mail source » écrit par le chiffrage : « boîte@ | <Internet-Message-ID> » (ex. « kte@ | <PAX…@…outlook.com> ») */
+function srcMail(v){const s=txt(v).trim();const m=s.match(/<[^<>\s]+@[^<>\s]+>/);if(!m)return null;
+  let box=(s.split('|')[0]||'').trim();if(/@$/.test(box))box+='kte-fr.com';if(!/^[^@\s|<>]+@[\w.-]+\.\w+$/.test(box))box='';
+  return{id:m[0],box}}
+async function mailParId(j,base,id){
+  const r=await graph(j,`${base}/messages?$filter=internetMessageId eq '${encodeURIComponent(id.replace(/'/g,"''"))}'&$select=id,subject,from,toRecipients,ccRecipients,isDraft,receivedDateTime&$top=10`);
+  const L=(r?.value||[]).filter(m=>!m.isDraft);
+  return L.find(m=>!/@kte-fr\.com$/i.test(m.from?.emailAddress?.address||''))||L[0]||null}
 async function retrouverMail(j,ews){
   const rest=ews.replace(/\//g,'-').replace(/\+/g,'_');
   try{return await graph(j,`/me/messages/${encodeURIComponent(rest)}?$select=id,subject,from,toRecipients`)}catch(e){if(e.status!==404&&e.status!==400)throw e}
@@ -2060,9 +2068,16 @@ async function repondreClient(row,forcer){
     const dl=it['@microsoft.graph.downloadUrl'];if(!dl)throw new Error('PDF introuvable dans SharePoint');
     const pdf=await (await fetch(dl)).blob();
     // 2. Brouillon : réponse au mail d'origine, sinon nouveau mail au client
-    let brouillon=null,mode='nouveau';
-    const ews=idMailSource(row['Mail source']);
-    if(ews){try{const orig=await retrouverMail(j,ews);if(orig){brouillon=await graph(j,`/me/messages/${encodeURIComponent(orig.id)}/createReply`,{method:'POST',body:'{}'});mode='réponse'}}
+    let brouillon=null,mode='nouveau',partage=null;
+    const ews=idMailSource(row['Mail source']),src=srcMail(row['Mail source']);
+    const repondreA=async orig=>{brouillon=await graph(j,`/me/messages/${encodeURIComponent(orig.id)}/createReply`,{method:'POST',body:'{}'});mode='réponse'};
+    if(src){try{const orig=await mailParId(j,'/me',src.id);if(orig)await repondreA(orig)}catch(e){console.warn('Mail source',e)}
+      // mail reçu seulement dans une autre boîte (ex. kte@) : on le lit là-bas pour répondre depuis sa propre boîte
+      if(!brouillon&&src.box&&src.box.toLowerCase()!==String(MSAL?.getActiveAccount()?.username||'').toLowerCase()){
+        try{const j2=await jetonGraph(['Mail.Read.Shared']);const base=`/users/${encodeURIComponent(src.box)}`;const o=await mailParId(j2,base,src.id);
+          if(o)partage=await graph(j2,`${base}/messages/${encodeURIComponent(o.id)}?$select=subject,from,toRecipients,ccRecipients,body,receivedDateTime`)}
+        catch(e){console.warn('Mail source (boîte '+src.box+')',e)}}}
+    else if(ews){try{const orig=await retrouverMail(j,ews);if(orig)await repondreA(orig)}
       catch(e){console.warn('Mail source',e)}}
     if(brouillon){
       const internes=(brouillon.toRecipients||[]).every(r=>/@kte-fr\.com$/i.test(r.emailAddress?.address||''));
@@ -2070,9 +2085,19 @@ async function repondreClient(row,forcer){
       const html=d.body.contentType==='html'?d.body.content:`<pre>${esc(d.body.content)}</pre>`;
       const corps=/<body[^>]*>/i.test(html)?html.replace(/<body[^>]*>/i,m=>m+texteReponse(row,cli,ref)):texteReponse(row,cli,ref)+html;
       const maj={body:{contentType:'HTML',content:corps}};
-      if(!/D\d{6}/.test(d.subject||''))maj.subject=`${d.subject||'RE:'} – Offre KTE ${num}`;
+      if(!(d.subject||'').includes(num))maj.subject=`${d.subject||'RE:'} – ${num}`;
       if(internes&&mailCli.length)maj.toRecipients=mailCli.map(a=>({emailAddress:{address:a}}));
       await graph(j,`/me/messages/${brouillon.id}`,{method:'PATCH',body:JSON.stringify(maj)});
+    }else if(partage){
+      // réponse rédigée dans sa propre boîte au mail reçu sur la boîte partagée : même objet (RE: … – n°), même expéditeur, mail d'origine cité
+      const de=partage.from?.emailAddress||{},adr=a=>(a||[]).map(r=>esc(r.emailAddress?.name||r.emailAddress?.address||'')).join('; ');
+      const obj=(partage.subject||'').replace(/^\s*(re|tr|fw|fwd)\s*:\s*/i,'');
+      const cite=`<hr style="border:none;border-top:1px solid #E1E1E1"><div style="font-family:Calibri,Arial,sans-serif;font-size:11pt"><b>De :</b> ${esc(de.name||'')} &lt;${esc(de.address||'')}&gt;<br><b>Envoyé :</b> ${esc(new Date(partage.receivedDateTime).toLocaleString('fr-FR'))}<br><b>À :</b> ${adr(partage.toRecipients)}${partage.ccRecipients?.length?`<br><b>Cc :</b> ${adr(partage.ccRecipients)}`:''}<br><b>Objet :</b> ${esc(partage.subject||'')}</div><br>`;
+      const orig=partage.body?.contentType==='html'?(partage.body.content.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1]??partage.body.content):`<pre>${esc(partage.body?.content||'')}</pre>`;
+      const a=de.address&&!/@kte-fr\.com$/i.test(de.address)?[de.address]:mailCli;
+      brouillon=await graph(j,'/me/messages',{method:'POST',body:JSON.stringify({subject:`RE: ${obj}${obj.includes(num)?'':' – '+num}`,
+        body:{contentType:'HTML',content:texteReponse(row,cli,ref)+cite+orig},toRecipients:a.map(x=>({emailAddress:{address:x}}))})});
+      mode='réponse';
     }else{
       brouillon=await graph(j,'/me/messages',{method:'POST',body:JSON.stringify({subject:`Offre KTE ${num}${txt(row.Objet)?' – '+txt(row.Objet):''}`,
         body:{contentType:'HTML',content:texteReponse(row,cli,ref)},toRecipients:mailCli.map(a=>({emailAddress:{address:a}}))})});
