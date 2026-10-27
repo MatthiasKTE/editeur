@@ -301,7 +301,7 @@ const MODS={
  clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
    liees:[{nom:'Devis',mod:'devis',lien:'Client'},{nom:'Commandes',mod:'commandes',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
  taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Fiche','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
-   requis:['Libellé','Échéance','Référent'],cacheStatuts:['Annulée'],faitLe:'Fait le'},
+   requis:['Libellé','Échéance','Référent'],cacheStatuts:['Fait','Annulée'],solde:'Fait',faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
  nc:{t:1284881,nom:'Non-conformités',un:'non-conformité',fem:true,ico:'nc',grp:'Qualité',cols:['N° NC','Date de détection','Affaire','Client','Origine','Secteur','Fournisseur','Repère / pièce','Décision','Coût direct','Responsable','Statut'],
    statut:'Statut',date:'Date de détection',ref:'Responsable',num:'N° NC',virt:'nc',requis:['Affaire','Origine','Secteur','Description'],cacheStatuts:['Annulée'],faitLe:'Soldée le',faitRe:/^sold/i,
@@ -1152,6 +1152,8 @@ function filtrer(k){
     const st=m.statut?txt(r[m.statut]):'';
     if(E.st.length&&!E.st.includes(st))return false;
     if(!E.st.length&&!E.tout&&!recherche&&m.cacheStatuts?.includes(st))return false;
+    // statut soldé (tâche « Fait ») : retiré du tableau, même pendant une recherche, sauf demande explicite
+    if(m.solde&&st===m.solde&&!E.st.includes(st)&&!E.tout&&(E.cf||{})[m.statut]!==st)return false;
     if(E.retard&&!(tacheOuverte(r)&&r[m.date]&&r[m.date]<auj()))return false;
     if(E.encours&&!devisEnCours(r))return false;
     if(E.ref&&m.ref&&!ids(r[m.ref]).includes(+E.ref))return false;
@@ -1233,10 +1235,10 @@ function ligneFiltres(k,cols){
 }
 function kanban(k,L,opts){
   const m=MODS[k],sc=sch(m.t),E=etat(k),a=auj();
-  const cols=opts.filter(o=>E.st.length?E.st.includes(o.value):E.tout||!m.cacheStatuts?.includes(o.value));
+  const cols=opts.filter(o=>E.st.length?E.st.includes(o.value):E.tout||!m.cacheStatuts?.includes(o.value)||o.value===m.solde);
   const sec=m.cols.filter(c=>c!==sc.prim&&c!==m.statut&&sc.par[c]).slice(0,3);
-  return`<div class="kanban">${cols.map(o=>{const [bg,fg]=coul(o.color);const C=L.filter(r=>r[m.statut]?.id===o.id||txt(r[m.statut])===o.value);
-    return`<div class="kcol" data-o="${o.id}" data-v="${esc(o.value)}"><h3><span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span><span class="nb">${C.length}</span></h3>
+  return`<div class="kanban">${cols.map(o=>{const [bg,fg]=coul(o.color);const C=L.filter(r=>r[m.statut]?.id===o.id||txt(r[m.statut])===o.value);const zs=o.value===m.solde&&!C.length&&!E.tout&&!E.st.includes(o.value);
+    return`<div class="kcol" data-o="${o.id}" data-v="${esc(o.value)}"><h3><span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span><span class="nb">${zs?'':C.length}</span></h3>${zs?'<div class="mut" style="font-size:12px;padding:14px 6px;text-align:center;border:1px dashed var(--bord,#D1D5DB);border-radius:8px">Déposer ici pour solder la tâche</div>':''}
     ${C.slice(0,150).map(r=>{const d=m.date&&r[m.date];return`<div class="kcard" draggable="true" data-id="${r.id}" style="border-left-color:${fg}"><div class="t">${esc(titre(m.t,r))}</div><div class="m">${sec.map(c=>{const v=r[c];if(v==null||v===''||(Array.isArray(v)&&!v.length))return'';const f=sc.par[c];return`<span class="${c===m.date&&v<a&&tacheOuverte(r)?'retard':''}">${f.type==='date'?'📅 '+dfr(v):esc(txt(v)).slice(0,40)}</span>`}).join('')}${d&&!sec.includes(m.date)?`<span class="${d<a&&tacheOuverte(r)?'retard':''}">📅 ${dfr(d)}</span>`:''}</div></div>`}).join('')}</div>`}).join('')}</div>`;
 }
 function brancherKanban(k){
@@ -1252,7 +1254,7 @@ async function changerStatut(k,row,oid,val){
   const m=MODS[k],corps={[m.statut]:oid>0?oid:val};
   if(m.faitLe&&sch(m.t).par[m.faitLe]&&faitRe(m).test(val)&&!row[m.faitLe])corps[m.faitLe]=auj();
   const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
-  majRow(m.t,r);majCompteurs();toast(`${titre(m.t,r)} → ${val}`);return r;
+  majRow(m.t,r);majCompteurs();toast(m.solde&&val===m.solde?`${titre(m.t,r)} → ${val} : tâche soldée, retirée du tableau`:`${titre(m.t,r)} → ${val}`);return r;
 }
 function exporter(k){
   const m=MODS[k],cols=colonnes(k),L=trier(k,filtrer(k));
