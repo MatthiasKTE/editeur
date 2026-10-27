@@ -281,7 +281,8 @@ const I={
  loupe:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
  stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
- nc:'<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/><path d="M12 8v5M12 16h.01"/>'
+ nc:'<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/><path d="M12 8v5M12 16h.01"/>',
+ cle:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
 };
 const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${s}>${I[n]||''}</svg>`;
 
@@ -455,8 +456,10 @@ const PROFILS={
 let SESSION=null;try{SESSION=JSON.parse(localStorage.getItem('akteev_session')||'null')}catch(e){}
 if(PASSERELLE)SESSION=null; // le profil est relu auprès de la passerelle à chaque ouverture
 const PR=()=>PROFILS[SESSION?.profil]||(SESSION||PASSERELLE?PROFILS.atelier:PROFILS.admin);
-const peutVoir=k=>k==='utilisateurs'?(!!PASSERELLE&&!!PR().admin):(PR().voir==='*'||PR().voir.includes(k));
-const peutEcrire=k=>PR().ecrire==='*'||PR().ecrire.includes(k);
+/* Droits par onglet renvoyés par la passerelle (/moi/) : E = écriture, L = lecture, N = aucun (réglables dans « Droits d'accès »). */
+const DRS=()=>SESSION?.droits||null;
+const peutVoir=k=>k==='utilisateurs'||k==='droits'?(!!PASSERELLE&&!!PR().admin):DRS()&&k in DRS()?DRS()[k]!=='N':(PR().voir==='*'||PR().voir.includes(k));
+const peutEcrire=k=>k==='utilisateurs'?(!!PASSERELLE&&!!PR().admin):DRS()&&k in DRS()?DRS()[k]==='E':(PR().ecrire==='*'||PR().ecrire.includes(k));
 const montants=()=>PR().montants!==false;
 const estAdmin=()=>!!PR().admin;
 const masque=n=>!montants()&&estMonnaie(n);
@@ -468,7 +471,7 @@ function dessinerMenu(){
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
   if(STATS_ACTIF&&peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   let g='';
-  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`;if(k==='nc')h+=`<a class="it" data-m="ncsynth" href="#/ncsynth">${ico('stats')}Synthèse NC</a>`}
+  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`;if(k==='nc')h+=`<a class="it" data-m="ncsynth" href="#/ncsynth">${ico('stats')}Synthèse NC</a>`;if(k==='utilisateurs')h+=`<a class="it" data-m="droits" href="#/droits">${ico('cle')}Droits d’accès</a>`}
   if(estAdmin()&&!PASSERELLE){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
   h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
   $('side').innerHTML=h;
@@ -504,6 +507,7 @@ async function route(){
   try{
     if(k==='accueil')return await vueAccueil();
     if(k==='utilisateurs'&&estAdmin()&&!PASSERELLE)return await vueUtilisateurs();
+    if(k==='droits'&&peutVoir('droits'))return await vueDroits();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
     if(k==='ncsynth'&&peutVoir('nc'))return await vueNCSynth();
     if(k==='affecter'&&id&&peutVoir('cf')){actif('cf');return await vueAffecter(id)}
@@ -1185,7 +1189,7 @@ function dessinerListe(k){
   const neuf=!peutEcrire(k)?'':k==='bl'?`<button class="btn p" onclick="nouveauBL()">${ico('plus')}Nouveau BL</button>`:m.editeur||k==='commandes'?`<a class="btn p" href="${EDITEUR}" target="_blank" title="${k==='commandes'?'Une commande se crée depuis le devis (bouton « Commande reçue » de l’éditeur)':'Numérotation et mise en page dans l’éditeur'}">${ico('plus')}${k==='commandes'?'Commande reçue (éditeur)':nouv(m)}</a>`:`<a class="btn p" href="#/${k}/nouveau">${ico('plus')}${nouv(m)}</a>`;
   const refs=S.rows[MODS.referents.t]||[];
   let h=`<div class="entete"><h1>${m.nom}</h1><span class="sous">${L.length} sur ${R.length}</span><div class="act">
-    <button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>
+    ${k==='utilisateurs'&&peutVoir('droits')?`<a class="btn" href="#/droits">${ico('cle')}Droits d’accès par onglet</a>`:''}<button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>
   <div class="card"><div class="outils">
     <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
     ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
@@ -1302,6 +1306,7 @@ function dessinerFiche(){
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>`).join(''):''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn p" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn ${n>1?'p':''}" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
+    ${k==='utilisateurs'&&!nouveau&&peutVoir('droits')&&row['E-mail']?`<a class="btn p" href="#/droits?u=${encodeURIComponent(String(row['E-mail']).trim().toLowerCase())}">${ico('cle')}Droits d’accès</a>`:''}
     ${k==='cf'&&!nouveau?`<a class="btn" href="#/affecter/${row.id}" title="Affecter la commande à une affaire, au stock, à la maintenance, ou ligne par ligne">Affecter les lignes</a>`:''}
     ${k==='cf'&&!nouveau&&peutEcrire('cf')?`<button class="btn" id="bCfPdf" title="Crée le PDF de la commande et l’enregistre dans SharePoint (registre + dossier de chaque affaire)">${ico('pdf')}Éditer la commande</button><button class="btn p" id="bCfEnv" title="${row.PDF?'Mail au fournisseur avec la commande en pièce jointe':'Éditez d’abord la commande (PDF)'}" ${row.PDF?'':'disabled'}>${ico('mail')}Envoyer au fournisseur</button>`:''}
     ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
@@ -1961,7 +1966,7 @@ async function ouvrirSession(){
   const r=await fetch(PASSERELLE.replace(/\/+$/,'')+'/moi/',{headers:{Authorization:'Bearer '+await jetonAkteev()}});
   const j=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(r.status===401?'CONNEXION':(j.detail||('erreur '+r.status)));
-  SESSION={login:j.email,nom:j.nom,profil:j.profil};
+  SESSION={login:j.email,nom:j.nom,profil:j.profil,droits:j.droits&&typeof j.droits==='object'?j.droits:null};
   try{localStorage.setItem('akteev_session',JSON.stringify(SESSION));localStorage.removeItem('akteev_deconnecte')}catch(e){}
   $('toast').innerHTML='';for(const t in S.prom)delete S.prom[t];if(!location.hash||location.hash==='#/')location.hash='#/accueil';lancer()}
 function ecranConnexionMS(message){
@@ -2239,6 +2244,76 @@ function deconnecter(){
       Object.keys(localStorage).filter(k=>k.startsWith('msal.')||k.includes(MS_CLIENT)).forEach(k=>localStorage.removeItem(k))}}catch(e){}
   location.href=location.pathname;
 }
+/* ---------- Droits d'accès par onglet (administrateur, avec la passerelle) ----------
+   Table Baserow « Droits Akteev » : une ligne par profil (Nom = Commercial / Atelier) et une par personne ayant
+   des exceptions (Nom = e-mail). Droits = « devis:E nc:L stats:N … ». La passerelle applique ces niveaux (cache 1 min) ;
+   les règles fixes (colonnes cachées à l'atelier, fournisseurs Chine) restent en plus. Direction / Admin : tout. */
+const T_DROITS=1285300;
+const ONGLETS_ACCES=[
+ ['devis','Devis','avec les lignes de devis'],['consult','Consultations SST / DDP','avec les prix SST'],['commandes','Commandes',''],
+ ['arc','ARC','avec les lignes'],['bl','Bons de livraison','avec les lignes'],['clients','Clients',''],['taches','Tâches',''],
+ ['synthese','Synthèse pièces',''],['nc','Non-conformités','et Synthèse NC'],['cf','Commandes fournisseurs','avec les lignes'],
+ ['fournisseurs','Fournisseurs',''],['referents','Référents','nécessaire aux tâches et à « Je suis »'],['catalogue','Catalogue de tâches',''],['stats','Statistiques','onglet pas encore réactivé']];
+const PROFILS_ACCES=[['commercial','Commercial'],['atelier','Atelier']];
+/* Niveaux par défaut (= ceux codés dans la passerelle quand rien n'est réglé). */
+const DEF_ACCES={commercial:{devis:'E',consult:'E',commandes:'E',arc:'E',bl:'E',clients:'E',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'E',referents:'E',catalogue:'E',stats:'N'},
+ atelier:{devis:'N',consult:'E',commandes:'L',arc:'N',bl:'L',clients:'L',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'L',referents:'L',catalogue:'E',stats:'N'}};
+const NIV={E:'Écriture',L:'Lecture',N:'Aucun'};
+const lireNiv=s=>{const o={};for(const m of String(s||'').replace(/\\/g,'').matchAll(/([a-z]+)\s*[:=]\s*([ELN])/gi)){const k=m[1].toLowerCase();if(ONGLETS_ACCES.some(x=>x[0]===k))o[k]=m[2].toUpperCase()}return o};
+const ecrireNiv=o=>ONGLETS_ACCES.filter(([k])=>o[k]).map(([k])=>k+':'+o[k]).join(' ');
+const profilCle=r=>({'Direction / Admin':'admin','Commercial':'commercial','Atelier':'atelier'})[txt(r?.Profil)]||null;
+const nomDroit=r=>String(r?.Nom||'').trim().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+let BR_ACCES=null; // brouillon {profils:{commercial:{…},atelier:{…}}, personnes:{email:{…}}, u:email sélectionné}
+async function vueDroits(){
+  document.title='Akteev – Droits d’accès';actif('droits');
+  if(!S.rows[T_DROITS]||!S.rows[MODS.utilisateurs.t])chargement();
+  const [D,U]=await Promise.all([tout(T_DROITS),charger(MODS.utilisateurs.t)]);S.rows[T_DROITS]=D;
+  const p=params();
+  if(!BR_ACCES||p.u){const b={profils:{},personnes:{}};
+    for(const [k] of PROFILS_ACCES){const r=D.find(x=>nomDroit(x)===k);b.profils[k]={...DEF_ACCES[k],...lireNiv(r?.Droits)}}
+    for(const r of D){const n=nomDroit(r);if(n.includes('@'))b.personnes[n]=lireNiv(r.Droits)}
+    b.u=p.u||BR_ACCES?.u||'';BR_ACCES=b;BR_ACCES.orig=JSON.stringify({profils:b.profils,personnes:b.personnes})}
+  dessinerDroits(U)}
+function dessinerDroits(U){
+  const B=BR_ACCES,pers=(U||[]).filter(r=>String(r['E-mail']||'').trim()&&profilCle(r)&&profilCle(r)!=='admin').sort((a,b)=>txt(a.Nom).localeCompare(txt(b.Nom)));
+  const modif=JSON.stringify({profils:B.profils,personnes:B.personnes})!==B.orig;
+  const sel=(nom,v,vide)=>`<select data-acc="${nom}" style="border:1px solid var(--trait);border-radius:6px;padding:4px 6px;font-size:13px;background:${v==='E'?'#DCFCE7':v==='L'?'#E0ECFF':v==='N'?'#FEE2E2':'#fff'}">${vide?`<option value="">${esc(vide)}</option>`:''}${Object.entries(NIV).map(([k,l])=>`<option value="${k}" ${v===k?'selected':''}>${l}</option>`).join('')}</select>`;
+  const u=pers.find(r=>String(r['E-mail']).trim().toLowerCase()===B.u)||null,pu=u?profilCle(u):null,ex=u?(B.personnes[B.u]||{}):{};
+  const nbEx=e=>Object.keys(B.personnes[e]||{}).length;
+  let h=`<div class="entete"><a class="btn" href="#/utilisateurs" title="Retour aux utilisateurs">${ico('retour')}</a><h1>Droits d’accès</h1><span class="sous">par onglet et par profil</span><div class="act">
+    ${modif?`<button class="btn" id="dAnn">Annuler</button>`:''}<button class="btn p" id="dEnr" ${modif?'':'disabled'}>Enregistrer</button></div></div>
+  <p class="mut" style="margin:-6px 0 14px;font-size:13px">Direction / Admin a toujours accès à tout. Les changements s’appliquent dans la minute ; chacun voit son menu mis à jour à la prochaine ouverture d’Akteev.
+   Règles fixes conservées quel que soit le réglage : l’atelier ne voit pas les montants des commandes, seulement Code / Entreprise des clients, ni les prix des fournisseurs en Chine.</p>
+  <div class="card"><h2 style="font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait)">Par profil</h2>
+   <table class="l" id="dProfils"><thead><tr><th>Onglet</th>${PROFILS_ACCES.map(([,l])=>`<th>${l}</th>`).join('')}</tr></thead><tbody>
+   ${ONGLETS_ACCES.map(([k,l,n])=>`<tr style="cursor:default"><td><b>${l}</b>${n?` <span class="mut" style="font-size:12px">· ${esc(n)}</span>`:''}</td>${PROFILS_ACCES.map(([p])=>`<td>${sel('p|'+p+'|'+k,B.profils[p][k])}</td>`).join('')}</tr>`).join('')}
+   </tbody></table></div>
+  <div class="card" style="margin-top:16px"><h2 style="font-size:14.5px;margin:0;padding:14px 16px;border-bottom:1px solid var(--trait)">Exceptions pour une personne</h2>
+   <div style="padding:12px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="mut" style="font-size:13px">Personne</label>
+    <select id="dU" style="border:1px solid var(--trait);border-radius:6px;padding:6px 8px;font-size:13.5px;min-width:260px"><option value="">— choisir —</option>${pers.map(r=>{const e=String(r['E-mail']).trim().toLowerCase();return`<option value="${esc(e)}" ${e===B.u?'selected':''}>${esc(txt(r.Nom))} · ${esc(txt(r.Profil))}${nbEx(e)?` · ${nbEx(e)} exception(s)`:''}${r.Actif?'':' · inactif'}</option>`}).join('')}</select>
+    ${u&&Object.keys(ex).length?`<button class="btn" id="dRaz">Retirer ses exceptions</button>`:''}</div>
+   ${u?`<table class="l" id="dPers"><thead><tr><th>Onglet</th><th>Profil ${esc(txt(u.Profil))}</th><th>Exception</th><th>Résultat</th></tr></thead><tbody>
+    ${ONGLETS_ACCES.map(([k,l])=>{const vp=B.profils[pu]?.[k]||'N',ve=ex[k]||'',r=ve||vp;return`<tr style="cursor:default"><td><b>${l}</b></td><td class="mut">${NIV[vp]}</td><td>${sel('u|'+B.u+'|'+k,ve,'Comme le profil')}</td><td><span class="badge" style="background:${r==='E'?'#DCFCE7':r==='L'?'#E0ECFF':'#FEE2E2'};color:${r==='E'?'#15803D':r==='L'?'#1D4ED8':'#B91C1C'}">${NIV[r]}</span></td></tr>`}).join('')}
+   </tbody></table>`:pers.length?'':'<div class="vide mut" style="padding:16px">Aucun utilisateur Commercial ou Atelier.</div>'}</div>`;
+  $('main').innerHTML=h;
+  document.querySelectorAll('[data-acc]').forEach(s=>s.onchange=()=>{const [t,a,k]=s.dataset.acc.split('|');
+    if(t==='p')B.profils[a][k]=s.value;else{const o=B.personnes[a]=B.personnes[a]||{};if(s.value)o[k]=s.value;else delete o[k]}
+    dessinerDroits(U)});
+  $('dU').onchange=e=>{B.u=e.target.value;dessinerDroits(U)};
+  if($('dRaz'))$('dRaz').onclick=()=>{B.personnes[B.u]={};dessinerDroits(U)};
+  if($('dAnn'))$('dAnn').onclick=()=>{BR_ACCES=null;vueDroits()};
+  $('dEnr').onclick=()=>enregistrerDroits(U);
+}
+async function enregistrerDroits(U){
+  const B=BR_ACCES,D=S.rows[T_DROITS]||[],b=$('dEnr');b.disabled=true;b.textContent='Enregistrement…';
+  const voulu=[...PROFILS_ACCES.map(([k,l])=>[k,l,ecrireNiv(B.profils[k])]),...Object.entries(B.personnes).map(([e,o])=>[e,e,ecrireNiv(o)])];
+  try{let n=0;
+    for(const [cle,nom,droits] of voulu){const r=D.find(x=>nomDroit(x)===cle);
+      if(r){if(String(r.Droits||'').trim()===droits)continue;await api(`/rows/table/${T_DROITS}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({Droits:droits})});n++}
+      else if(droits){await api(`/rows/table/${T_DROITS}/?user_field_names=true`,{method:'POST',body:JSON.stringify({Nom:nom,Droits:droits})});n++}}
+    toast(n?'Droits enregistrés : actifs dans la minute':'Aucun changement');BR_ACCES=null;await vueDroits()}
+  catch(e){toast('Enregistrement impossible : '+e.message,true);b.disabled=false;b.textContent='Enregistrer'}}
+
 /* ---------- Page Utilisateurs (administrateur) ---------- */
 let BROUILLON_ACCES=null;
 const DROITS=[
