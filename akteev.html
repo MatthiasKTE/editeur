@@ -292,7 +292,7 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
    liees : listes affichées en onglets dans la fiche (table + champ lien vers la fiche). */
 const MODS={
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
-   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé']},
+   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé'],solde:['Accepté','Refusé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
    liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
@@ -1147,9 +1147,12 @@ async function vueListe(k){
   if(m.ref)charger(MODS.referents.t).catch(()=>{});
   dessinerListe(k);
 }
+// statut(s) qui soldent / clôturent : retirés de la liste même en recherche (tâche Fait, devis Accepté / Refusé)
+function estSolde(m,v){return !!m.solde&&(Array.isArray(m.solde)?m.solde.includes(v):m.solde===v)}
+function soldeMots(m){const v=m.soldeVerbe||'solder';return{v,pp:v.replace(/er$/,'é')+(m.fem?'e':'')}}
 function filtrer(k){
   enrichir(k);
-  // une recherche ou un filtre de colonne retrouve aussi les éléments masqués (ex. devis acceptés / refusés)
+  // une recherche ou un filtre de colonne retrouve aussi les éléments masqués (ex. commandes soldées), sauf les statuts « solde »
   const recherche=!!(etat(k).q.trim()||nbCf(etat(k)));
   const m=MODS[k],E=etat(k),R=S.rows[m.t]||[],sc=sch(m.t),q=norm(E.q).split(/\s+/).filter(Boolean);
   return R.filter(r=>{
@@ -1157,7 +1160,7 @@ function filtrer(k){
     if(E.st.length&&!E.st.includes(st))return false;
     if(!E.st.length&&!E.tout&&!recherche&&m.cacheStatuts?.includes(st))return false;
     // statut soldé (tâche « Fait ») : retiré du tableau, même pendant une recherche, sauf demande explicite
-    if(m.solde&&st===m.solde&&!E.st.includes(st)&&!E.tout&&(E.cf||{})[m.statut]!==st)return false;
+    if(estSolde(m,st)&&!E.st.includes(st)&&!E.tout&&(E.cf||{})[m.statut]!==st)return false;
     if(E.retard&&!(tacheOuverte(r)&&r[m.date]&&r[m.date]<auj()))return false;
     if(E.encours&&!devisEnCours(r))return false;
     if(E.ref&&m.ref&&!ids(r[m.ref]).includes(+E.ref))return false;
@@ -1239,10 +1242,10 @@ function ligneFiltres(k,cols){
 }
 function kanban(k,L,opts){
   const m=MODS[k],sc=sch(m.t),E=etat(k),a=auj();
-  const cols=opts.filter(o=>E.st.length?E.st.includes(o.value):E.tout||!m.cacheStatuts?.includes(o.value)||o.value===m.solde);
+  const cols=opts.filter(o=>E.st.length?E.st.includes(o.value):E.tout||!m.cacheStatuts?.includes(o.value)||estSolde(m,o.value));
   const sec=m.cols.filter(c=>c!==sc.prim&&c!==m.statut&&sc.par[c]).slice(0,3);
-  return`<div class="kanban">${cols.map(o=>{const [bg,fg]=coul(o.color);const C=L.filter(r=>r[m.statut]?.id===o.id||txt(r[m.statut])===o.value);const zs=o.value===m.solde&&!C.length&&!E.tout&&!E.st.includes(o.value);
-    return`<div class="kcol" data-o="${o.id}" data-v="${esc(o.value)}"><h3><span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span><span class="nb">${zs?'':C.length}</span></h3>${zs?'<div class="mut" style="font-size:12px;padding:14px 6px;text-align:center;border:1px dashed var(--bord,#D1D5DB);border-radius:8px">Déposer ici pour solder la tâche</div>':''}
+  return`<div class="kanban">${cols.map(o=>{const [bg,fg]=coul(o.color);const C=L.filter(r=>r[m.statut]?.id===o.id||txt(r[m.statut])===o.value);const zs=estSolde(m,o.value)&&!C.length&&!E.tout&&!E.st.includes(o.value);
+    return`<div class="kcol" data-o="${o.id}" data-v="${esc(o.value)}"><h3><span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span><span class="nb">${zs?'':C.length}</span></h3>${zs?`<div class="mut" style="font-size:12px;padding:14px 6px;text-align:center;border:1px dashed var(--bord,#D1D5DB);border-radius:8px">Déposer ici pour ${soldeMots(m).v} ${m.fem?'la':'le'} ${esc(m.un)}</div>`:''}
     ${C.slice(0,150).map(r=>{const d=m.date&&r[m.date];return`<div class="kcard" draggable="true" data-id="${r.id}" style="border-left-color:${fg}"><div class="t">${esc(titre(m.t,r))}</div><div class="m">${sec.map(c=>{const v=r[c];if(v==null||v===''||(Array.isArray(v)&&!v.length))return'';const f=sc.par[c];return`<span class="${c===m.date&&v<a&&tacheOuverte(r)?'retard':''}">${f.type==='date'?'📅 '+dfr(v):esc(txt(v)).slice(0,40)}</span>`}).join('')}${d&&!sec.includes(m.date)?`<span class="${d<a&&tacheOuverte(r)?'retard':''}">📅 ${dfr(d)}</span>`:''}</div></div>`}).join('')}</div>`}).join('')}</div>`;
 }
 function brancherKanban(k){
@@ -1258,7 +1261,7 @@ async function changerStatut(k,row,oid,val){
   const m=MODS[k],corps={[m.statut]:oid>0?oid:val};
   if(m.faitLe&&sch(m.t).par[m.faitLe]&&faitRe(m).test(val)&&!row[m.faitLe])corps[m.faitLe]=auj();
   const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
-  majRow(m.t,r);majCompteurs();toast(m.solde&&val===m.solde?`${titre(m.t,r)} → ${val} : tâche soldée, retirée du tableau`:`${titre(m.t,r)} → ${val}`);return r;
+  majRow(m.t,r);majCompteurs();toast(estSolde(m,val)?`${titre(m.t,r)} → ${val} : ${m.un} ${soldeMots(m).pp}, retiré${m.fem?'e':''} de la liste`:`${titre(m.t,r)} → ${val}`);return r;
 }
 function exporter(k){
   const m=MODS[k],cols=colonnes(k),L=trier(k,filtrer(k));
