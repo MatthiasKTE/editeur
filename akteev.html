@@ -2217,7 +2217,8 @@ async function fenetreBL(cde){
    - Tâche : type (catalogue → libellé « <affaire> – <type> » + référent par défaut), libellé, référent, échéance, statut,
      pièces de la synthèse (cases à cocher → lien « Synthèse commande »), notes. Une tâche est toujours rattachée à la commande.
    - Fiche atelier : métier Fraisage / Tournage / Fraisage Fil / Achats, tâche liée (existante ou nouvelle), délais, référent,
-     gravure (Non / Oui obligatoire pour la fabrication), observations facultatives.
+     gravure (Non / Oui obligatoire pour la fabrication), observations facultatives (cadre « Observations » toujours
+     imprimé, vide par défaut pour une remarque manuscrite du référent). Métier Contrôle ajouté le 28/10/2026.
      Lignes = TOUTES les lignes de l'affaire (lignes de l'ARC, sinon du devis, puis pièces de la synthèse non reprises),
      rien n'est coché : on coche celles de la fiche (+ « Tout cocher », « Cocher l'étape … ») et on peut ajouter des lignes.
      Vignette de chaque ligne (Vignette PDF / Vignette des lignes de devis ou d'ARC, par repère pour la synthèse), sinon
@@ -2234,6 +2235,7 @@ const FA_METIERS={
   'Fraisage':{coul:[31,95,168],etape:/^fraisage$/i,fic:'Fraisage',cat:/^fraisage$/i},
   'Tournage':{coul:[46,125,50],etape:/^tournage$/i,fic:'Tournage',cat:/^tournage$/i},
   'Fraisage Fil':{coul:[217,108,0],etape:/^fraisage fil$/i,fic:'Fraisage_Fil',cat:/^fraisage fil$/i},
+  'Contrôle':{coul:[0,131,143],etape:/^contr[ôo]le$/i,fic:'Controle',cat:/^contr[ôo]le/i,sansAppro:true},
   'Achats':{coul:[106,61,154],etape:/^achat composant/i,fic:'Achats_standards',cat:/^achat/i,achats:true}};
 let FT=null; // état de la fenêtre {cde,mode,lignes,…}
 const faChamp=(lab,html,plein)=>`<div${plein?' style="grid-column:1/-1"':''}><label>${lab}</label>${html}</div>`;
@@ -2311,8 +2313,8 @@ async function faOuvrirExistante(nom){
   const E=FT,sp=E.sp||{},f=(sp.fiches||[]).find(x=>x.name===nom);
   if(!f){toast('Fiche introuvable dans « Fiches atelier » : '+nom,true);return}
   $('mCorps').insertAdjacentHTML('afterbegin','<div class="charge" style="padding:10px">Lecture de la fiche…</div>');
-  const base=nom.replace(/\.pdf$/i,''),m=base.match(/_(Fraisage_Fil|Fraisage|Tournage|Achats(?:_standards)?)(?:_\d+)?$/i);
-  const metier=!m?'Fraisage':/fil/i.test(m[1])?'Fraisage Fil':/^achat/i.test(m[1])?'Achats':/^tour/i.test(m[1])?'Tournage':'Fraisage',ach=metier==='Achats';
+  const base=nom.replace(/\.pdf$/i,''),m=base.match(/_(Fraisage_Fil|Fraisage|Tournage|Contr[ôo]le|Achats(?:_standards)?)(?:_\d+)?$/i);
+  const metier=!m?'Fraisage':/fil/i.test(m[1])?'Fraisage Fil':/^achat/i.test(m[1])?'Achats':/^tour/i.test(m[1])?'Tournage':/^contr/i.test(m[1])?'Contrôle':'Fraisage',ach=metier==='Achats';
   const lireJ=async x=>{try{return await fetch(x['@microsoft.graph.downloadUrl'],{cache:'no-store'}).then(r=>r.json())}catch(e){return null}};
   let src=null,data=null,fi=null;
   const pj=(sp.json||[]).find(x=>x.name.toLowerCase()===(base+'.json').toLowerCase());
@@ -2420,7 +2422,7 @@ function faDessiner(){
     ${FT.lignes.map((l,i)=>`<tr style="cursor:default;${l.coche?'background:#F0FDF4':''}" data-tr="${i}"><td><input type="checkbox" data-li="${i}" ${l.coche?'checked':''}></td><td style="padding:5px 8px">${vigCel(l,i)}</td>${cols.map(c=>`<td style="max-width:none;padding:6px 6px;${c[0]==='des'?'min-width:220px':''}">${inp(i,c[0],c[2],c[3])}${c[0]==='des'&&(l.aide||l.etapes.length||l.orig)?`<div class="mut" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:330px" title="${esc(l.aide)}">${esc([l.orig==='Ajout'?'':l.orig,l.etapes.join(', '),l.aide].filter(Boolean).join(' · '))}</div>`:''}</td>`).join('')}</tr>`).join('')}
     </tbody></table>${FT.lignes.length?'':'<div class="vide" style="padding:18px">Aucune ligne connue pour cette affaire : « Ajouter une ligne ».</div>'}</div>
     <div style="text-align:right;margin-top:6px"><span class="mut" style="font-size:12.5px" id="faTot"></span></div>
-    <div class="formU" style="padding:10px 0 0">${faChamp('Observations (facultatif – vide par défaut : consigne indispensable absente du plan)',`<textarea id="faObs" rows="2" style="width:100%;border:1px solid var(--trait);border-radius:7px;padding:7px 9px;margin-top:3px;resize:vertical">${esc(v('faObs',''))}</textarea>`,true)}</div>
+    <div class="formU" style="padding:10px 0 0">${faChamp('Observations (facultatif – vide par défaut : le cadre reste vierge pour une remarque manuscrite du référent)',`<textarea id="faObs" rows="2" style="width:100%;border:1px solid var(--trait);border-radius:7px;padding:7px 9px;margin-top:3px;resize:vertical">${esc(v('faObs',''))}</textarea>`,true)}</div>
     <div class="mut" style="font-size:12px;margin-top:8px">PDF ${esc(`FA_${n}_${M.fic}.pdf`)} → ${/^https?:/.test(cde['Dossier SharePoint']||'')?'dossier SharePoint de l’affaire, 05_Commande/Fiches atelier/':'<b style="color:var(--err)">pas de « Dossier SharePoint » sur la commande : PDF téléchargé seulement</b>'} · lien ajouté dans les notes de la tâche.</div>`;
   }
   $('mCorps').innerHTML=h;
@@ -2478,7 +2480,9 @@ async function faCreerTache(){
    (règle du 29/10/2026 : une fiche ne doit pas changer d'aspect selon qu'elle est faite par Claude ou dans Akteev).
    Mêmes entrées (format JSON de la compétence : a = affaire, f = fiche), mêmes marges (14 mm, cadre reportlab à 6 pt),
    mêmes tableaux (largeurs, marges internes, grille 0,5 pt #D0D0D0, en-tête plein de la couleur du métier, ligne Total
-   #F0F3F8), même en-tête de page « KTE – … (document interne, sans prix) / Page x/N », même flèche « Suite au verso »,
+   #F0F3F8), même présentation du 28/10/2026 (pas d'en-tête de page ; titre = métier seul ; client 15 pt sans la ville ;
+   expédition 15 pt noir ; pas de ligne Dossier ; cadre Observations ; tableaux Appro matière / outillage en bas de la
+   page 1 ; « Page x/N » en bas au centre), même flèche « Suite au verso »,
    mêmes règles de lisibilité (typo_kte.lisible : insécables, ==surlignage==). Toute évolution se fait dans les DEUX. */
 const FA_NB=' ';
 const FA_ABR=new RegExp('(?<!\\S)((?:réf\\.|Réf\\.|rep\\.|Rep\\.|repère|n°|N°|ép\\.|Ø|M|DN|Ra|art\\.)) (?=\\S)','g');
@@ -2494,7 +2498,9 @@ async function faConstruirePDF(a,f,opt={}){
   const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4',compress:true}),F=await cfPolice(doc);
   const pt=25.4/72,ach=f.metier==='Achats',M=FA_METIERS[f.metier]||FA_METIERS.Fraisage,K=M.coul;
   const GRIS=[107,107,107],TRAIT=[208,208,208],FOND=[240,243,248],ROUGE=[176,0,42],BLEU=[0,0,255],NOIR=[0,0,0],BLANC=[255,255,255],JAUNE=[255,242,0];
-  const FX=14,FW=182,PADF=6*pt,TOP=16+PADF,BOT=297-16-PADF;   // cadre reportlab : marges 14/16 mm + 6 pt
+  const FX=14,FW=182,PADF=6*pt,TOP=12+PADF,BOT0=297-14-PADF;   // cadre reportlab : marges 14 / 12 (haut) / 14 (bas) mm + 6 pt
+  const APPRO=!ach&&!M.sansAppro,BAS_APPRO=50;let BOT=APPRO?BOT0-BAS_APPRO:BOT0;   // page 1 : place des tableaux d'appro
+  const nouvellePage=()=>{doc.addPage();BOT=BOT0;return TOP};
   const N={size:10,lead:12.5},B={size:10,lead:12.5,bold:true},P={size:8.5,lead:10.5};
   const fnt=(s,b)=>{doc.setFont(F,b?'bold':'normal');doc.setFontSize(s)};
   // Paragraphe (texte riche minimal : runs [{t,bold,color,size}], ==surlignage==) ; t='' → hauteur nulle comme reportlab
@@ -2532,25 +2538,22 @@ async function faConstruirePDF(a,f,opt={}){
       if(spec.cadre){doc.setDrawColor(...spec.cadre.c);doc.setLineWidth(spec.cadre.w*pt);doc.rect(x0,y0,x1-x0,y1-y0,'S')}
       return y}}};
   const P_=(t,st,extra)=>iw=>para(t,st,iw,extra?.align);
-  const libelle=ach?"Fiche d'achats – Éléments standards":`Fiche de suivi atelier – ${f.metier}`;
-  const code=ach?'Achats':f.metier.replace(/ /g,'_');
+  const titreM=ach?'Éléments standards':f.metier;
   let y=TOP;
-  // 1. Haut : logo 24 mm + titre / n° d'affaire / client / « Fiche FA-… – éditée le … »
-  const T={size:20,lead:24,color:K},A={size:22,lead:26,bold:true},R={size:10,lead:12.5};
+  // 1. Haut : logo 24 mm + métier seul (couleur, 24 pt) / n° d'affaire / client 15 pt sans la ville entre parenthèses
+  const T={size:24,lead:28,bold:true,color:K},A={size:22,lead:26,bold:true},C={size:15,lead:18,bold:true};
+  const client=String(a.client||'').replace(/\s*\([^)]*\)/g,'').trim();
   const haut=TAB({w:[40,142],valign:'top',pad:()=>({l:0,r:0,t:3*pt,b:3*pt}),align:(i,j)=>j?'right':'left',rows:[[
     [{h:24,w:24,draw(x,yy){try{doc.addImage(CF_LOGO,'JPEG',x,yy,24,24)}catch(e){}}}],
-    [P_(ach?[{t:"Fiche d'achats – "},{t:'Éléments standards',bold:true}]:[{t:'Fiche de suivi atelier – '},{t:f.metier,bold:true}],T,{align:'right'}),
-     P_(a.affaire,A,{align:'right'}),P_(a.client||'',R,{align:'right'}),
-     P_(`Fiche FA-${a.affaire}-${code} – éditée le ${a.edition}${opt.modifiee?' – modifiée le '+opt.modifiee:''}`,R,{align:'right'})].map(fn=>iw=>({...fn(iw),w:iw}))]]});
+    [P_(titreM,T,{align:'right'}),P_(a.affaire,A,{align:'right'}),P_(faLisible(client),C,{align:'right'})].map(fn=>iw=>({...fn(iw),w:iw}))]]});
   y=haut.dessiner(haut.rows,y);
-  y+=8;
-  // 2. Encadré délais / référent / dossier
+  y+=6;
+  // 2. Encadré délais / référent (plus de ligne Dossier / plans ; expédition en 15 pt noir)
   const rouge=d=>P_([{t:d||'',size:15,bold:true,color:ROUGE}],N);
-  const lien=P_([{t:a.dossier_nom||'',color:BLEU,lien:a.dossier_url||''}],P);
-  const infos=ach?[['Réception au plus tard',rouge(f.reception)],['Délai atelier',P_(a.delai_atelier||'',B)],['Expédition client',P_(a.expedition||'',B)],
-      ['Référent achat',P_(f.referent_achat||a.referent||'',N)],['Dossier / plans',lien]]
-    :[['Délai atelier',rouge(a.delai_atelier)],['Expédition client',P_(a.expedition||'',B)],['Référent affaire',P_(a.referent||'',N)],['Dossier / plans',lien]];
-  opt.lien=true;
+  const noir=d=>P_([{t:d||'',size:15,bold:true,color:NOIR}],N);
+  const infos=ach?[['Réception au plus tard',rouge(f.reception)],['Délai atelier',P_(a.delai_atelier||'',B)],['Expédition client',noir(a.expedition)],
+      ['Référent achat',P_(f.referent_achat||a.referent||'',N)]]
+    :[['Délai atelier',rouge(a.delai_atelier)],['Expédition client',noir(a.expedition)],['Référent affaire',P_(a.referent||'',N)]];
   const info=TAB({w:[40,142],grille:true,bg:(i,j)=>j===0?FOND:null,pad:()=>({l:6*pt,r:6*pt,t:4*pt,b:4*pt}),rows:infos.map(([k,v])=>[P_(k,B),v])});
   y=info.dessiner(info.rows,y);
   // 3. Gravure (fabrication)
@@ -2560,7 +2563,7 @@ async function faConstruirePDF(a,f,opt={}){
       P_('Gravure :',B),caseC(rens&&oui===false),P_('Non',N),caseC(!!oui),P_('Oui',N),
       oui&&tg?P_(faLisible(tg),B):(rens?null:P_([{t:'À graver : ……………………………',color:GRIS}],N)),
       P_('Procédé :',B),caseC(!!oui&&pro.startsWith('mach')),P_('Machine',N),caseC(!!oui&&pro.startsWith('las')),P_('Laser',N)]]});
-    y=gr.dessiner(gr.rows,y);y+=6}
+    y=gr.dessiner(gr.rows,y);y+=5}
   else y+=7;
   // 4. Tableau des pièces / articles (en-tête répété à chaque page)
   let tab;const tot=f.lignes.reduce((s,l)=>s+(+l.qte||0),0),totTxt=String(Math.round(tot*1000)/1000);
@@ -2583,20 +2586,33 @@ async function faConstruirePDF(a,f,opt={}){
     tab=TAB({w:[11,25,21,21,24,10,26,22,22],grille:true,bg:(i)=>i===0?K:i===n-1?FOND:null,
       pad:(i)=>({l:6*pt,r:6*pt,t:i>0&&i<n-1?7*pt:3*pt,b:i>0&&i<n-1?7*pt:3*pt}),rows})}
   { const [h,...corps]=tab.rows;let part=[h];
-    if(y+h.h+(corps[0]?.h||0)>BOT){doc.addPage();y=TOP}
-    for(const r of corps){if(y+part.reduce((s,x)=>s+x.h,0)+r.h>BOT&&part.length>1){tab.dessiner(part,y);doc.addPage();y=TOP;part=[h]}part.push(r)}
+    if(y+h.h+(corps[0]?.h||0)>BOT)y=nouvellePage();
+    for(const r of corps){if(y+part.reduce((s,x)=>s+x.h,0)+r.h>BOT&&part.length>1){tab.dessiner(part,y);y=nouvellePage();part=[h]}part.push(r)}
     y=tab.dessiner(part,y)}
-  // 5. Observations (seulement si renseignées)
+  // 5. Cadre « Observations » toujours présent : vide (24 mm, réduit jusqu'à 14 mm en bas de page) pour une remarque
+  //    manuscrite du référent ; texte éventuel en 13 pt
   const obs=(f.observations||[]).filter(Boolean);
-  if(obs.length){y+=8;const w=FW-2*PADF;
-    for(const [k,o] of [[-1,'Observations'],...obs.map((o,i)=>[i,o])]){const p=para(k<0?[{t:o,bold:true}]:o,N,w);if(y+p.h>BOT){doc.addPage();y=TOP}p.draw(FX+PADF,y);y+=p.h}}
-  // En-tête et pied de chaque page : « KTE – … (document interne, sans prix) », « Page x/N », flèche « Suite au verso »
+  y+=ach?6:4;
+  { const tH=6.5,bord=[154,154,154];
+    const titreObs=(yy,hh)=>{doc.setFillColor(...FOND);doc.rect(FX,yy,FW,tH,'F');doc.setDrawColor(...bord);doc.setLineWidth(.6*pt);doc.rect(FX,yy,FW,hh,'S');
+      doc.setDrawColor(...TRAIT);doc.setLineWidth(.5*pt);doc.line(FX,yy+tH,FX+FW,yy+tH);fnt(10,true);doc.setTextColor(...NOIR);doc.text('Observations',FX+6*pt,yy+tH-2)};
+    if(!obs.length){const dispo=BOT-y;let hh=24;if(dispo<24){if(dispo>=14)hh=dispo;else y=nouvellePage()}titreObs(y,hh);y+=hh}
+    else{const O={size:13,lead:16.5},w=FW-12*pt,ps=obs.map(o=>para(faLisible(o),O,w)),hh=tH+5*pt+ps.reduce((s,p)=>s+p.h,0)+6*pt;
+      if(y+hh>BOT)y=nouvellePage();titreObs(y,hh);let yy=y+tH+5*pt;for(const p of ps){p.draw(FX+6*pt,yy);yy+=p.h}y+=hh}}
+  // Pied de chaque page : « Page x/N » en bas au centre, flèche « Suite au verso » sauf sur la dernière ;
+  // page 1 des fiches de fabrication (sauf Contrôle) : tableaux Appro matière (2 lignes) / Appro outillage (1 ligne)
   const NP=doc.getNumberOfPages();
-  for(let i=1;i<=NP;i++){doc.setPage(i);fnt(9,false);doc.setTextColor(...GRIS);
-    doc.text(`KTE – ${libelle} – ${a.affaire}  (document interne, sans prix)`,16,10);doc.text(`Page ${i}/${NP}`,194,10,{align:'right'});
-    doc.setDrawColor(...TRAIT);doc.setLineWidth(1*pt);doc.line(16,11.5,194,11.5);
+  for(let i=1;i<=NP;i++){doc.setPage(i);fnt(9,false);doc.setTextColor(...GRIS);doc.text(`Page ${i}/${NP}`,105,290,{align:'center'});
     if(i<NP){fnt(11,true);doc.setTextColor(...NOIR);doc.text('Suite au verso',180,289.5,{align:'right'});
-      doc.setDrawColor(...NOIR);doc.setLineWidth(2.2*pt);doc.line(182,288,191,288);doc.setFillColor(...NOIR);doc.triangle(194,288,189.5,285,189.5,291,'F')}}
+      doc.setDrawColor(...NOIR);doc.setLineWidth(2.2*pt);doc.line(182,288,191,288);doc.setFillColor(...NOIR);doc.triangle(194,288,189.5,285,189.5,291,'F')}
+    if(i===1&&APPRO){const W=[36,96,50],xs=[FX,FX+36,FX+132],G=[154,154,154];
+      const tabA=(lib,n,yb)=>{const hh=7+10*n,y0=yb-hh;
+        doc.setFillColor(...FOND);doc.rect(xs[1],y0,W[1]+W[2],7,'F');
+        doc.setDrawColor(...G);doc.setLineWidth(.6*pt);doc.rect(FX,y0,FW,hh,'S');doc.line(xs[1],y0,xs[1],yb);doc.line(xs[2],y0,xs[2],yb);
+        for(let k=0;k<n;k++){const yl=y0+7+10*k;doc.line(xs[1],yl,FX+FW,yl)}
+        fnt(9.5,true);doc.setTextColor(...NOIR);doc.text('Fournisseur',xs[1]+W[1]/2,y0+4.7,{align:'center'});doc.text('Date de livraison',xs[2]+W[2]/2,y0+4.7,{align:'center'});
+        fnt(12,true);doc.setTextColor(...K);doc.text(lib,FX+6*pt,y0+hh/2+1.5);return y0};
+      const y2=tabA('Appro outillage',1,297-14);tabA('Appro matière',2,y2-3)}}
   doc.setProperties({title:ach?`Fiche d'achats standards ${a.affaire}`:`Fiche atelier ${f.metier} ${a.affaire}`,author:'KTE'});
   return{blob:doc.output('blob'),pages:NP};
 }
