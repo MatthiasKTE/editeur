@@ -2260,6 +2260,22 @@ async function creerTacheFiche(cde,mode){
   FT={cde,n,mode:mode||'tache',lignes,SY,CAT,REF,TT,vigAff,metier:'',ch:{}};
   faMetier(faMetierDefaut());
   faDessiner();
+  faVignettesSP(FT).catch(e=>console.warn('vignettes SharePoint',e));
+}
+/* Vignettes rangées par la compétence « fiches atelier » dans <Dossier SharePoint>/05_Commande/Fiches atelier/Vignettes/
+   (<affaire>_Rep01_….png, _Rep11-12_ = repères 11 et 12) : utilisées pour les lignes sans vignette Baserow, et comme
+   vignette de l'affaire s'il n'y en a pas d'autre. */
+async function faVignettesSP(E){
+  const url=String(E.cde['Dossier SharePoint']||'');if(!/^https?:/.test(url))return;
+  const j=await jetonGraph(['Files.ReadWrite.All']),dos=await dossierSPA(j,url);
+  let L;try{L=(await graph(j,`/drives/${dos.parentReference.driveId}/items/${dos.id}:/05_Commande/Fiches atelier/Vignettes:/children?$top=200`)).value||[]}catch(e){if(e.status===404)return;throw e}
+  L=L.filter(f=>/\.(png|jpe?g)$/i.test(f.name)&&f['@microsoft.graph.downloadUrl']).sort((a,b)=>a.name.localeCompare(b.name));if(!L.length)return;
+  const reps=f=>{const m=f.name.match(/_Rep(\d+)(?:-(\d+))?(?=[_.])/i);if(!m)return[];const a=+m[1],b=m[2]?+m[2]:a;const o=[];for(let i=a;i<=Math.min(b,a+50);i++)o.push(String(i));return o};
+  const cache=new Map(),lire=async f=>{if(!cache.has(f.id))cache.set(f.id,fetch(f['@microsoft.graph.downloadUrl']).then(r=>r.blob()).then(faReduireImage).catch(()=>''));return cache.get(f.id)};
+  let n=0;
+  for(const l of E.lignes){if(l.vig||!l.rep)continue;const f=L.find(f=>reps(f).includes(l.rep));if(!f)continue;const d=await lire(f);if(d){l.vig=d;n++}}
+  if(!E.vigAff){const d=await lire(L[0]);if(d)E.vigAff=d}
+  if((n||E.vigAff)&&FT===E&&$('modal').style.display!=='none'&&E.mode==='fiche'&&$('faMet')){faLire();faDessiner()}
 }
 function faMetierDefaut(){const e=FT.lignes.flatMap(l=>l.etapes);return Object.keys(FA_METIERS).find(k=>e.some(x=>FA_METIERS[k].etape.test(x)))||'Fraisage'}
 function faMetier(m){FT.metier=m;const M=FA_METIERS[m];
