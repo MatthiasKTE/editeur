@@ -2242,7 +2242,7 @@ const faCopie=l=>({...l,sy:[...l.sy],etapes:[...l.etapes]});
 async function creerTacheFiche(cde,mode,nomFiche){
   ouvrirModal('Tâche / fiche atelier – '+txt(cde['N° affaire']),'<div class="charge">Chargement…</div>','');
   const bx=$('modal').querySelector('.box');bx.style.width='min(1120px,96vw)';bx.style.maxHeight='92vh';$('modal').style.paddingTop='3vh';
-  await Promise.all([MODS.taches.t,MODS.catalogue.t,MODS.referents.t,MODS.synthese.t,MODS.devis.t,T_LDV,MODS.arc.t,T_LARC].map(t=>charger(t).catch(()=>[])));
+  await Promise.all([MODS.taches.t,MODS.catalogue.t,MODS.referents.t,MODS.clients.t,MODS.synthese.t,MODS.devis.t,T_LDV,MODS.arc.t,T_LARC].map(t=>charger(t).catch(()=>[])));
   const n=txt(cde['N° affaire']),ord=(a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id;
   const SY=(S.rows[MODS.synthese.t]||[]).filter(r=>ids(r.Affaire).includes(cde.id)&&!/annul/i.test(txt(r.Statut))).sort(ord);
   const DV=(S.rows[MODS.devis.t]||[]).filter(d=>ids(d.Commande).includes(cde.id)||ids(cde.Devis).includes(d.id));
@@ -2454,8 +2454,9 @@ function faReduireImage(f){return new Promise((ok,ko)=>{const r=new FileReader()
 async function faImage(src){if(!src)return null;
   try{let d=src;if(!/^data:/.test(src)){const b=await (await fetch(src)).blob();d=await new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=ko;r.readAsDataURL(b)})}
     const im=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=d});
-    if(!/^data:image\/(png|jpe?g)/i.test(d)){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);d=c.toDataURL('image/png')}
-    return{data:d,w:im.width||1,h:im.height||1,fmt:/^data:image\/jpe?g/i.test(d)?'JPEG':'PNG'}}catch(e){console.warn('vignette',e);return null}}
+    // vignette carrée (comme celles de la compétence, 400 × 400) : image centrée sur fond blanc, posée en 24 × 24 mm
+    const W=im.width||1,H=im.height||1;if(W!==H||!/^data:image\/(png|jpe?g)/i.test(d)){const S_=Math.max(W,H),c=document.createElement('canvas');c.width=S_;c.height=S_;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,S_,S_);x.drawImage(im,(S_-W)/2,(S_-H)/2);d=c.toDataURL('image/png')}
+    return{data:d,w:1,h:1,fmt:/^data:image\/jpe?g/i.test(d)?'JPEG':'PNG'}}catch(e){console.warn('vignette',e);return null}}
 async function faApresCreation(){delete S.prom[MODS.taches.t];await charger(MODS.taches.t).catch(()=>{});
   if(SALE?.k==='commandes'&&SALE.row?.id===FT.cde.id&&!Object.keys(SALE.draft).length){dessinerFiche();const L=MODS.commandes.liees;dessinerLiees(Math.max(0,L.findIndex(x=>x.mod==='taches')))}}
 async function faCreerTache(){
@@ -2470,78 +2471,131 @@ async function faCreerTache(){
   const r=await api(`/rows/table/${MODS.taches.t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
   majRow(MODS.taches.t,r);fermerModal();toast(`Tâche « ${lib} » créée`);await faApresCreation();
 }
-/* PDF de la fiche (format des fiches atelier de la compétence) */
-async function faConstruirePDF(D){
+/* PDF de la fiche : rendu IDENTIQUE à _Outils chiffrage/generer_fiche_atelier.py (reportlab, compétence « fiches atelier »)
+   (règle du 29/10/2026 : une fiche ne doit pas changer d'aspect selon qu'elle est faite par Claude ou dans Akteev).
+   Mêmes entrées (format JSON de la compétence : a = affaire, f = fiche), mêmes marges (14 mm, cadre reportlab à 6 pt),
+   mêmes tableaux (largeurs, marges internes, grille 0,5 pt #D0D0D0, en-tête plein de la couleur du métier, ligne Total
+   #F0F3F8), même en-tête de page « KTE – … (document interne, sans prix) / Page x/N », même flèche « Suite au verso »,
+   mêmes règles de lisibilité (typo_kte.lisible : insécables, ==surlignage==). Toute évolution se fait dans les DEUX. */
+const FA_NB=' ';
+const FA_ABR=new RegExp('(?<!\\S)((?:réf\\.|Réf\\.|rep\\.|Rep\\.|repère|n°|N°|ép\\.|Ø|M|DN|Ra|art\\.)) (?=\\S)','g');
+function faLisible(t){if(t==null)return'';
+  return String(t).split('\n').map(l=>{let s=l.replace(/[ \t]+/g,' ').trim();
+    s=s.replace(FA_ABR,'$1'+FA_NB);
+    s=s.replace(/(\d) (?=[^\s\d–—-][^\s]{0,8}(?:\s|$))/g,'$1'+FA_NB);
+    s=s.replace(/ (?=[–—:;!?\/×x]\s)/g,FA_NB);
+    const m=s.match(/ (\S{1,6})$/);if(m)s=s.slice(0,m.index)+FA_NB+m[1];
+    return s}).join('\n')}
+async function faConstruirePDF(a,f,opt={}){
   await chargerScript(CF_JSPDF);
-  const M=FA_METIERS[D.metier],ach=!!M.achats,{jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a4',orientation:ach?'landscape':'portrait',compress:true}),F=await cfPolice(doc);
-  const PT=0.3528,W=ach?297:210,H=ach?210:297,G=14,DR=W-G,COUL=M.coul,GRIS=[107,107,107],TRAIT=[200,200,200],NOIR=[0,0,0],ROUGE=[200,30,30];
-  const net=s=>String(s??'').replace(/[  ]/g,' ');
-  const st=(t,g,c)=>{doc.setFont(F,g?'bold':'normal');doc.setFontSize(t);doc.setTextColor(...(c||NOIR))};
-  const tx=(s,x,y,o={})=>doc.text(net(s),x,y,{baseline:'top',...o});
-  const trait=(x1,y1,x2,y2,c,e)=>{doc.setDrawColor(...(c||TRAIT));doc.setLineWidth(e||0.26);doc.line(x1,y1,x2,y2)};
-  const lignesDe=(s,w,t,g)=>{st(t,g);return doc.splitTextToSize(net(s),w)};
-  const titreDoc=ach?'Fiche d’achats – éléments standards':'Fiche de suivi atelier – '+D.metier;
-  let y;
-  const enteteComplet=()=>{
-    try{doc.addImage(CF_LOGO,'JPEG',G,10,20,20*800/781)}catch(e){}
-    st(17,true,COUL);tx(titreDoc,DR,10,{align:'right'});
-    st(22,true);tx(D.n,DR,18.5,{align:'right'});
-    st(10,false,GRIS);tx([D.client,'Édition du '+D.edition+(D.modifDe?' – modifiée (remplace l’édition du '+D.modifDe+')':D.manuel?' (Akteev)':'')].filter(Boolean).join('  ·  '),DR,28.5,{align:'right'});
-    y=36;
-    const cases=ach?[['Réception au plus tard',D.delai,true],['Délai atelier',D.delaiAt||'—'],['Expédition client',D.exp||'—'],['Référent achat',D.ref||'—'],['Dossier',D.dossier||'—']]
-      :[['Délai atelier',D.delai,true],['Expédition client',D.exp||'—'],['Référent',D.ref||'—'],['Dossier',D.dossier||'—']];
-    const lg=ach?[52,40,40,40]:[40,34,32];const reste=DR-G-lg.reduce((a,b)=>a+b,0);const ws=[...lg,reste];
-    const hs=Math.max(...cases.map(([a,b,r],i)=>lignesDe(b,ws[i]-5,r?12:10.5,true).length*(r?12:10.5)*PT*1.2))+8;
-    doc.setDrawColor(...TRAIT);doc.setLineWidth(0.3);doc.roundedRect(G,y,DR-G,hs,2,2,'S');
-    let x=G;cases.forEach(([a,b,r],i)=>{if(i)trait(x,y,x,y+hs);st(7.5,false,GRIS);tx(a.toUpperCase(),x+2.5,y+1.8);
-      const L=lignesDe(b,ws[i]-5,r?12:10.5,true);st(r?12:10.5,true,r?ROUGE:NOIR);L.forEach((l,j)=>tx(l,x+2.5,y+5.5+j*(r?12:10.5)*PT*1.2));x+=ws[i]});
-    y+=hs+4;
-    if(!ach&&D.gravure){const g=D.gravure;doc.setDrawColor(...TRAIT);doc.setLineWidth(0.3);doc.rect(G,y,DR-G,8);
-      let gx=G+2.5;st(10.5,true);tx('Gravure :',gx,y+1.9);gx+=doc.getTextWidth('Gravure :')+4;
-      const cas=(c,lab)=>{doc.setDrawColor(...NOIR);doc.setLineWidth(0.28);doc.rect(gx,y+2.2,3.6,3.6);if(c){doc.setLineWidth(0.45);doc.line(gx+0.3,y+2.5,gx+3.3,y+5.5);doc.line(gx+0.3,y+5.5,gx+3.3,y+2.5)}gx+=5.5;st(10.5);tx(lab,gx,y+1.9);gx+=doc.getTextWidth(lab)+6};
-      cas(!g.oui,'Non');cas(g.oui,'Oui');
-      if(g.oui){const s=[g.texte?'« '+g.texte+' »':'',g.procede?'– '+g.procede:''].filter(Boolean).join(' ');st(10.5,true);tx(doc.splitTextToSize(net(s),DR-gx-2)[0]||'',gx,y+1.9)}
-      y+=12}
-    else y+=1};
-  const enteteSuite=()=>{st(12,true,COUL);tx(titreDoc,G,10);st(14,true);tx(D.n,DR,9.5,{align:'right'});trait(G,17,DR,17);y=20};
-  // Colonnes (Visuel = vignette)
-  const VIS=ach?20:24;
-  const C=ach?[['vis','Visuel',VIS],['rep','Rep.',14],['des','Désignation',0],['reff','Réf. fournisseur',34],['four','Fournisseur',28],['dim','Dimensions',28],['qte','Qté',12,'r'],['pour','Pour',30],['cmd','Commandé le',24],['recu','Reçu le',24]]
-    :[['vis','Visuel',VIS],['rep','Rep.',14],['des','Désignation / réf.',0],['qte','Qté',11,'r'],['mat','Matière',28],['trait','Traitement',24],['dim','Dimensions finies',30]];
-  const fixe=C.reduce((a,c)=>a+c[2],0);C.forEach(c=>{if(!c[2])c[2]=DR-G-fixe});
-  let xx=G;C.forEach(c=>{c[4]=xx;xx+=c[2]});
-  const tete=()=>{st(9,true,COUL);C.forEach(c=>tx(c[1],c[3]?c[4]+c[2]-1.5:c[4]+1.5,y,c[3]?{align:'right'}:{}));y+=5;trait(G,y,DR,y,COUL,0.45);y+=1.8};
-  const BAS=H-16;
-  const nouvellePage=()=>{doc.addPage();enteteSuite();tete()};
-  enteteComplet();tete();
-  const fmtQ=q=>q===''||q==null?'':String(q).replace('.',',');
-  const hVis=ach?16:20;
-  for(const l of D.lignes){
-    const cel={};let hl=0;
-    for(const c of C){const [k,,w]=c;let L;if(k==='vis')continue;
-      if(k==='des'&&!ach){const a=lignesDe(l.des,w-3,9.75,true),b=l.ref?lignesDe(l.ref,w-3,8.5,false):[];L={a,b};hl=Math.max(hl,a.length*9.75*PT*1.25+b.length*8.5*PT*1.25)}
-      else{const t=k==='qte'?fmtQ(l.qte):l[k]||'';L=lignesDe(t,w-3,9.5,k==='rep'||k==='des');hl=Math.max(hl,L.length*9.5*PT*1.25)}
-      cel[k]=L}
-    hl=Math.max(hl,l.img?hVis:(ach?7:5))+2.4;
-    if(y+hl>BAS-8)nouvellePage();
-    const y0=y+0.8;
-    for(const c of C){const [k,,w,r,x]=c,L=cel[k];
-      if(k==='vis'){if(l.img){const bw=w-3,bh=hVis,s=Math.min(bw/l.img.w,bh/l.img.h),iw=l.img.w*s,ih=l.img.h*s;
-          try{doc.addImage(l.img.data,l.img.fmt,x+1.5+(bw-iw)/2,y0+(bh-ih)/2,iw,ih,undefined,'FAST')}catch(e){console.warn(e)}}continue}
-      if(k==='des'&&!ach){let yy=y0;st(9.75,true);L.a.forEach(s=>{tx(s,x+1.5,yy);yy+=9.75*PT*1.25});st(8.5,false,GRIS);L.b.forEach(s=>{tx(s,x+1.5,yy);yy+=8.5*PT*1.25});continue}
-      st(9.5,k==='rep'||k==='des'||k==='qte');L.forEach((s,j)=>tx(s,r?x+w-1.5:x+1.5,y0+j*9.5*PT*1.25,r?{align:'right'}:{}))}
-    y+=hl;trait(G,y,DR,y);y+=0.6}
-  if(y+9>BAS-8)nouvellePage();
-  const tot=D.lignes.reduce((a,l)=>a+(+l.qte||0),0);
-  st(10.5,true);const cq=C.find(c=>c[0]==='qte');tx(ach?'Total articles':'Total pièces',cq[4]-3,y+2,{align:'right'});tx(fmtQ(Math.round(tot*1000)/1000),cq[4]+cq[2]-1.5,y+2,{align:'right'});y+=9;
-  if(D.obs){const L=lignesDe(D.obs,DR-G-8,9.5,false),h=L.length*9.5*PT*1.3+9;if(y+h>BAS-8)nouvellePage();
-    doc.setDrawColor(...TRAIT);doc.setLineWidth(0.3);doc.roundedRect(G,y,DR-G,h,2,2,'S');st(8,true,GRIS);tx('OBSERVATIONS',G+3,y+2);st(9.5);L.forEach((s,i)=>tx(s,G+3,y+6+i*9.5*PT*1.3));y+=h+3}
-  const N=doc.getNumberOfPages();
-  for(let i=1;i<=N;i++){doc.setPage(i);st(8.5,false,GRIS);tx(`${D.n} – ${ach?'Achats':D.metier} – Page ${i}/${N}`,G,H-9);
-    if(i<N){st(12,true,COUL);tx('Suite au verso →',DR,H-10,{align:'right'})}}
-  doc.setProperties({title:`KTE – ${titreDoc} – ${D.n}`,author:'KTE'});
-  return{blob:doc.output('blob'),pages:N};
+  const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4',compress:true}),F=await cfPolice(doc);
+  const pt=25.4/72,ach=f.metier==='Achats',M=FA_METIERS[f.metier]||FA_METIERS.Fraisage,K=M.coul;
+  const GRIS=[107,107,107],TRAIT=[208,208,208],FOND=[240,243,248],ROUGE=[176,0,42],BLEU=[0,0,255],NOIR=[0,0,0],BLANC=[255,255,255],JAUNE=[255,242,0];
+  const FX=14,FW=182,PADF=6*pt,TOP=16+PADF,BOT=297-16-PADF;   // cadre reportlab : marges 14/16 mm + 6 pt
+  const N={size:10,lead:12.5},B={size:10,lead:12.5,bold:true},P={size:8.5,lead:10.5};
+  const fnt=(s,b)=>{doc.setFont(F,b?'bold':'normal');doc.setFontSize(s)};
+  // Paragraphe (texte riche minimal : runs [{t,bold,color,size}], ==surlignage==) ; t='' → hauteur nulle comme reportlab
+  const para=(runs,st,w,align)=>{runs=(Array.isArray(runs)?runs:[{t:runs}]).map(r=>({...r,t:String(r.t??''),bold:r.bold??st.bold,size:r.size||st.size,color:r.color||st.color||NOIR}));
+    const plein=runs.map(r=>r.t).join('');if(!plein)return{h:0,draw(){}};
+    let lignes;if(runs.length===1){const r=runs[0];fnt(r.size,r.bold);lignes=r.t.split('\n').flatMap(x=>doc.splitTextToSize(x,w)).map(x=>[{...r,t:x}])}
+    else lignes=[runs];   // titres et valeurs riches : une seule ligne
+    const first=Math.max(...runs.map(r=>r.size))*0+runs[0].size;
+    return{h:lignes.length*st.lead*pt,draw(x,y){let hl=false;
+      lignes.forEach((L,i)=>{const yb=y+(first+i*st.lead)*pt;
+        const segs=[];for(const r of L){String(r.t).split('==').forEach((s,k)=>{if(k)hl=!hl;if(s)segs.push({...r,t:s,hl})})}
+        const larg=segs.reduce((s,g)=>{fnt(g.size,g.bold);return s+doc.getTextWidth(g.t)},0);
+        let xx=align==='right'?x+w-larg:align==='center'?x+(w-larg)/2:x;
+        for(const g of segs){fnt(g.size,g.bold);const gw=doc.getTextWidth(g.t);
+          if(g.hl){doc.setFillColor(...JAUNE);doc.rect(xx,yb-g.size*0.8*pt,gw,g.size*1.05*pt,'F')}
+          doc.setTextColor(...g.color);doc.text(g.t,xx,yb);
+          if(opt.lien&&g.lien)doc.link(xx,yb-g.size*0.8*pt,gw,g.size*pt,{url:g.lien});
+          xx+=gw}})}}};
+  const img=(im,w,h)=>({h,w,draw(x,y){try{doc.addImage(im.data,im.fmt,x,y,w,h,undefined,'FAST')}catch(e){console.warn(e)}}});
+  const caseC=on=>({h:3.6,w:3.6,draw(x,y){doc.setDrawColor(...NOIR);doc.setLineWidth(.8*pt);doc.rect(x,y,3.6,3.6,'S');
+    if(on){doc.setLineWidth(1.3*pt);doc.line(x+.6,y+3,x+3,y+.6);doc.line(x+.6,y+.6,x+3,y+3)}}});
+  // Tableau façon reportlab : cellule = liste d'éléments empilés ; VALIGN ; ALIGN ; fonds ; grille ou cadre
+  const TAB=(spec)=>{const W=spec.w,xs=[];let x=FX+(FW-W.reduce((s,v)=>s+v,0))/2;W.forEach(v=>{xs.push(x);x+=v});
+    const rows=spec.rows.map((r,i)=>{const pd=spec.pad(i);const cells=r.map((c,j)=>{const iw=W[j]-pd.l-pd.r;const it=(c?(Array.isArray(c)?c:[c]):[]).map(e=>typeof e==='function'?e(iw):e);
+        return{it,h:it.reduce((s,e)=>s+e.h,0),iw,al:spec.align?spec.align(i,j):'left'}});
+      return{cells,pd,h:Math.max(...cells.map(c=>c.h))+pd.t+pd.b,i}});
+    return{xs,W,rows,largeur:W.reduce((s,v)=>s+v,0),dessiner(liste,y){
+      for(const r of liste){for(let j=0;j<W.length;j++){const bg=spec.bg&&spec.bg(r.i,j);if(bg){doc.setFillColor(...bg);doc.rect(xs[j],y,W[j],r.h,'F')}}
+        r.cells.forEach((c,j)=>{let yy=spec.valign==='top'?y+r.pd.t:y+(r.h+r.pd.t-r.pd.b-c.h)/2;
+          for(const e of c.it){const ew=e.w??c.iw;const x=c.al==='center'?xs[j]+(W[j]+r.pd.l-r.pd.r-ew)/2:c.al==='right'?xs[j]+W[j]-r.pd.r-ew:xs[j]+r.pd.l;e.draw(x,yy,c.iw);yy+=e.h}});
+        r.y=y;y+=r.h}
+      const y0=liste[0].y,y1=y,x0=xs[0],x1=xs[0]+W.reduce((s,v)=>s+v,0);
+      if(spec.grille){doc.setDrawColor(...TRAIT);doc.setLineWidth(.5*pt);
+        for(const r of liste)doc.line(x0,r.y,x1,r.y);doc.line(x0,y1,x1,y1);xs.forEach(x=>doc.line(x,y0,x,y1));doc.line(x1,y0,x1,y1)}
+      if(spec.cadre){doc.setDrawColor(...spec.cadre.c);doc.setLineWidth(spec.cadre.w*pt);doc.rect(x0,y0,x1-x0,y1-y0,'S')}
+      return y}}};
+  const P_=(t,st,extra)=>iw=>para(t,st,iw,extra?.align);
+  const libelle=ach?"Fiche d'achats – Éléments standards":`Fiche de suivi atelier – ${f.metier}`;
+  const code=ach?'Achats':f.metier.replace(/ /g,'_');
+  let y=TOP;
+  // 1. Haut : logo 24 mm + titre / n° d'affaire / client / « Fiche FA-… – éditée le … »
+  const T={size:20,lead:24,color:K},A={size:22,lead:26,bold:true},R={size:10,lead:12.5};
+  const haut=TAB({w:[40,142],valign:'top',pad:()=>({l:0,r:0,t:3*pt,b:3*pt}),align:(i,j)=>j?'right':'left',rows:[[
+    [{h:24,w:24,draw(x,yy){try{doc.addImage(CF_LOGO,'JPEG',x,yy,24,24)}catch(e){}}}],
+    [P_(ach?[{t:"Fiche d'achats – "},{t:'Éléments standards',bold:true}]:[{t:'Fiche de suivi atelier – '},{t:f.metier,bold:true}],T,{align:'right'}),
+     P_(a.affaire,A,{align:'right'}),P_(a.client||'',R,{align:'right'}),
+     P_(`Fiche FA-${a.affaire}-${code} – éditée le ${a.edition}${opt.modifiee?' – modifiée le '+opt.modifiee:''}`,R,{align:'right'})].map(fn=>iw=>({...fn(iw),w:iw}))]]});
+  y=haut.dessiner(haut.rows,y);
+  y+=8;
+  // 2. Encadré délais / référent / dossier
+  const rouge=d=>P_([{t:d||'',size:15,bold:true,color:ROUGE}],N);
+  const lien=P_([{t:a.dossier_nom||'',color:BLEU,lien:a.dossier_url||''}],P);
+  const infos=ach?[['Réception au plus tard',rouge(f.reception)],['Délai atelier',P_(a.delai_atelier||'',B)],['Expédition client',P_(a.expedition||'',B)],
+      ['Référent achat',P_(f.referent_achat||a.referent||'',N)],['Dossier / plans',lien]]
+    :[['Délai atelier',rouge(a.delai_atelier)],['Expédition client',P_(a.expedition||'',B)],['Référent affaire',P_(a.referent||'',N)],['Dossier / plans',lien]];
+  opt.lien=true;
+  const info=TAB({w:[40,142],grille:true,bg:(i,j)=>j===0?FOND:null,pad:()=>({l:6*pt,r:6*pt,t:4*pt,b:4*pt}),rows:infos.map(([k,v])=>[P_(k,B),v])});
+  y=info.dessiner(info.rows,y);
+  // 3. Gravure (fabrication)
+  if(!ach){y+=4;const g=f.gravure,rens=g!=null,oui=rens&&typeof g==='object'?!!g.oui:(rens?!!g:null);
+    const tg=rens&&typeof g==='object'?String(g.texte||g.precision||'').trim():'',pro=rens&&typeof g==='object'?String(g.procede||'').trim().toLowerCase():'';
+    const gr=TAB({w:[17,5,9,5,9,72,17,5,16,5,22],pad:()=>({l:2*pt,r:2*pt,t:5*pt,b:5*pt}),cadre:{w:oui?1.2:.8,c:oui?K:TRAIT},rows:[[
+      P_('Gravure :',B),caseC(rens&&oui===false),P_('Non',N),caseC(!!oui),P_('Oui',N),
+      oui&&tg?P_(faLisible(tg),B):(rens?null:P_([{t:'À graver : ……………………………',color:GRIS}],N)),
+      P_('Procédé :',B),caseC(!!oui&&pro.startsWith('mach')),P_('Machine',N),caseC(!!oui&&pro.startsWith('las')),P_('Laser',N)]]});
+    y=gr.dessiner(gr.rows,y);y+=6}
+  else y+=7;
+  // 4. Tableau des pièces / articles (en-tête répété à chaque page)
+  let tab;const tot=f.lignes.reduce((s,l)=>s+(+l.qte||0),0),totTxt=String(Math.round(tot*1000)/1000);
+  const H=ach?{size:9.5,lead:11,bold:true,color:BLANC}:{...B,color:BLANC};
+  if(!ach){
+    const rows=[['Visuel','Rep.','Désignation / réf.','Qté','Matière','Traitement','Dimensions finies'].map(x=>P_(x,H))];
+    f.lignes.forEach((l,i)=>{const im=opt.images?.[i];
+      rows.push([im?img(im,24,24):null,P_(String(l.rep??''),N),[P_(faLisible(l.designation),B),P_(faLisible(l.ref||''),P)],P_(String(l.qte??''),B),
+        P_(faLisible(l.matiere||''),P),P_(faLisible(l.traitement??'—'),P),P_(faLisible(l.dimensions||''),P)])});
+    rows.push([null,null,P_('Total pièces',B),P_(totTxt,B),null,null,null]);
+    const n=rows.length;
+    tab=TAB({w:[27,12,52,12,27,24,28],grille:true,bg:(i)=>i===0?K:i===n-1?FOND:null,align:(i,j)=>j===0&&i>0&&i<n-1?'center':'left',
+      pad:()=>({l:6*pt,r:6*pt,t:3*pt,b:3*pt}),rows})}
+  else{
+    const rows=[['Rep.','Désignation','Réf. fournisseur','Fournisseur','Dimensions','Qté','Pour','Commandé le','Reçu le'].map(x=>P_(x,H))];
+    f.lignes.forEach(l=>rows.push([P_(String(l.rep??''),N),P_(faLisible(l.designation),B),P_(faLisible(l.ref||'—'),N),P_(l.fournisseur||'',P),P_(l.dimensions||'',P),
+      P_(String(l.qte??''),B),P_(l.pour||'',P),null,null]));
+    rows.push([null,P_('Total articles',B),null,null,null,P_(totTxt,B),null,null,null]);
+    const n=rows.length;
+    tab=TAB({w:[11,25,21,21,24,10,26,22,22],grille:true,bg:(i)=>i===0?K:i===n-1?FOND:null,
+      pad:(i)=>({l:6*pt,r:6*pt,t:i>0&&i<n-1?7*pt:3*pt,b:i>0&&i<n-1?7*pt:3*pt}),rows})}
+  { const [h,...corps]=tab.rows;let part=[h];
+    if(y+h.h+(corps[0]?.h||0)>BOT){doc.addPage();y=TOP}
+    for(const r of corps){if(y+part.reduce((s,x)=>s+x.h,0)+r.h>BOT&&part.length>1){tab.dessiner(part,y);doc.addPage();y=TOP;part=[h]}part.push(r)}
+    y=tab.dessiner(part,y)}
+  // 5. Observations (seulement si renseignées)
+  const obs=(f.observations||[]).filter(Boolean);
+  if(obs.length){y+=8;const w=FW-2*PADF;
+    for(const [k,o] of [[-1,'Observations'],...obs.map((o,i)=>[i,o])]){const p=para(k<0?[{t:o,bold:true}]:o,N,w);if(y+p.h>BOT){doc.addPage();y=TOP}p.draw(FX+PADF,y);y+=p.h}}
+  // En-tête et pied de chaque page : « KTE – … (document interne, sans prix) », « Page x/N », flèche « Suite au verso »
+  const NP=doc.getNumberOfPages();
+  for(let i=1;i<=NP;i++){doc.setPage(i);fnt(9,false);doc.setTextColor(...GRIS);
+    doc.text(`KTE – ${libelle} – ${a.affaire}  (document interne, sans prix)`,16,10);doc.text(`Page ${i}/${NP}`,194,10,{align:'right'});
+    doc.setDrawColor(...TRAIT);doc.setLineWidth(1*pt);doc.line(16,11.5,194,11.5);
+    if(i<NP){fnt(11,true);doc.setTextColor(...NOIR);doc.text('Suite au verso',180,289.5,{align:'right'});
+      doc.setDrawColor(...NOIR);doc.setLineWidth(2.2*pt);doc.line(182,288,191,288);doc.setFillColor(...NOIR);doc.triangle(194,288,189.5,285,189.5,291,'F')}}
+  doc.setProperties({title:ach?`Fiche d'achats standards ${a.affaire}`:`Fiche atelier ${f.metier} ${a.affaire}`,author:'KTE'});
+  return{blob:doc.output('blob'),pages:NP};
 }
 async function faCreerFiche(){
   const c=FT.ch,M=FA_METIERS[FT.metier],ach=!!M.achats,{cde,n}=FT,ED=FT.edit,manque=[];
@@ -2553,14 +2607,24 @@ async function faCreerFiche(){
   const refR=FT.REF.find(r=>String(r.id)===String(c.faRef));
   const url=/^https?:/.test(cde['Dossier SharePoint']||'')?String(cde['Dossier SharePoint']):'';
   if(ED&&!url){b.disabled=false;b.textContent='Enregistrer la fiche modifiée';return toast('Pas de « Dossier SharePoint » : impossible de remplacer la fiche.',true)}
-  let dossier='';if(url){try{const s=decodeURIComponent(new URL(url).pathname).split('/').filter(Boolean);dossier=s.slice(-2).join(' / ')}catch(e){}}
+  const jour=new Date().toLocaleDateString('fr-FR'),frD=v=>v?frDate(v):'';
+  let dosNom='';if(url){try{dosNom=decodeURIComponent(new URL(url).pathname).split('/').filter(Boolean).pop()||''}catch(e){}}
+  const nomRef=r=>r?(txt(r['Nom complet'])||titre(MODS.referents.t,r)):'';
+  const refAff=FT.REF.find(r=>r.id===ids(cde['Référent KTE'])[0]);
+  const cli=(S.rows[MODS.clients.t]||[]).find(r=>r.id===ids(cde.Client)[0]);
+  // Affaire + fiche au format JSON de la compétence « fiches atelier » (même rendu PDF que generer_fiche_atelier.py)
+  const aff={affaire:n,client:txt(cli?.Entreprise)||txt(cde.Client),edition:ED?(ED.src?.data?.edition||ED.edition||jour):jour,
+    delai_atelier:frD(ach?c.faDelaiAt:c.faDelai),expedition:frD(c.faExp),referent:nomRef(refAff)||nomRef(refR),dossier_nom:dosNom,dossier_url:url,vignettes:'Vignettes'};
+  const num=q=>q===''||q==null?0:(+String(q).replace(',','.')||0);
+  const fe={metier:FT.metier,...(ach?{reception:frD(c.faDelai),referent_achat:nomRef(refR)}:{gravure:c.faGrav==='oui'?{oui:true,texte:String(c.faGravTxt||'').trim(),procede:c.faGravProc||'Machine'}:{oui:false}}),
+    lignes:L.map(l=>{const v=l.vigNom?{vignette:l.vigNom}:{},x={rep:String(l.rep).trim(),designation:String(l.des).trim()};
+      return ach?{...v,...x,ref:String(l.reff||'').trim(),fournisseur:l.four||'',dimensions:l.dim||'',qte:num(l.qte),pour:l.pour||''}
+        :{...v,...x,ref:String(l.ref||'').trim(),qte:num(l.qte),matiere:l.mat||'',traitement:l.trait||'',dimensions:l.dim||''}}),
+    observations:String(c.faObs||'').split('\n').map(x=>x.trim()).filter(Boolean),...(ED?{modifiee:jour}:{})};
   const imgs=new Map();for(const s of new Set(L.map(l=>l.vig||FT.vigAff).filter(Boolean)))imgs.set(s,await faImage(s));
-  const D={n,metier:FT.metier,client:txt(cde.Client),edition:new Date().toLocaleDateString('fr-FR'),manuel:true,modifDe:ED?ED.edition||'':'',delai:dfr(c.faDelai),delaiAt:dfr(c.faDelaiAt||''),exp:dfr(c.faExp||''),
-    ref:refR?(txt(refR['Nom complet'])||titre(MODS.referents.t,refR)):'',dossier,obs:String(c.faObs||'').trim(),
-    gravure:ach?null:{oui:c.faGrav==='oui',texte:String(c.faGravTxt||'').trim(),procede:c.faGrav==='oui'?c.faGravProc:''},
-    lignes:L.map(l=>({rep:String(l.rep).trim(),des:String(l.des).trim(),ref:String(l.ref||'').trim(),qte:l.qte===''?'':+String(l.qte).replace(',','.'),mat:l.mat,trait:l.trait,dim:l.dim,four:l.four,reff:l.reff,pour:l.pour,
-      img:imgs.get(l.vig||FT.vigAff)||null}))};
-  const {blob,pages}=await faConstruirePDF(D);
+  const images=ach?[]:L.map(l=>imgs.get(l.vig||FT.vigAff)||null);
+  const {blob,pages}=await faConstruirePDF(aff,fe,{images,modifiee:ED?jour:''});
+
   let nom=ED?ED.nom:`FA_${n}_${M.fic}.pdf`,lien='';
   if(url){try{b.textContent='Enregistrement dans SharePoint…';
       const j=await jetonGraph(['Files.ReadWrite.All']),dos=await dossierSPA(j,url),drive=dos.parentReference.driveId;
@@ -2575,14 +2639,10 @@ async function faCreerFiche(){
         const nv=`${n}_Rep${r0?r0.padStart(2,'0'):'X'+(L.indexOf(l)+1)}_${slug}.png`;
         try{await graph(j,chemin('Vignettes/'+nv)+':/content?@microsoft.graph.conflictBehavior=replace',{method:'PUT',headers:{'Content-Type':'image/png'},body:await (await fetch(l.vig)).blob()});l.vigNom=nv;l.vigUp=false}catch(e){console.warn('vignette',e)}}
       // Données (format de la compétence « fiches atelier ») : JSON de la fiche, ou entrée du métier dans FA_<affaire>.json
-      const frD=v=>v?frDate(v):'';
-      const fe={metier:FT.metier,...(ach?{reception:frD(c.faDelai),delai_atelier:frD(c.faDelaiAt),referent_achat:D.ref}:{delai_atelier:frD(c.faDelai),gravure:D.gravure.oui?{oui:true,texte:D.gravure.texte,procede:D.gravure.procede}:{oui:false}}),
-        expedition:frD(c.faExp),referent:D.ref,observations:D.obs?D.obs.split('\n').map(x=>x.trim()).filter(Boolean):[],...(ED?{modifiee:D.edition}:{}),
-        lignes:L.map((l,i)=>{const x=D.lignes[i],v=l.vigNom?{vignette:l.vigNom}:{};return ach?{...v,rep:x.rep,designation:x.des,ref:x.reff,fournisseur:x.four,dimensions:x.dim,qte:x.qte,pour:x.pour}
-          :{...v,rep:x.rep,designation:x.des,ref:x.ref,qte:x.qte,matiere:x.mat,traitement:x.trait,dimensions:x.dim}})};
+      L.forEach((l,i)=>{if(l.vigNom)fe.lignes[i].vignette=l.vigNom});
       let jn=nom.replace(/\.pdf$/i,'.json'),js;
       if(ED&&ED.nom===nom&&ED.src?.type==='global'){jn=ED.src.nom;js=ED.src.data;js.fiches[ED.src.i]={...js.fiches[ED.src.i],...fe}}
-      else js={affaire:n,client:D.client,edition:ED?.src?.data?.edition||D.edition,...(ED?{modifiee:D.edition}:{}),source:'Akteev',dossier_url:url,vignettes:'Vignettes',fiches:[fe]};
+      else js={...aff,...(ED?{modifiee:jour}:{}),source:'Akteev',fiches:[fe]};
       try{await graph(j,chemin(jn)+':/content?@microsoft.graph.conflictBehavior=replace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(js,null,1)})}catch(e){console.warn('JSON',e);toast('Données de la fiche non enregistrées ('+e.message+')',true)}
     }catch(e){console.warn(e);toast('SharePoint indisponible ('+e.message+') : PDF téléchargé seulement'+(ED?', fiche NON remplacée.':', sans lien dans la tâche.'),true)}}
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;if(!lien){document.body.appendChild(a);a.click();a.remove()}else window.open(a.href,'_blank');
@@ -2591,12 +2651,12 @@ async function faCreerFiche(){
   b.textContent='Mise à jour de la tâche…';
   const dec=x=>{try{return decodeURIComponent(x)}catch(e){return x}};
   const ligneFiche=`${ach?'Fiche d\'achats':'Fiche atelier'}${lien?' : '+lien:' : '+nom+' (non enregistrée dans SharePoint)'}`;
-  const resume=`Fiche ${ach?'d\'achats':FT.metier} ${ED?'modifiée':'créée'} dans Akteev le ${D.edition} : ${D.lignes.map(l=>l.rep?'rep. '+l.rep:l.des).join(' ; ').slice(0,300)}`;
+  const resume=`Fiche ${ach?'d\'achats':FT.metier} ${ED?'modifiée':'créée'} dans Akteev le ${jour} : ${fe.lignes.map(l=>l.rep?'rep. '+l.rep:l.designation).join(' ; ').slice(0,300)}`;
   const syIds=[...new Set(L.flatMap(l=>l.sy.filter(s=>M.etape.test(s.etape)).map(s=>s.id)))];
   let t=FT.TT.find(r=>String(r.id)===String(c.faTache)),r,echMaj=false;
   if(t){const notes=String(t.Notes||'');const corps={},aj=[];
     if(!dec(notes).includes(nom))aj.push(lien?ligneFiche:resume+'\n'+ligneFiche);
-    if(ED)aj.push(`Fiche ${ach?'d\'achats':FT.metier} modifiée dans Akteev le ${D.edition}${MOI?' ('+titre(MODS.referents.t,FT.REF.find(x=>x.id===MOI)||{})+')':''}`);
+    if(ED)aj.push(`Fiche ${ach?'d\'achats':FT.metier} modifiée dans Akteev le ${jour}${MOI?' ('+titre(MODS.referents.t,FT.REF.find(x=>x.id===MOI)||{})+')':''}`);
     if(aj.length)corps.Notes=(notes.trim()?notes.replace(/\s+$/,'')+'\n':'')+aj.join('\n');
     if(ED&&c.faDelai&&c.faDelai!==t['Échéance']){corps['Échéance']=c.faDelai;echMaj=true}
     const sy=[...new Set([...ids(t['Synthèse commande']),...syIds])];if(sy.length!==ids(t['Synthèse commande']).length)corps['Synthèse commande']=sy;
@@ -2608,8 +2668,8 @@ async function faCreerFiche(){
   majRow(MODS.taches.t,r);
   const verbe=ED?'modifiée':'créée';
   $('mTitre').textContent=nom+' '+verbe;
-  const sansVig=D.lignes.filter(l=>!l.img).length;
-  $('mCorps').innerHTML=`<div style="padding:8px 0;line-height:1.7">Fiche <b>${esc(nom)}</b> ${verbe} (${pages} page${pages>1?'s':''}, ${D.lignes.length} ligne(s), ${nb(D.lignes.reduce((s,l)=>s+(+l.qte||0),0))} ${ach?'article(s)':'pièce(s)'}${sansVig?`, ${sansVig} sans vignette`:''}) ${lien?(ED?'et remplacée dans <b>05_Commande/Fiches atelier</b> (l’ancienne version reste dans l’historique des versions SharePoint)':'enregistrée dans <b>05_Commande/Fiches atelier</b>'):'<b>téléchargée</b> (pas d’enregistrement SharePoint)'}.<br>Tâche ${t?'mise à jour':'créée'}${echMaj?' (nouvelle échéance '+dfr(c.faDelai)+')':''} : <a href="#/taches/${r.id}" onclick="fermerModal()">${esc(txt(r['Libellé']))}</a>.${ED?'<br><b>Pensez à réimprimer la fiche pour l’atelier.</b>':''}</div>`;
+  const sansVig=ach?0:images.filter(x=>!x).length;
+  $('mCorps').innerHTML=`<div style="padding:8px 0;line-height:1.7">Fiche <b>${esc(nom)}</b> ${verbe} (${pages} page${pages>1?'s':''}, ${fe.lignes.length} ligne(s), ${nb(fe.lignes.reduce((s,l)=>s+(+l.qte||0),0))} ${ach?'article(s)':'pièce(s)'}${sansVig?`, ${sansVig} sans vignette`:''}) ${lien?(ED?'et remplacée dans <b>05_Commande/Fiches atelier</b> (l’ancienne version reste dans l’historique des versions SharePoint)':'enregistrée dans <b>05_Commande/Fiches atelier</b>'):'<b>téléchargée</b> (pas d’enregistrement SharePoint)'}.<br>Tâche ${t?'mise à jour':'créée'}${echMaj?' (nouvelle échéance '+dfr(c.faDelai)+')':''} : <a href="#/taches/${r.id}" onclick="fermerModal()">${esc(txt(r['Libellé']))}</a>.${ED?'<br><b>Pensez à réimprimer la fiche pour l’atelier.</b>':''}</div>`;
   $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Fermer</button>${lien?`<a class="btn p" href="${esc(lien)}" target="_blank">${ico('pdf')}Ouvrir la fiche</a>`:''}`;
   toast(nom+' '+verbe);await faApresCreation();
 }
