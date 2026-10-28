@@ -61,6 +61,7 @@ h1{font-size:21px;margin:0;font-weight:700}
 .btn.d{color:var(--err)}
 .btn.vert{background:#DCFCE7;border-color:#86EFAC;color:#166534}
 .btn.vert:hover{background:#BBF7D0}
+.ic16 svg{width:16px;height:16px;flex:none}
 .btn:disabled{opacity:.5;cursor:default}
 .btn svg{width:15px;height:15px}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);border:1px solid #EAEDF2}
@@ -282,7 +283,7 @@ const I={
  retour:'<path d="M15 18l-6-6 6-6"/>',euro:'<path d="M17 6.5A6.5 6.5 0 1 0 17 17.5M4 10h9M4 14h9"/>',alerte:'<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/>',
  loupe:'<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>',
  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
- stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+ stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',crayon:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
  nc:'<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/><path d="M12 8v5M12 16h.01"/>',
  cle:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
 };
@@ -1308,7 +1309,7 @@ function dessinerFiche(){
     ${stF&&!nouveau&&!ecr?badge(val(m.statut)):''}${stF&&!nouveau&&ecr?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
     <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
     <div class="act">${lienEditeur?`<a class="btn p" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
-    ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>`).join(''):''}
+    ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>${/^FA_.+\.pdf$/i.test(x.fichier)&&peutEcrire('taches')&&ids(row.Commande).length?`<button class="btn vert" data-fat="${esc(x.fichier)}" title="Rouvrir et modifier ${esc(x.fichier)}">${ico('crayon')}Modifier</button>`:''}`).join(''):''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn p" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn ${n>1?'p':''}" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
     ${k==='utilisateurs'&&!nouveau&&peutVoir('droits')&&row['E-mail']?`<a class="btn p" href="#/droits?u=${encodeURIComponent(String(row['E-mail']).trim().toLowerCase())}">${ico('cle')}Droits d’accès</a>`:''}
@@ -1332,6 +1333,7 @@ function dessinerFiche(){
   if(k==='devis'&&!nouveau&&peutVoir('consult')&&!S.rows[MODS.consult.t])charger(MODS.consult.t).then(()=>{if(SALE&&SALE.k==='devis'&&SALE.id===row.id&&!Object.keys(SALE.draft).length)dessinerFiche()}).catch(()=>{});
   if($('bCfPdf')){$('bCfPdf').onclick=()=>cfEditer(SALE.row);prechargerMSAL()}
   if($('bCfEnv'))$('bCfEnv').onclick=()=>cfEnvoyer(SALE.row);
+  document.querySelectorAll('#main [data-fat]').forEach(b=>b.onclick=async()=>{try{await charger(MODS.commandes.t);const c=(S.rows[MODS.commandes.t]||[]).find(x=>x.id===ids(SALE.row.Commande)[0]);if(!c)return toast('Commande de la tâche introuvable',true);await creerTacheFiche(c,'fiche',b.dataset.fat)}catch(e){toast('Erreur : '+e.message,true)}});
   if($('bFT')){$('bFT').onclick=()=>creerTacheFiche(SALE.row,'tache').catch(e=>toast('Erreur : '+e.message,true));prechargerMSAL()}
   if($('bBL'))$('bBL').onclick=()=>fenetreBL(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if($('selSt'))$('selSt').onchange=async e=>{const o=stF.select_options.find(x=>x.id==e.target.value);try{const r=await changerStatut(k,SALE.row,o.id,o.value);SALE.row=r;delete SALE.draft[m.statut];dessinerFiche()}catch(er){toast('Échec : '+er.message,true)}};
@@ -1499,7 +1501,7 @@ async function dessinerLiees(i){
   h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='taches'&&c===MODS[cible].statut&&peutEcrire(cible)?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
   h+='</tbody></table></div>';
   if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
-  if(x.ajout&&cible==='taches'&&k==='commandes'&&peutEcrire(cible))h+=`<div class="plus"><button class="btn vert" id="bAjT">${ico('plus')}Ajouter une tâche</button> <button class="btn vert" id="bAjF">${ico('pdf')}Créer une fiche atelier</button></div>`;
+  if(x.ajout&&cible==='taches'&&k==='commandes'&&peutEcrire(cible))h+=`<div class="plus"><button class="btn vert" id="bAjT">${ico('plus')}Ajouter une tâche</button> <button class="btn vert" id="bAjF">${ico('pdf')}Créer une fiche atelier</button> <button class="btn vert" id="bModF">${ico('crayon')}Modifier une fiche</button></div>`;
   else if(x.ajout&&cible&&peutEcrire(cible))h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
   else if(x.ajout&&!cible&&peutEcrire(k))h+=`<div class="plus"><button class="btn" id="bAjL">${ico('plus')}Ajouter une ligne</button></div>`;
   if(m.editeur&&x.t)h+=`<div class="plus mut" style="font-size:12.5px">Les lignes se modifient dans l’éditeur (mise en page, vignettes, versions).</div>`;
@@ -1509,6 +1511,7 @@ async function dessinerLiees(i){
   if($('bAjL'))$('bAjL').onclick=()=>editerLigne(t,x,null);
   if($('bAjT'))$('bAjT').onclick=()=>creerTacheFiche(row,'tache').catch(e=>toast('Erreur : '+e.message,true));
   if($('bAjF'))$('bAjF').onclick=()=>creerTacheFiche(row,'fiche').catch(e=>toast('Erreur : '+e.message,true));
+  if($('bModF'))$('bModF').onclick=()=>creerTacheFiche(row,'fiche').catch(e=>toast('Erreur : '+e.message,true));
 }
 /* Petite fenêtre d'édition pour les lignes sans module propre (ex. lignes de commande fournisseur). */
 async function editerLigne(t,x,r){
@@ -1899,7 +1902,7 @@ async function documentsAffaire(cde){
   if(D.taches){const TT=D.taches.filter(r=>lie(r,'Commande')&&!/annul/i.test(txt(r.Statut)));
     const FA=[],vus=new Set();let dosFA='';
     for(const r of TT)for(const x of fichesNotes(r.Notes)){if(vus.has(x.url))continue;vus.add(x.url);if(!dosFA&&/sharepoint\.com/i.test(x.url))dosFA=x.url.split(/[?#]/)[0].replace(/\/[^\/]*$/,'');
-      FA.push(doc({ico:'pdf',lab:x.value==='RC'?'Rapport de contrôle':x.value==='Plan contrôle'?'Plan de contrôle':'Fiche '+x.value,gras:true,sous:x.fichier,url:x.url,nom:x.fichier}))}
+      FA.push(doc({ico:'pdf',lab:x.value==='RC'?'Rapport de contrôle':x.value==='Plan contrôle'?'Plan de contrôle':'Fiche '+x.value,gras:true,sous:x.fichier,url:x.url,nom:x.fichier,fa:/^FA_.+\.pdf$/i.test(x.fichier)?x.fichier:''}))}
     if(FA.length)G.push(['Fiches atelier',dosFA?[{ico:'dossier',lab:'Dossier « Fiches atelier »',sous:'',titre:true,lienDossier:dosFA},...FA]:FA]);
     if(TT.length)G.push(['Tâches',[doc({ico:'taches',lab:`Tâches ${n}`,sous:`${TT.length} tâche(s) – PDF généré`,gen:()=>pdfTaches(cde,TT),nom:`Taches_${n}.pdf`})]])}
   /* 5. Synthèse */
@@ -1921,10 +1924,11 @@ async function documentsAffaire(cde){
       const lab=d.k?`<a href="#/${d.k}/${d.id}" style="color:var(--txt)">${ico(d.ico)}<b style="margin-left:6px">${esc(d.lab)}</b> <span class="mut">${esc(d.sous||'')}</span></a>`
         :d.url?`<a href="${esc(d.url)}" target="_blank" style="color:var(--txt);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="Ouvrir ${esc(d.nom||d.lab)}">${ico(d.ico)}<span style="margin-left:6px">${d.gras?`<b>${esc(d.lab)}</b>`:esc(d.lab)}</span> <span class="mut">${esc(d.sous||'')}</span></a>`
         :`<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(d.lab)}">${ico(d.ico)}<span style="margin-left:6px">${esc(d.lab)}</span> <span class="mut">${esc(d.sous||'')}</span></span>`;
-      h+=`<div class="lien" style="justify-content:space-between;${d.ind?'padding-left:34px':''}">${lab}${btn(d,i)}</div>`}}
+      h+=`<div class="lien" style="justify-content:space-between;${d.ind?'padding-left:34px':''}">${lab}${d.fa&&peutEcrire('taches')?`<span style="display:flex;gap:4px;flex:none"><button class="btn vert" style="padding:3px 7px" data-fa="${esc(d.fa)}" title="Rouvrir et modifier cette fiche">${ico('crayon')}</button>${btn(d,i)}</span>`:btn(d,i)}</div>`}}
   $('docsAff').innerHTML=h||'<div class="c mut">Aucun document pour cette affaire.</div>';
   $('docsAff').querySelectorAll('[data-dl]').forEach(b=>b.onclick=e=>{const d=DOCS_AFF[+b.dataset.dl];if(d?.gen){e.preventDefault();telechargerDoc(d).catch(er=>toast('Échec : '+er.message,true))}});
   if($('dlTout'))$('dlTout').onclick=()=>toutTelecharger(DOCS_AFF);
+  $('docsAff').querySelectorAll('[data-fa]').forEach(b=>b.onclick=e=>{e.preventDefault();e.stopPropagation();creerTacheFiche(cde,'fiche',b.dataset.fa).catch(er=>toast('Erreur : '+er.message,true))});
 }
 /* Un fichier : généré → blob ; SharePoint → lien « ?download=1 » suivi dans la page (le serveur répond en pièce jointe :
    la page reste affichée et la session SharePoint de l'utilisateur est utilisée) ; autre → cadre caché. */
@@ -2217,7 +2221,12 @@ async function fenetreBL(cde){
      vignette de l'affaire (première vignette de ses lignes) ; chaque vignette peut être remplacée par une image.
      Dates saisies en jj/mm/aaaa (champDate). PDF jsPDF au format des fiches (couleur du métier sur le titre et l'en-tête du
      tableau, sans aplat, colonne Visuel, « Page x/N » + « Suite au verso → »), déposé dans <Dossier SharePoint>/05_Commande/
-     Fiches atelier/FA_<affaire>_<Métier>.pdf (+ .json), lien écrit dans les Notes de la tâche. Document interne, sans prix. */
+     Fiches atelier/FA_<affaire>_<Métier>.pdf (+ .json), lien écrit dans les Notes de la tâche. Document interne, sans prix.
+   Réouverture (29/10/2026) : toute fiche FA_*.pdf du dossier « Fiches atelier » de l'affaire peut être rouverte et modifiée
+   (sélecteur « Fiche » de la fenêtre, crayon dans « Documents de l'affaire », bouton « Modifier une fiche » de l'onglet Tâches,
+   crayon à côté de la fiche sur la page d'une tâche). Données relues dans FA_<affaire>_<Métier>.json (Akteev) sinon dans
+   FA_<affaire>.json (compétence « fiches atelier », entrée du métier, mise à jour en place pour garder les RC cohérents).
+   Le PDF est remplacé au même nom (historique des versions SharePoint), en-tête « modifiée », tâche liée : note + échéance. */
 const FA_METIERS={
   'Fraisage':{coul:[31,95,168],etape:/^fraisage$/i,fic:'Fraisage',cat:/^fraisage$/i},
   'Tournage':{coul:[46,125,50],etape:/^tournage$/i,fic:'Tournage',cat:/^tournage$/i},
@@ -2229,7 +2238,8 @@ const faSel=(id,opts,v)=>`<select id="${id}">${opts.map(([val,lab])=>`<option va
 const faDate=(id,v)=>champDate(`id="${id}" style="margin-left:0"`,v||'',false);
 /* Vignette d'une ligne de devis / d'ARC : « Vignette PDF » (data URI) sinon le fichier « Vignette » */
 const faVig=l=>{const d=String(l?.['Vignette PDF']||'');if(/^data:image\//.test(d))return d;const f=(Array.isArray(l?.Vignette)?l.Vignette:[])[0];return f?(f.url||f.thumbnails?.card_cover?.url||''):''};
-async function creerTacheFiche(cde,mode){
+const faCopie=l=>({...l,sy:[...l.sy],etapes:[...l.etapes]});
+async function creerTacheFiche(cde,mode,nomFiche){
   ouvrirModal('Tâche / fiche atelier – '+txt(cde['N° affaire']),'<div class="charge">Chargement…</div>','');
   const bx=$('modal').querySelector('.box');bx.style.width='min(1120px,96vw)';bx.style.maxHeight='92vh';$('modal').style.paddingTop='3vh';
   await Promise.all([MODS.taches.t,MODS.catalogue.t,MODS.referents.t,MODS.synthese.t,MODS.devis.t,T_LDV,MODS.arc.t,T_LARC].map(t=>charger(t).catch(()=>[])));
@@ -2257,26 +2267,78 @@ async function creerTacheFiche(cde,mode){
         aide:prem(r['Précisions']),vig:(vigs.find(x=>rep&&x.rep===rep)||{}).v||'',sy:[],etapes:[],coche:false};lignes.push(l)}
     else if(l.orig==='Synthèse'&&q>(+l.qte||0))l.qte=q;
     l.sy.push({id:r.id,etape:et});if(et&&!l.etapes.includes(et))l.etapes.push(et);if(!l.four&&r.Intervenant)l.four=txt(r.Intervenant)}
-  FT={cde,n,mode:mode||'tache',lignes,SY,CAT,REF,TT,vigAff,metier:'',ch:{}};
+  const E=FT={cde,n,mode:mode||'tache',lignes,aff:lignes.map(faCopie),SY,CAT,REF,TT,vigAff,metier:'',ch:{},edit:null,sp:null};
   faMetier(faMetierDefaut());
   faDessiner();
-  faVignettesSP(FT).catch(e=>console.warn('vignettes SharePoint',e));
+  const ch=faChargerSP(E).catch(e=>{console.warn('SharePoint',e);E.sp={erreur:e.message};faRedessiner(E)});
+  if(nomFiche){await ch;if(FT===E)await faOuvrirExistante(nomFiche)}
 }
-/* Vignettes rangées par la compétence « fiches atelier » dans <Dossier SharePoint>/05_Commande/Fiches atelier/Vignettes/
-   (<affaire>_Rep01_….png, _Rep11-12_ = repères 11 et 12) : utilisées pour les lignes sans vignette Baserow, et comme
-   vignette de l'affaire s'il n'y en a pas d'autre. */
-async function faVignettesSP(E){
-  const url=String(E.cde['Dossier SharePoint']||'');if(!/^https?:/.test(url))return;
-  const j=await jetonGraph(['Files.ReadWrite.All']),dos=await dossierSPA(j,url);
-  let L;try{L=(await graph(j,`/drives/${dos.parentReference.driveId}/items/${dos.id}:/05_Commande/Fiches atelier/Vignettes:/children?$top=200`)).value||[]}catch(e){if(e.status===404)return;throw e}
-  L=L.filter(f=>/\.(png|jpe?g)$/i.test(f.name)&&f['@microsoft.graph.downloadUrl']).sort((a,b)=>a.name.localeCompare(b.name));if(!L.length)return;
+const faRedessiner=E=>{if(FT===E&&$('modal').style.display!=='none'&&E.mode==='fiche'&&$('faMet')){faLire();faDessiner()}};
+const faNumRep=r=>String(r||'').split(/[,;]+/).map(x=>x.trim().replace(/^rep\.?\s*/i,'').replace(/^0+(?=\d)/,'')).filter(Boolean);
+/* Dossier SharePoint de l'affaire : fiches existantes (05_Commande/Fiches atelier/FA_*.pdf + *.json) et vignettes rangées par
+   la compétence « fiches atelier » dans Fiches atelier/Vignettes/ (<affaire>_Rep01_….png, _Rep11-12_ = repères 11 et 12) :
+   utilisées pour les lignes sans vignette Baserow, et comme vignette de l'affaire s'il n'y en a pas d'autre. */
+async function faChargerSP(E){
+  const url=String(E.cde['Dossier SharePoint']||'');if(!/^https?:/.test(url)){E.sp={absent:true};return}
+  E.sp={charge:true};
+  const j=await jetonGraph(['Files.ReadWrite.All']),dos=await dossierSPA(j,url),drive=dos.parentReference.driveId;
+  const lister=async p=>{try{return(await graph(j,`/drives/${drive}/items/${dos.id}:/${p}:/children?$top=500`)).value||[]}catch(e){if(e.status===404)return[];throw e}};
+  const [F,V]=await Promise.all([lister('05_Commande/Fiches atelier'),lister('05_Commande/Fiches atelier/Vignettes')]);
+  E.sp={drive,dosId:dos.id,cache:new Map(),
+    fiches:F.filter(f=>/^FA_.+\.pdf$/i.test(f.name)).sort((a,b)=>a.name.localeCompare(b.name)),
+    json:F.filter(f=>/^FA_.+\.json$/i.test(f.name)&&f['@microsoft.graph.downloadUrl']),
+    vig:V.filter(f=>/\.(png|jpe?g)$/i.test(f.name)&&f['@microsoft.graph.downloadUrl']).sort((a,b)=>a.name.localeCompare(b.name))};
+  faRedessiner(E);
+  await faAppliquerVignettes(E);
+}
+const faLireVig=(E,f)=>{const C=E.sp.cache;if(!C.has(f.id))C.set(f.id,fetch(f['@microsoft.graph.downloadUrl']).then(r=>r.blob()).then(faReduireImage).catch(()=>''));return C.get(f.id)};
+async function faAppliquerVignettes(E){
+  const V=E.sp?.vig||[];if(!V.length)return;
   const reps=f=>{const m=f.name.match(/_Rep(\d+)(?:-(\d+))?(?=[_.])/i);if(!m)return[];const a=+m[1],b=m[2]?+m[2]:a;const o=[];for(let i=a;i<=Math.min(b,a+50);i++)o.push(String(i));return o};
-  const cache=new Map(),lire=async f=>{if(!cache.has(f.id))cache.set(f.id,fetch(f['@microsoft.graph.downloadUrl']).then(r=>r.blob()).then(faReduireImage).catch(()=>''));return cache.get(f.id)};
   let n=0;
-  for(const l of E.lignes){if(l.vig||!l.rep)continue;const f=L.find(f=>reps(f).includes(l.rep));if(!f)continue;const d=await lire(f);if(d){l.vig=d;n++}}
-  if(!E.vigAff){const d=await lire(L[0]);if(d)E.vigAff=d}
-  if((n||E.vigAff)&&FT===E&&$('modal').style.display!=='none'&&E.mode==='fiche'&&$('faMet')){faLire();faDessiner()}
+  for(const l of [...E.lignes,...E.aff]){if(l.vig)continue;
+    let f=l.vigNom?V.find(x=>x.name===l.vigNom):null;
+    if(!f){const r=faNumRep(l.rep)[0];if(r)f=V.find(x=>reps(x).includes(r))}
+    if(!f)continue;const d=await faLireVig(E,f);if(d){l.vig=d;l.vigNom=f.name;n++}}
+  if(!E.vigAff){const d=await faLireVig(E,V[0]);if(d){E.vigAff=d;n++}}
+  if(n)faRedessiner(E);
 }
+/* Rouvre une fiche existante : métier d'après le nom, données du JSON, tâche liée = celle dont les notes citent la fiche */
+async function faOuvrirExistante(nom){
+  const E=FT,sp=E.sp||{},f=(sp.fiches||[]).find(x=>x.name===nom);
+  if(!f){toast('Fiche introuvable dans « Fiches atelier » : '+nom,true);return}
+  $('mCorps').insertAdjacentHTML('afterbegin','<div class="charge" style="padding:10px">Lecture de la fiche…</div>');
+  const base=nom.replace(/\.pdf$/i,''),m=base.match(/_(Fraisage_Fil|Fraisage|Tournage|Achats(?:_standards)?)(?:_\d+)?$/i);
+  const metier=!m?'Fraisage':/fil/i.test(m[1])?'Fraisage Fil':/^achat/i.test(m[1])?'Achats':/^tour/i.test(m[1])?'Tournage':'Fraisage',ach=metier==='Achats';
+  const lireJ=async x=>{try{return await fetch(x['@microsoft.graph.downloadUrl'],{cache:'no-store'}).then(r=>r.json())}catch(e){return null}};
+  let src=null,data=null,fi=null;
+  const pj=(sp.json||[]).find(x=>x.name.toLowerCase()===(base+'.json').toLowerCase());
+  if(pj&&(data=await lireJ(pj))&&(data.fiches||[])[0]){fi=data.fiches[0];src={nom:pj.name,type:'propre',data}}
+  if(!fi){const gj=(sp.json||[]).find(x=>x.name.toLowerCase()===`fa_${E.n}.json`.toLowerCase());
+    if(gj&&(data=await lireJ(gj))){const i=(data.fiches||[]).findIndex(x=>ach?/achat/i.test(x.metier||''):norm(x.metier)===norm(metier));if(i>=0){fi=data.fiches[i];src={nom:gj.name,type:'global',data,i}}}}
+  if(FT!==E)return;
+  E.mode='fiche';E.ch={};faMetier(metier);
+  const dec=x=>{try{return decodeURIComponent(x)}catch(e){return x}};
+  const t=E.TT.find(r=>dec(String(r.Notes||'')).includes(nom));
+  if(t){E.ch.faTache=String(t.id);const r=ids(t['Référent'])[0];if(r)E.ch.faRef=String(r);if(t['Échéance'])E.ch.faDelai=t['Échéance']}
+  E.edit={nom,src,edition:(fi&&(fi.modifiee||src.data.edition))||dfr(String(f.lastModifiedDateTime||'').slice(0,10))};
+  if(fi){const G=src.data||{},iso=v=>lireDateFr(v)||'';
+    const d=iso(ach?(fi.reception||G.reception):(fi.delai_atelier||G.delai_atelier));if(d)E.ch.faDelai=d;
+    if(ach){const da=iso(fi.delai_atelier||G.delai_atelier);if(da)E.ch.faDelaiAt=da}
+    const ex=iso(fi.expedition||G.expedition);if(ex)E.ch.faExp=ex;
+    if(!t){const rn=norm(fi.referent_achat||fi.referent||G.referent||'').trim();const rr=rn&&E.REF.find(r=>[r['Nom complet'],r.Nom].some(x=>x&&norm(txt(x)).trim()===rn));if(rr)E.ch.faRef=String(rr.id)}
+    if(!ach&&fi.gravure&&typeof fi.gravure==='object'){E.ch.faGrav=fi.gravure.oui?'oui':'non';if(fi.gravure.oui){E.ch.faGravTxt=fi.gravure.texte||'';E.ch.faGravProc=/laser/i.test(fi.gravure.procede||'')?'Laser':'Machine'}}
+    E.ch.faObs=(Array.isArray(fi.observations)?fi.observations:[fi.observations]).filter(Boolean).join('\n');
+    const reste=E.aff.map(faCopie),pris=new Set();
+    const LF=(fi.lignes||[]).map(x=>{const l={orig:'Fiche',rep:String(x.rep??''),des:x.designation||x.des||'',ref:ach?'':(x.ref||''),reff:ach?(x.ref_fournisseur||x.ref||''):'',qte:x.qte??'',
+        mat:x.matiere||'',trait:x.traitement||'',dim:x.dimensions||'',four:x.fournisseur||'',pour:x.pour||'',aide:'',vig:'',vigNom:x.vignette||'',sy:[],etapes:[],coche:true};
+      for(const r of faNumRep(l.rep)){const a=reste.find(z=>z.rep===r&&!pris.has(z));if(!a)continue;pris.add(a);l.sy.push(...a.sy);a.etapes.forEach(e=>l.etapes.includes(e)||l.etapes.push(e));if(!l.vigNom&&!l.vig&&a.vig)l.vig=a.vig}
+      return l});
+    E.lignes=[...LF,...reste.filter(z=>!pris.has(z))]}
+  else{E.lignes=E.aff.map(faCopie);toast(`Données de ${nom} introuvables (pas de fichier JSON) : recochez et complétez les lignes avant d’enregistrer.`,true)}
+  faDessiner();await faAppliquerVignettes(E);
+}
+function faNouvelle(){const E=FT;E.edit=null;E.ch={};E.lignes=E.aff.map(faCopie);faMetier(faMetierDefaut());faDessiner();faAppliquerVignettes(E)}
 function faMetierDefaut(){const e=FT.lignes.flatMap(l=>l.etapes);return Object.keys(FA_METIERS).find(k=>e.some(x=>FA_METIERS[k].etape.test(x)))||'Fraisage'}
 function faMetier(m){FT.metier=m;const M=FA_METIERS[m];
   const cat=FT.CAT.find(c=>M.cat.test(txt(c.Nom)));FT.catFA=cat||null;
@@ -2313,8 +2375,16 @@ function faDessiner(){
   }else{
     const M=FA_METIERS[FT.metier],ach=!!M.achats,cat=FT.catFA;
     const optT=[['nouvelle',`Nouvelle tâche « ${n} – ${cat?txt(cat.Nom):FT.metier} »`],...TT.map(r=>[r.id,`${txt(r['Libellé'])}${r['Échéance']?' · '+dfr(r['Échéance']):''} · ${txt(r.Statut)}`])];
+    const sp=FT.sp||{},ed=FT.edit;
+    h+=`<div style="display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;padding:9px 12px;margin-bottom:12px;border-radius:8px;background:${ed?'#FFF8E6':'#F0FDF4'};border:1px solid ${ed?'#F5D58A':'#86EFAC'}">
+      <b class="ic16" style="font-size:13px;display:inline-flex;align-items:center;gap:6px">${ico('crayon')}Fiche</b>
+      ${sp.fiches?faSel('faFiche',[['','— Nouvelle fiche —'],...sp.fiches.map(f=>[f.name,`Modifier ${f.name}${f.lastModifiedDateTime?' · '+dfr(f.lastModifiedDateTime.slice(0,10)):''}`])],ed?.nom||'').replace('<select','<select style="min-width:320px;border:1px solid var(--trait);border-radius:7px;padding:6px 8px;background:#fff"')
+        :`<span class="mut" style="font-size:12.5px">${sp.charge||!FT.sp?'Lecture des fiches existantes de l’affaire…':sp.absent?'Pas de « Dossier SharePoint » sur la commande : pas de fiche existante à rouvrir.':'Fiches existantes illisibles'+(sp.erreur?' ('+esc(sp.erreur)+')':'')}</span>`}
+      ${sp.fiches&&!sp.fiches.length?'<span class="mut" style="font-size:12.5px">Aucune fiche existante pour cette affaire.</span>':''}
+      ${ed?`<span style="font-size:12.5px;flex-basis:100%">Modification de <b>${esc(ed.nom)}</b>${ed.edition?' (édition du '+esc(ed.edition)+')':''} : le PDF sera remplacé au même endroit (l’ancienne version reste dans l’historique des versions SharePoint) et la tâche liée sera mise à jour.${ed.src?'':' <b style="color:var(--err)">Données d’origine introuvables : vérifiez les lignes.</b>'}</span>`:''}
+    </div>`;
     h+=`<div class="formU" style="padding:0">
-      ${faChamp('Métier',faSel('faMet',Object.keys(FA_METIERS).map(k=>[k,k==='Achats'?'Achats (éléments standards)':k]),FT.metier))}
+      ${faChamp('Métier',ed?faSel('faMet',[[FT.metier,FT.metier==='Achats'?'Achats (éléments standards)':FT.metier]],FT.metier).replace('<select','<select disabled'):faSel('faMet',Object.keys(FA_METIERS).map(k=>[k,k==='Achats'?'Achats (éléments standards)':k]),FT.metier))}
       ${faChamp('Tâche liée',faSel('faTache',optT,v('faTache','nouvelle')))}
       ${faChamp((ach?'Réception au plus tard':'Délai atelier')+' <span style="color:var(--err)">*</span>',faDate('faDelai',v('faDelai','')))}
       ${ach?faChamp('Délai atelier',faDate('faDelaiAt',v('faDelaiAt',''))):''}
@@ -2351,7 +2421,8 @@ function faDessiner(){
     <div class="mut" style="font-size:12px;margin-top:8px">PDF ${esc(`FA_${n}_${M.fic}.pdf`)} → ${/^https?:/.test(cde['Dossier SharePoint']||'')?'dossier SharePoint de l’affaire, 05_Commande/Fiches atelier/':'<b style="color:var(--err)">pas de « Dossier SharePoint » sur la commande : PDF téléchargé seulement</b>'} · lien ajouté dans les notes de la tâche.</div>`;
   }
   $('mCorps').innerHTML=h;
-  $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="ftOk">${mode==='tache'?ico('plus')+'Créer la tâche':ico('pdf')+'Créer la fiche atelier'}</button>`;
+  $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="ftOk">${mode==='tache'?ico('plus')+'Créer la tâche':FT.edit?ico('pdf')+'Enregistrer la fiche modifiée':ico('pdf')+'Créer la fiche atelier'}</button>`;
+  if($('faFiche'))$('faFiche').onchange=e=>{const v=e.target.value;if(v)faOuvrirExistante(v).catch(er=>toast('Échec : '+er.message,true));else faNouvelle()};
   $('mCorps').querySelectorAll('[data-mo]').forEach(b=>b.onclick=()=>{faLire();FT.mode=b.dataset.mo;faDessiner()});
   if($('ftType'))$('ftType').onchange=()=>{const avant=FT.ch.ftType,c0=FT.CAT.find(c=>String(c.id)===String(avant));faLire();
     const c=FT.CAT.find(x=>String(x.id)===FT.ch.ftType);
@@ -2367,11 +2438,11 @@ function faDessiner(){
   if($('faRien'))$('faRien').onclick=()=>cocher(()=>false);
   if($('faEtape'))$('faEtape').onclick=()=>{const M=FA_METIERS[FT.metier];cocher(l=>l.coche||l.etapes.some(e=>M.etape.test(e)))};
   $('mCorps').querySelectorAll('input[data-vig]').forEach(e=>e.onchange=async()=>{const f=e.files[0];if(!f)return;
-    try{const d=await faReduireImage(f);faLire();const l=FT.lignes[+e.dataset.vig];l.vig=d;l.coche=true;faDessiner()}catch(er){toast('Image illisible : '+er.message,true)}});
+    try{const d=await faReduireImage(f);faLire();const l=FT.lignes[+e.dataset.vig];l.vig=d;l.vigUp=true;l.vigNom='';l.coche=true;faDessiner()}catch(er){toast('Image illisible : '+er.message,true)}});
   if($('faAj'))$('faAj').onclick=()=>{faLire();FT.lignes.push({orig:'Ajout',rep:'',des:'',ref:'',qte:'',mat:'',trait:'',dim:'',four:'',reff:'',pour:'',aide:'',vig:'',sy:[],etapes:[],coche:true});faDessiner();
     const L=$('mCorps').querySelectorAll('input[data-c=rep]');L[L.length-1]?.scrollIntoView({block:'center'});L[L.length-1]?.focus()};
   faTotal();
-  $('ftOk').onclick=()=>{faLire();(FT.mode==='tache'?faCreerTache():faCreerFiche()).catch(e=>{toast('Échec : '+e.message,true);console.error(e);if($('ftOk')){$('ftOk').disabled=false;$('ftOk').innerHTML=FT.mode==='tache'?'Créer la tâche':'Créer la fiche atelier'}})};
+  $('ftOk').onclick=()=>{faLire();(FT.mode==='tache'?faCreerTache():faCreerFiche()).catch(e=>{toast('Échec : '+e.message,true);console.error(e);if($('ftOk')){$('ftOk').disabled=false;$('ftOk').innerHTML=FT.mode==='tache'?'Créer la tâche':FT.edit?'Enregistrer la fiche modifiée':'Créer la fiche atelier'}})};
 }
 function faTotal(){if(!$('faTot'))return;const q=[...$('mCorps').querySelectorAll('input[type=checkbox][data-li]')].filter(e=>e.checked).map(e=>+($('mCorps').querySelector(`input[data-li="${e.dataset.li}"][data-c=qte]`)?.value)||0);
   $('faTot').textContent=`${q.length} ligne(s) cochée(s) sur ${FT.lignes.length} · ${nb(q.reduce((a,b)=>a+b,0))} ${FA_METIERS[FT.metier]?.achats?'article(s)':'pièce(s)'}`}
@@ -2416,7 +2487,7 @@ async function faConstruirePDF(D){
     try{doc.addImage(CF_LOGO,'JPEG',G,10,20,20*800/781)}catch(e){}
     st(17,true,COUL);tx(titreDoc,DR,10,{align:'right'});
     st(22,true);tx(D.n,DR,18.5,{align:'right'});
-    st(10,false,GRIS);tx([D.client,'Édition du '+D.edition+(D.manuel?' (Akteev)':'')].filter(Boolean).join('  ·  '),DR,28.5,{align:'right'});
+    st(10,false,GRIS);tx([D.client,'Édition du '+D.edition+(D.modifDe?' – modifiée (remplace l’édition du '+D.modifDe+')':D.manuel?' (Akteev)':'')].filter(Boolean).join('  ·  '),DR,28.5,{align:'right'});
     y=36;
     const cases=ach?[['Réception au plus tard',D.delai,true],['Délai atelier',D.delaiAt||'—'],['Expédition client',D.exp||'—'],['Référent achat',D.ref||'—'],['Dossier',D.dossier||'—']]
       :[['Délai atelier',D.delai,true],['Expédition client',D.exp||'—'],['Référent',D.ref||'—'],['Dossier',D.dossier||'—']];
@@ -2473,7 +2544,7 @@ async function faConstruirePDF(D){
   return{blob:doc.output('blob'),pages:N};
 }
 async function faCreerFiche(){
-  const c=FT.ch,M=FA_METIERS[FT.metier],ach=!!M.achats,{cde,n}=FT,manque=[];
+  const c=FT.ch,M=FA_METIERS[FT.metier],ach=!!M.achats,{cde,n}=FT,ED=FT.edit,manque=[];
   const L=FT.lignes.filter(l=>l.coche&&(String(l.des).trim()||String(l.rep).trim()));
   if(!L.length)manque.push('au moins une ligne cochée');if(!c.faDelai)manque.push((ach?'Réception au plus tard':'Délai atelier')+' (jj/mm/aaaa)');if(!c.faRef)manque.push('Référent');
   if(!ach&&!c.faGrav)manque.push('Gravure (Non / Oui)');if(!ach&&c.faGrav==='oui'&&!String(c.faGravTxt||'').trim())manque.push('texte à graver');
@@ -2481,36 +2552,53 @@ async function faCreerFiche(){
   const b=$('ftOk');b.disabled=true;b.textContent='Création du PDF…';
   const refR=FT.REF.find(r=>String(r.id)===String(c.faRef));
   const url=/^https?:/.test(cde['Dossier SharePoint']||'')?String(cde['Dossier SharePoint']):'';
+  if(ED&&!url){b.disabled=false;b.textContent='Enregistrer la fiche modifiée';return toast('Pas de « Dossier SharePoint » : impossible de remplacer la fiche.',true)}
   let dossier='';if(url){try{const s=decodeURIComponent(new URL(url).pathname).split('/').filter(Boolean);dossier=s.slice(-2).join(' / ')}catch(e){}}
   const imgs=new Map();for(const s of new Set(L.map(l=>l.vig||FT.vigAff).filter(Boolean)))imgs.set(s,await faImage(s));
-  const D={n,metier:FT.metier,client:txt(cde.Client),edition:new Date().toLocaleDateString('fr-FR'),manuel:true,delai:dfr(c.faDelai),delaiAt:dfr(c.faDelaiAt||''),exp:dfr(c.faExp||''),
+  const D={n,metier:FT.metier,client:txt(cde.Client),edition:new Date().toLocaleDateString('fr-FR'),manuel:true,modifDe:ED?ED.edition||'':'',delai:dfr(c.faDelai),delaiAt:dfr(c.faDelaiAt||''),exp:dfr(c.faExp||''),
     ref:refR?(txt(refR['Nom complet'])||titre(MODS.referents.t,refR)):'',dossier,obs:String(c.faObs||'').trim(),
     gravure:ach?null:{oui:c.faGrav==='oui',texte:String(c.faGravTxt||'').trim(),procede:c.faGrav==='oui'?c.faGravProc:''},
     lignes:L.map(l=>({rep:String(l.rep).trim(),des:String(l.des).trim(),ref:String(l.ref||'').trim(),qte:l.qte===''?'':+String(l.qte).replace(',','.'),mat:l.mat,trait:l.trait,dim:l.dim,four:l.four,reff:l.reff,pour:l.pour,
       img:imgs.get(l.vig||FT.vigAff)||null}))};
   const {blob,pages}=await faConstruirePDF(D);
-  let nom=`FA_${n}_${M.fic}.pdf`,lien='';
+  let nom=ED?ED.nom:`FA_${n}_${M.fic}.pdf`,lien='';
   if(url){try{b.textContent='Enregistrement dans SharePoint…';
       const j=await jetonGraph(['Files.ReadWrite.All']),dos=await dossierSPA(j,url),drive=dos.parentReference.driveId;
-      const chemin=f=>`/drives/${drive}/items/${dos.id}:/05_Commande/Fiches atelier/${encodeURIComponent(f)}`;
+      const chemin=f=>`/drives/${drive}/items/${dos.id}:/05_Commande/Fiches atelier/${f.split('/').map(encodeURIComponent).join('/')}`;
       const existe=async f=>{try{await graph(j,chemin(f)+'?$select=id');return true}catch(e){if(e.status===404)return false;throw e}};
-      if(await existe(nom)&&!confirm(`${nom} existe déjà dans « Fiches atelier ».\n\nOK = le remplacer\nAnnuler = enregistrer une nouvelle fiche à côté (…_2.pdf)`)){
+      if(!ED&&await existe(nom)&&!confirm(`${nom} existe déjà dans « Fiches atelier ».\n\nOK = la remplacer (pour la modifier, utilisez plutôt « Fiche : Modifier … » en haut de la fenêtre)\nAnnuler = enregistrer une nouvelle fiche à côté (…_2.pdf)`)){
         const base=nom.replace(/\.pdf$/,'');let k=2;while(await existe(`${base}_${k}.pdf`))k++;nom=`${base}_${k}.pdf`}
       const r=await graph(j,chemin(nom)+':/content?@microsoft.graph.conflictBehavior=replace',{method:'PUT',headers:{'Content-Type':'application/pdf'},body:blob});lien=r.webUrl;
-      const js={affaire:n,client:D.client,edition:auj(),source:'Akteev (saisie manuelle)',delai_atelier:c.faDelai||'',expedition:c.faExp||'',referent:D.ref,dossier:url,
-        fiches:[{metier:FT.metier,gravure:D.gravure?(D.gravure.oui?{oui:true,texte:D.gravure.texte,procede:D.gravure.procede}:{oui:false}):undefined,observations:D.obs?[D.obs]:[],
-          lignes:D.lignes.map(l=>ach?{rep:l.rep,designation:l.des,ref_fournisseur:l.reff,fournisseur:l.four,dimensions:l.dim,qte:l.qte,pour:l.pour}:{rep:l.rep,designation:l.des,ref:l.ref,qte:l.qte,matiere:l.mat,traitement:l.trait,dimensions:l.dim})}]};
-      try{await graph(j,chemin(nom.replace(/\.pdf$/,'.json'))+':/content?@microsoft.graph.conflictBehavior=replace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(js,null,1)})}catch(e){console.warn('JSON',e)}
-    }catch(e){console.warn(e);toast('SharePoint indisponible ('+e.message+') : PDF téléchargé seulement, sans lien dans la tâche.',true)}}
+      // Vignettes choisies à la main → Fiches atelier/Vignettes/<affaire>_RepXX_<désignation>.png (réutilisées à la réouverture)
+      for(const l of L){if(!l.vigUp||!/^data:image\//.test(l.vig||''))continue;
+        const r0=faNumRep(l.rep)[0],slug=norm(l.des||'piece').replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'').slice(0,40)||'piece';
+        const nv=`${n}_Rep${r0?r0.padStart(2,'0'):'X'+(L.indexOf(l)+1)}_${slug}.png`;
+        try{await graph(j,chemin('Vignettes/'+nv)+':/content?@microsoft.graph.conflictBehavior=replace',{method:'PUT',headers:{'Content-Type':'image/png'},body:await (await fetch(l.vig)).blob()});l.vigNom=nv;l.vigUp=false}catch(e){console.warn('vignette',e)}}
+      // Données (format de la compétence « fiches atelier ») : JSON de la fiche, ou entrée du métier dans FA_<affaire>.json
+      const frD=v=>v?frDate(v):'';
+      const fe={metier:FT.metier,...(ach?{reception:frD(c.faDelai),delai_atelier:frD(c.faDelaiAt),referent_achat:D.ref}:{delai_atelier:frD(c.faDelai),gravure:D.gravure.oui?{oui:true,texte:D.gravure.texte,procede:D.gravure.procede}:{oui:false}}),
+        expedition:frD(c.faExp),referent:D.ref,observations:D.obs?D.obs.split('\n').map(x=>x.trim()).filter(Boolean):[],...(ED?{modifiee:D.edition}:{}),
+        lignes:L.map((l,i)=>{const x=D.lignes[i],v=l.vigNom?{vignette:l.vigNom}:{};return ach?{...v,rep:x.rep,designation:x.des,ref:x.reff,fournisseur:x.four,dimensions:x.dim,qte:x.qte,pour:x.pour}
+          :{...v,rep:x.rep,designation:x.des,ref:x.ref,qte:x.qte,matiere:x.mat,traitement:x.trait,dimensions:x.dim}})};
+      let jn=nom.replace(/\.pdf$/i,'.json'),js;
+      if(ED&&ED.nom===nom&&ED.src?.type==='global'){jn=ED.src.nom;js=ED.src.data;js.fiches[ED.src.i]={...js.fiches[ED.src.i],...fe}}
+      else js={affaire:n,client:D.client,edition:ED?.src?.data?.edition||D.edition,...(ED?{modifiee:D.edition}:{}),source:'Akteev',dossier_url:url,vignettes:'Vignettes',fiches:[fe]};
+      try{await graph(j,chemin(jn)+':/content?@microsoft.graph.conflictBehavior=replace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(js,null,1)})}catch(e){console.warn('JSON',e);toast('Données de la fiche non enregistrées ('+e.message+')',true)}
+    }catch(e){console.warn(e);toast('SharePoint indisponible ('+e.message+') : PDF téléchargé seulement'+(ED?', fiche NON remplacée.':', sans lien dans la tâche.'),true)}}
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;if(!lien){document.body.appendChild(a);a.click();a.remove()}else window.open(a.href,'_blank');
-  // Tâche liée : notes (lien de la fiche) + pièces de la synthèse de l'étape du métier
+  if(ED&&!lien){$('mTitre').textContent='Fiche non remplacée';b.disabled=false;b.textContent='Enregistrer la fiche modifiée';return}
+  // Tâche liée : notes (lien de la fiche, trace de la modification) + échéance + pièces de la synthèse de l'étape du métier
   b.textContent='Mise à jour de la tâche…';
+  const dec=x=>{try{return decodeURIComponent(x)}catch(e){return x}};
   const ligneFiche=`${ach?'Fiche d\'achats':'Fiche atelier'}${lien?' : '+lien:' : '+nom+' (non enregistrée dans SharePoint)'}`;
-  const resume=`Fiche ${ach?'d\'achats':FT.metier} créée dans Akteev le ${D.edition} : ${D.lignes.map(l=>l.rep?'rep. '+l.rep:l.des).join(' ; ').slice(0,300)}`;
+  const resume=`Fiche ${ach?'d\'achats':FT.metier} ${ED?'modifiée':'créée'} dans Akteev le ${D.edition} : ${D.lignes.map(l=>l.rep?'rep. '+l.rep:l.des).join(' ; ').slice(0,300)}`;
   const syIds=[...new Set(L.flatMap(l=>l.sy.filter(s=>M.etape.test(s.etape)).map(s=>s.id)))];
-  let t=FT.TT.find(r=>String(r.id)===String(c.faTache)),r;
-  if(t){const notes=String(t.Notes||'');const corps={};
-    if(!lien||!notes.includes(lien))corps.Notes=(notes.trim()?notes.replace(/\s+$/,'')+'\n':'')+(lien?ligneFiche:resume+'\n'+ligneFiche);
+  let t=FT.TT.find(r=>String(r.id)===String(c.faTache)),r,echMaj=false;
+  if(t){const notes=String(t.Notes||'');const corps={},aj=[];
+    if(!dec(notes).includes(nom))aj.push(lien?ligneFiche:resume+'\n'+ligneFiche);
+    if(ED)aj.push(`Fiche ${ach?'d\'achats':FT.metier} modifiée dans Akteev le ${D.edition}${MOI?' ('+titre(MODS.referents.t,FT.REF.find(x=>x.id===MOI)||{})+')':''}`);
+    if(aj.length)corps.Notes=(notes.trim()?notes.replace(/\s+$/,'')+'\n':'')+aj.join('\n');
+    if(ED&&c.faDelai&&c.faDelai!==t['Échéance']){corps['Échéance']=c.faDelai;echMaj=true}
     const sy=[...new Set([...ids(t['Synthèse commande']),...syIds])];if(sy.length!==ids(t['Synthèse commande']).length)corps['Synthèse commande']=sy;
     r=Object.keys(corps).length?await api(`/rows/table/${MODS.taches.t}/${t.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)}):t}
   else{const corps={'Libellé':`${n} – ${FT.catFA?txt(FT.catFA.Nom):FT.metier}`,Commande:[cde.id],'Échéance':c.faDelai,'Référent':[+c.faRef],Notes:resume+'\n'+ligneFiche};
@@ -2518,11 +2606,12 @@ async function faCreerFiche(){
     const o=sch(MODS.taches.t).par.Statut?.select_options?.[0];if(o)corps.Statut=o.id;
     r=await api(`/rows/table/${MODS.taches.t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)})}
   majRow(MODS.taches.t,r);
-  $('mTitre').textContent=nom+' créée';
+  const verbe=ED?'modifiée':'créée';
+  $('mTitre').textContent=nom+' '+verbe;
   const sansVig=D.lignes.filter(l=>!l.img).length;
-  $('mCorps').innerHTML=`<div style="padding:8px 0;line-height:1.7">Fiche <b>${esc(nom)}</b> (${pages} page${pages>1?'s':''}, ${D.lignes.length} ligne(s), ${nb(D.lignes.reduce((s,l)=>s+(+l.qte||0),0))} ${ach?'article(s)':'pièce(s)'}${sansVig?`, ${sansVig} sans vignette`:''}) ${lien?'enregistrée dans <b>05_Commande/Fiches atelier</b>':'<b>téléchargée</b> (pas d’enregistrement SharePoint)'}.<br>Tâche ${t?'mise à jour':'créée'} : <a href="#/taches/${r.id}" onclick="fermerModal()">${esc(txt(r['Libellé']))}</a>.</div>`;
+  $('mCorps').innerHTML=`<div style="padding:8px 0;line-height:1.7">Fiche <b>${esc(nom)}</b> ${verbe} (${pages} page${pages>1?'s':''}, ${D.lignes.length} ligne(s), ${nb(D.lignes.reduce((s,l)=>s+(+l.qte||0),0))} ${ach?'article(s)':'pièce(s)'}${sansVig?`, ${sansVig} sans vignette`:''}) ${lien?(ED?'et remplacée dans <b>05_Commande/Fiches atelier</b> (l’ancienne version reste dans l’historique des versions SharePoint)':'enregistrée dans <b>05_Commande/Fiches atelier</b>'):'<b>téléchargée</b> (pas d’enregistrement SharePoint)'}.<br>Tâche ${t?'mise à jour':'créée'}${echMaj?' (nouvelle échéance '+dfr(c.faDelai)+')':''} : <a href="#/taches/${r.id}" onclick="fermerModal()">${esc(txt(r['Libellé']))}</a>.${ED?'<br><b>Pensez à réimprimer la fiche pour l’atelier.</b>':''}</div>`;
   $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Fermer</button>${lien?`<a class="btn p" href="${esc(lien)}" target="_blank">${ico('pdf')}Ouvrir la fiche</a>`:''}`;
-  toast(nom+' créée');await faApresCreation();
+  toast(nom+' '+verbe);await faApresCreation();
 }
 
 /* ---------- Fenêtre modale ---------- */
