@@ -59,6 +59,8 @@ h1{font-size:21px;margin:0;font-weight:700}
 .btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
 .btn.p:hover{filter:brightness(.95)}
 .btn.d{color:var(--err)}
+.btn.vert{background:#DCFCE7;border-color:#86EFAC;color:#166534}
+.btn.vert:hover{background:#BBF7D0}
 .btn:disabled{opacity:.5;cursor:default}
 .btn svg{width:15px;height:15px}
 .card{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);border:1px solid #EAEDF2}
@@ -1312,7 +1314,7 @@ function dessinerFiche(){
     ${k==='utilisateurs'&&!nouveau&&peutVoir('droits')&&row['E-mail']?`<a class="btn p" href="#/droits?u=${encodeURIComponent(String(row['E-mail']).trim().toLowerCase())}">${ico('cle')}Droits d’accès</a>`:''}
     ${k==='cf'&&!nouveau?`<a class="btn" href="#/affecter/${row.id}" title="Affecter la commande à une affaire, au stock, à la maintenance, ou ligne par ligne">Affecter les lignes</a>`:''}
     ${k==='cf'&&!nouveau&&peutEcrire('cf')?`<button class="btn" id="bCfPdf" title="Crée le PDF de la commande et l’enregistre dans SharePoint (registre + dossier de chaque affaire)">${ico('pdf')}Éditer la commande</button><button class="btn p" id="bCfEnv" title="${row.PDF?'Mail au fournisseur avec la commande en pièce jointe':'Éditez d’abord la commande (PDF)'}" ${row.PDF?'':'disabled'}>${ico('mail')}Envoyer au fournisseur</button>`:''}
-    ${k==='commandes'&&!nouveau&&peutEcrire('taches')?`<button class="btn" id="bFT" title="Créer à la main une tâche ou une fiche atelier (PDF) rattachée à cette commande">${ico('plus')}Tâche / fiche atelier</button>`:''}
+    ${k==='commandes'&&!nouveau&&peutEcrire('taches')?`<button class="btn vert" id="bFT" title="Créer à la main une tâche ou une fiche atelier (PDF) rattachée à cette commande">${ico('plus')}Tâche / fiche atelier</button>`:''}
     ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
     ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
     ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
@@ -1497,7 +1499,7 @@ async function dessinerLiees(i){
   h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='taches'&&c===MODS[cible].statut&&peutEcrire(cible)?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
   h+='</tbody></table></div>';
   if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
-  if(x.ajout&&cible==='taches'&&k==='commandes'&&peutEcrire(cible))h+=`<div class="plus"><button class="btn" id="bAjT">${ico('plus')}Ajouter une tâche</button> <button class="btn" id="bAjF">${ico('pdf')}Créer une fiche atelier</button></div>`;
+  if(x.ajout&&cible==='taches'&&k==='commandes'&&peutEcrire(cible))h+=`<div class="plus"><button class="btn vert" id="bAjT">${ico('plus')}Ajouter une tâche</button> <button class="btn vert" id="bAjF">${ico('pdf')}Créer une fiche atelier</button></div>`;
   else if(x.ajout&&cible&&peutEcrire(cible))h+=`<div class="plus"><a class="btn" href="#/${cible}/nouveau?${encodeURIComponent(x.lien)}=${row.id}">${ico('plus')}Ajouter</a></div>`;
   else if(x.ajout&&!cible&&peutEcrire(k))h+=`<div class="plus"><button class="btn" id="bAjL">${ico('plus')}Ajouter une ligne</button></div>`;
   if(m.editeur&&x.t)h+=`<div class="plus mut" style="font-size:12.5px">Les lignes se modifient dans l’éditeur (mise en page, vignettes, versions).</div>`;
@@ -2204,55 +2206,74 @@ async function fenetreBL(cde){
 }
 
 /* ---------- Tâches et fiches atelier créées à la main depuis une commande (28/10/2026) ----------
-   Bouton « Tâche / fiche atelier » de la fiche commande (et « Ajouter » de son onglet Tâches) → fenêtre à deux volets :
+   Bouton vert « Tâche / fiche atelier » de la fiche commande (et boutons de son onglet Tâches) → fenêtre à deux volets :
    - Tâche : type (catalogue → libellé « <affaire> – <type> » + référent par défaut), libellé, référent, échéance, statut,
      pièces de la synthèse (cases à cocher → lien « Synthèse commande »), notes. Une tâche est toujours rattachée à la commande.
    - Fiche atelier : métier Fraisage / Tournage / Fraisage Fil / Achats, tâche liée (existante ou nouvelle), délais, référent,
-     gravure (Non / Oui obligatoire pour la fabrication), lignes préremplies (synthèse de l'affaire, sinon lignes du devis),
-     observations facultatives. PDF jsPDF au format des fiches (couleur du métier sur le titre et l'en-tête du tableau, sans
-     aplat, sans vignettes, « Page x/N » + « Suite au verso → »), déposé dans <Dossier SharePoint>/05_Commande/Fiches atelier/
-     FA_<affaire>_<Métier>.pdf (+ .json des données), lien écrit dans les Notes de la tâche. Document interne, sans prix. */
+     gravure (Non / Oui obligatoire pour la fabrication), observations facultatives.
+     Lignes = TOUTES les lignes de l'affaire (lignes de l'ARC, sinon du devis, puis pièces de la synthèse non reprises),
+     rien n'est coché : on coche celles de la fiche (+ « Tout cocher », « Cocher l'étape … ») et on peut ajouter des lignes.
+     Vignette de chaque ligne (Vignette PDF / Vignette des lignes de devis ou d'ARC, par repère pour la synthèse), sinon
+     vignette de l'affaire (première vignette de ses lignes) ; chaque vignette peut être remplacée par une image.
+     Dates saisies en jj/mm/aaaa (champDate). PDF jsPDF au format des fiches (couleur du métier sur le titre et l'en-tête du
+     tableau, sans aplat, colonne Visuel, « Page x/N » + « Suite au verso → »), déposé dans <Dossier SharePoint>/05_Commande/
+     Fiches atelier/FA_<affaire>_<Métier>.pdf (+ .json), lien écrit dans les Notes de la tâche. Document interne, sans prix. */
 const FA_METIERS={
   'Fraisage':{coul:[31,95,168],etape:/^fraisage$/i,fic:'Fraisage',cat:/^fraisage$/i},
   'Tournage':{coul:[46,125,50],etape:/^tournage$/i,fic:'Tournage',cat:/^tournage$/i},
   'Fraisage Fil':{coul:[217,108,0],etape:/^fraisage fil$/i,fic:'Fraisage_Fil',cat:/^fraisage fil$/i},
   'Achats':{coul:[106,61,154],etape:/^achat composant/i,fic:'Achats_standards',cat:/^achat/i,achats:true}};
-let FT=null; // état de la fenêtre {cde,mode,lignes,src,…}
+let FT=null; // état de la fenêtre {cde,mode,lignes,…}
 const faChamp=(lab,html,plein)=>`<div${plein?' style="grid-column:1/-1"':''}><label>${lab}</label>${html}</div>`;
 const faSel=(id,opts,v)=>`<select id="${id}">${opts.map(([val,lab])=>`<option value="${esc(val)}" ${String(val)===String(v??'')?'selected':''}>${esc(lab)}</option>`).join('')}</select>`;
+const faDate=(id,v)=>champDate(`id="${id}" style="margin-left:0"`,v||'',false);
+/* Vignette d'une ligne de devis / d'ARC : « Vignette PDF » (data URI) sinon le fichier « Vignette » */
+const faVig=l=>{const d=String(l?.['Vignette PDF']||'');if(/^data:image\//.test(d))return d;const f=(Array.isArray(l?.Vignette)?l.Vignette:[])[0];return f?(f.url||f.thumbnails?.card_cover?.url||''):''};
 async function creerTacheFiche(cde,mode){
   ouvrirModal('Tâche / fiche atelier – '+txt(cde['N° affaire']),'<div class="charge">Chargement…</div>','');
-  const bx=$('modal').querySelector('.box');bx.style.width='min(1080px,96vw)';bx.style.maxHeight='90vh';$('modal').style.paddingTop='4vh';
-  await Promise.all([MODS.taches.t,MODS.catalogue.t,MODS.referents.t,MODS.synthese.t,MODS.devis.t,T_LDV].map(t=>charger(t).catch(()=>[])));
+  const bx=$('modal').querySelector('.box');bx.style.width='min(1120px,96vw)';bx.style.maxHeight='92vh';$('modal').style.paddingTop='3vh';
+  await Promise.all([MODS.taches.t,MODS.catalogue.t,MODS.referents.t,MODS.synthese.t,MODS.devis.t,T_LDV,MODS.arc.t,T_LARC].map(t=>charger(t).catch(()=>[])));
   const n=txt(cde['N° affaire']),ord=(a,b)=>(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id;
   const SY=(S.rows[MODS.synthese.t]||[]).filter(r=>ids(r.Affaire).includes(cde.id)&&!/annul/i.test(txt(r.Statut))).sort(ord);
   const DV=(S.rows[MODS.devis.t]||[]).filter(d=>ids(d.Commande).includes(cde.id)||ids(cde.Devis).includes(d.id));
-  const LD=(S.rows[T_LDV]||[]).filter(l=>ids(l.Devis).some(i=>DV.some(d=>d.id===i))&&!AFF_FRAIS.test(l.Description||'')).sort(ord);
+  const AR=(S.rows[MODS.arc.t]||[]).filter(a=>ids(a.Affaire).includes(cde.id)||ids(cde.ARC).includes(a.id)||txt(a['N° ARC'])==='ARC-'+n);
+  const LA=(S.rows[T_LARC]||[]).filter(l=>ids(l.ARC).some(i=>AR.some(a=>a.id===i))).sort(ord);
+  const LD=(S.rows[T_LDV]||[]).filter(l=>ids(l.Devis).some(i=>DV.some(d=>d.id===i))).sort(ord);
   const CAT=[...(S.rows[MODS.catalogue.t]||[])].sort((a,b)=>(+a.Ordre||a.id)-(+b.Ordre||b.id));
   const REF=S.rows[MODS.referents.t]||[];
   const TT=(S.rows[MODS.taches.t]||[]).filter(r=>ids(r.Commande).includes(cde.id)&&!/annul/i.test(txt(r.Statut)));
   const prem=s=>String(s||'').split('\n').map(x=>x.trim()).filter(Boolean)[0]||'';
-  const src=SY.length?'synthese':'devis';
-  const lignes=SY.length?SY.map(r=>({sy:r.id,etape:txt(r['Étape']),rep:txt(r.Rep),des:txt(r['Désignation'])||txt(r['Libellé']),ref:'',qte:+r['Qté attribuée']||+r['Quantité']||'',
-      mat:'',trait:'',dim:'',four:txt(r.Intervenant),reff:'',pour:'',aide:prem(r['Précisions'])}))
-    :LD.map(l=>({sy:null,etape:'',rep:l.Rep!=null&&l.Rep!==''?String(l.Rep):'',des:txt(l.Description),ref:'',qte:+l['Quantité']||'',mat:'',trait:'',dim:'',four:'',reff:'',pour:'',aide:prem(l['Précisions'])}));
-  FT={cde,n,mode:mode||'tache',src,lignes,SY,CAT,REF,TT,metier:'',ch:{}};
-  faMetier(FT.metier||faMetierDefaut());
+  const nRep=v=>String(v??'').trim().replace(/^rep\.?\s*/i,'').replace(/^0+(?=\d)/,'');
+  // 1. Lignes de la commande (ARC, sinon devis), hors frais
+  const base=(LA.length?LA:LD).filter(l=>!AFF_FRAIS.test(l.Description||''));
+  const vigs=[...LA,...LD].map(l=>({rep:nRep(l.Rep),v:faVig(l)})).filter(x=>x.v);
+  const vigAff=vigs[0]?.v||'';
+  const lignes=base.map(l=>({orig:LA.length?'ARC':'Devis',rep:nRep(l.Rep),des:txt(l.Description),ref:'',qte:+l['Quantité']||'',mat:'',trait:'',dim:'',four:'',reff:'',pour:'',
+    aide:prem(l['Précisions']),vig:faVig(l),sy:[],etapes:[],coche:false}));
+  // 2. Pièces de la synthèse : rattachées à la ligne de même repère, sinon ajoutées (une ligne par repère)
+  for(const r of SY){const rep=nRep(r.Rep),et=txt(r['Étape']),q=+r['Qté attribuée']||+r['Quantité']||0;
+    let l=rep?lignes.find(x=>x.rep===rep):lignes.find(x=>!x.rep&&norm(x.des)===norm(txt(r['Désignation'])));
+    if(!l){l={orig:'Synthèse',rep,des:txt(r['Désignation'])||txt(r['Libellé']),ref:'',qte:q||'',mat:'',trait:'',dim:'',four:txt(r.Intervenant),reff:'',pour:'',
+        aide:prem(r['Précisions']),vig:(vigs.find(x=>rep&&x.rep===rep)||{}).v||'',sy:[],etapes:[],coche:false};lignes.push(l)}
+    else if(l.orig==='Synthèse'&&q>(+l.qte||0))l.qte=q;
+    l.sy.push({id:r.id,etape:et});if(et&&!l.etapes.includes(et))l.etapes.push(et);if(!l.four&&r.Intervenant)l.four=txt(r.Intervenant)}
+  FT={cde,n,mode:mode||'tache',lignes,SY,CAT,REF,TT,vigAff,metier:'',ch:{}};
+  faMetier(faMetierDefaut());
   faDessiner();
 }
-function faMetierDefaut(){const e=new Set(FT.lignes.map(l=>l.etape));return Object.keys(FA_METIERS).find(k=>[...e].some(x=>FA_METIERS[k].etape.test(x)))||'Fraisage'}
+function faMetierDefaut(){const e=FT.lignes.flatMap(l=>l.etapes);return Object.keys(FA_METIERS).find(k=>e.some(x=>FA_METIERS[k].etape.test(x)))||'Fraisage'}
 function faMetier(m){FT.metier=m;const M=FA_METIERS[m];
-  FT.lignes.forEach(l=>{l.coche=FT.src==='synthese'?M.etape.test(l.etape):!M.achats});
   const cat=FT.CAT.find(c=>M.cat.test(txt(c.Nom)));FT.catFA=cat||null;
   const t=FT.TT.find(r=>cat&&ids(r['Type de tâche']).includes(cat.id))||FT.TT.find(r=>M.cat.test(String(txt(r['Libellé'])).replace(/^\S+\s*[–-]\s*/,'')));
   FT.ch.faTache=t?String(t.id):'nouvelle';
   const rd=t?ids(t['Référent'])[0]:ids(cat?.['Référent par défaut'])[0];FT.ch.faRef=String(rd||MOI||'');
   if(t?.['Échéance'])FT.ch.faDelai=t['Échéance'];}
-/* Relit les champs de la fenêtre dans FT (avant de redessiner) */
+/* Relit les champs de la fenêtre dans FT (avant de redessiner) ; dates jj/mm/aaaa → ISO */
 function faLire(){
-  $('mCorps').querySelectorAll('[id^=ft],[id^=fa]').forEach(e=>{if(e.type==='radio'){if(e.checked)FT.ch[e.name]=e.value}else if(e.type==='checkbox')FT.ch[e.id]=e.checked;else FT.ch[e.id]=e.value});
+  $('mCorps').querySelectorAll('[id^=ft],[id^=fa]').forEach(e=>{if(e.type==='radio'){if(e.checked)FT.ch[e.name]=e.value}else if(e.type==='checkbox')FT.ch[e.id]=e.checked;
+    else if(e.dataset.date)FT.ch[e.id]=lireDateFr(e.value)||'';else if(e.type!=='file')FT.ch[e.id]=e.value});
   $('mCorps').querySelectorAll('[data-li]').forEach(e=>{const l=FT.lignes[+e.dataset.li];if(!l)return;if(e.type==='checkbox')l.coche=e.checked;else l[e.dataset.c]=e.value});
-  FT.syCoche=[...$('mCorps').querySelectorAll('[data-sy]')].filter(e=>e.checked).map(e=>+e.dataset.sy);
+  if($('mCorps').querySelector('[data-sy]'))FT.syCoche=[...$('mCorps').querySelectorAll('[data-sy]')].filter(e=>e.checked).map(e=>+e.dataset.sy);
 }
 function faDessiner(){
   const {cde,n,mode,CAT,REF,TT}=FT,ch=FT.ch,v=(k,d)=>ch[k]??d;
@@ -2264,9 +2285,9 @@ function faDessiner(){
     const typ=v('ftType','');const cat=CAT.find(c=>String(c.id)===String(typ));
     h+=`<div class="formU" style="padding:0">
       ${faChamp('Type de tâche',faSel('ftType',[['','— autre (libellé libre) —'],...CAT.map(c=>[c.id,txt(c.Nom)])],typ))}
-      ${faChamp('Libellé <span class="req" style="color:var(--err)">*</span>',`<input id="ftLib" value="${esc(v('ftLib',cat?n+' – '+txt(cat.Nom):n+' – '))}">`)}
+      ${faChamp('Libellé <span style="color:var(--err)">*</span>',`<input id="ftLib" value="${esc(v('ftLib',cat?n+' – '+txt(cat.Nom):n+' – '))}">`)}
       ${faChamp('Référent <span style="color:var(--err)">*</span>',faSel('ftRef',optRef,v('ftRef',ids(cat?.['Référent par défaut'])[0]||MOI||'')))}
-      ${faChamp('Échéance <span style="color:var(--err)">*</span>',`<input type="date" id="ftEch" value="${esc(v('ftEch',''))}">`)}
+      ${faChamp('Échéance <span style="color:var(--err)">*</span>',faDate('ftEch',v('ftEch','')))}
       ${faChamp('Statut',faSel('ftSt',stO.map(o=>[o.id,o.value]),v('ftSt',stO[0]?.id||'')))}
     </div>`;
     if(FT.SY.length){const coches=new Set(FT.syCoche||[]);
@@ -2279,9 +2300,9 @@ function faDessiner(){
     h+=`<div class="formU" style="padding:0">
       ${faChamp('Métier',faSel('faMet',Object.keys(FA_METIERS).map(k=>[k,k==='Achats'?'Achats (éléments standards)':k]),FT.metier))}
       ${faChamp('Tâche liée',faSel('faTache',optT,v('faTache','nouvelle')))}
-      ${faChamp((ach?'Réception au plus tard':'Délai atelier')+' <span style="color:var(--err)">*</span>',`<input type="date" id="faDelai" value="${esc(v('faDelai',''))}">`)}
-      ${ach?faChamp('Délai atelier',`<input type="date" id="faDelaiAt" value="${esc(v('faDelaiAt',''))}">`):''}
-      ${faChamp('Expédition client',`<input type="date" id="faExp" value="${esc(v('faExp',cde['Date Livraison']||''))}">`)}
+      ${faChamp((ach?'Réception au plus tard':'Délai atelier')+' <span style="color:var(--err)">*</span>',faDate('faDelai',v('faDelai','')))}
+      ${ach?faChamp('Délai atelier',faDate('faDelaiAt',v('faDelaiAt',''))):''}
+      ${faChamp('Expédition client',faDate('faExp',v('faExp',cde['Date Livraison']||'')))}
       ${faChamp((ach?'Référent achat':'Référent')+' <span style="color:var(--err)">*</span>',faSel('faRef',optRef,v('faRef','')))}
     </div>`;
     if(!ach){const g=v('faGrav','');
@@ -2295,12 +2316,22 @@ function faDessiner(){
     const inp=(i,c,w,num)=>`<input data-li="${i}" data-c="${c}" value="${esc(FT.lignes[i][c]??'')}" ${num?'type="number" min="0" step="any"':''} style="width:${w};border:1px solid var(--trait);border-radius:6px;padding:4px 6px;${num?'text-align:right':''}">`;
     const cols=ach?[['rep','Rep.','56px'],['des','Désignation','100%'],['reff','Réf. fournisseur','120px'],['four','Fournisseur','110px'],['dim','Dimensions','100px'],['qte','Qté','60px',1],['pour','Pour','110px']]
       :[['rep','Rep.','56px'],['des','Désignation','100%'],['ref','Réf. / n° de plan','120px'],['qte','Qté','60px',1],['mat','Matière','110px'],['trait','Traitement','100px'],['dim','Dimensions finies','110px']];
-    h+=`<div style="margin:14px 0 4px;font-size:12px;color:var(--mut);font-weight:500">Lignes de la fiche – ${FT.src==='synthese'?'reprises de la synthèse de l’affaire (cochées : étape '+esc(FT.metier)+')':FT.lignes.length?'reprises des lignes du devis':'aucune pièce connue : ajoutez les lignes'} · même référence = une seule ligne (repères « 1, 3, 5 », quantité totale)</div>
-    <div class="tw" style="max-height:44vh;overflow:auto;border:1px solid var(--trait);border-radius:8px"><table class="l"><thead><tr><th style="cursor:default;width:28px"></th>${cols.map(c=>`<th style="cursor:default" class="${c[3]?'n':''}">${c[1]}</th>`).join('')}</tr></thead><tbody>
-    ${FT.lignes.map((l,i)=>`<tr style="cursor:default;${l.coche?'':'opacity:.55'}"><td><input type="checkbox" data-li="${i}" ${l.coche?'checked':''}></td>${cols.map(c=>`<td style="max-width:none;${c[0]==='des'?'min-width:200px':''}">${inp(i,c[0],c[2],c[3])}${c[0]==='des'&&(l.aide||l.etape)?`<div class="mut" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:320px" title="${esc(l.aide)}">${esc([l.etape,l.aide].filter(Boolean).join(' · '))}</div>`:''}</td>`).join('')}</tr>`).join('')}
-    </tbody></table></div>
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px"><button class="btn mini" id="faAj">${ico('plus')}Ajouter une ligne</button><span class="mut" style="font-size:12.5px" id="faTot"></span></div>
-    <div class="formU" style="padding:12px 0 0">${faChamp('Observations (facultatif – vide par défaut : consigne indispensable absente du plan)',`<textarea id="faObs" rows="2" style="width:100%;border:1px solid var(--trait);border-radius:7px;padding:7px 9px;margin-top:3px;resize:vertical">${esc(v('faObs',''))}</textarea>`,true)}</div>
+    const vigCel=(l,i)=>{const s=l.vig||FT.vigAff,aff=!l.vig&&!!FT.vigAff;
+      return`<label title="${s?(aff?'Vignette de l’affaire – cliquer pour choisir une image':'Cliquer pour remplacer la vignette'):'Ajouter une vignette (image)'}" style="cursor:pointer;display:block;width:52px;height:44px;border:1px ${s?'solid':'dashed'} var(--trait);border-radius:6px;background:#fff;overflow:hidden;position:relative">
+        ${s?`<img src="${esc(s)}" style="width:100%;height:100%;object-fit:contain;${aff?'opacity:.55':''}">`:`<span class="mut" style="display:grid;place-items:center;height:100%;font-size:18px">+</span>`}
+        ${aff?'<span style="position:absolute;left:0;right:0;bottom:0;background:rgba(255,255,255,.85);font-size:9px;text-align:center;color:var(--mut)">affaire</span>':''}
+        <input type="file" accept="image/*" data-vig="${i}" style="display:none"></label>`};
+    const etM=FT.lignes.some(l=>l.etapes.some(e=>M.etape.test(e)));
+    h+=`<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0 6px">
+      <span style="font-size:12px;color:var(--mut);font-weight:500;margin-right:auto">Lignes de l’affaire : cochez celles de cette fiche · même référence = une seule ligne (repères « 1, 3, 5 », quantité totale)</span>
+      <button class="btn mini" style="margin:0" id="faTout">Tout cocher</button><button class="btn mini" style="margin:0" id="faRien">Tout décocher</button>
+      ${etM?`<button class="btn mini" style="margin:0" id="faEtape">Cocher l’étape ${esc(FT.metier)}</button>`:''}
+      <button class="btn mini vert" style="margin:0" id="faAj">${ico('plus')}Ajouter une ligne</button></div>
+    <div class="tw" style="max-height:46vh;overflow:auto;border:1px solid var(--trait);border-radius:8px"><table class="l"><thead><tr><th style="cursor:default;width:28px"></th><th style="cursor:default;width:60px">Visuel</th>${cols.map(c=>`<th style="cursor:default" class="${c[3]?'n':''}">${c[1]}</th>`).join('')}</tr></thead><tbody>
+    ${FT.lignes.map((l,i)=>`<tr style="cursor:default;${l.coche?'background:#F0FDF4':''}" data-tr="${i}"><td><input type="checkbox" data-li="${i}" ${l.coche?'checked':''}></td><td style="padding:5px 8px">${vigCel(l,i)}</td>${cols.map(c=>`<td style="max-width:none;padding:6px 6px;${c[0]==='des'?'min-width:220px':''}">${inp(i,c[0],c[2],c[3])}${c[0]==='des'&&(l.aide||l.etapes.length||l.orig)?`<div class="mut" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:330px" title="${esc(l.aide)}">${esc([l.orig==='Ajout'?'':l.orig,l.etapes.join(', '),l.aide].filter(Boolean).join(' · '))}</div>`:''}</td>`).join('')}</tr>`).join('')}
+    </tbody></table>${FT.lignes.length?'':'<div class="vide" style="padding:18px">Aucune ligne connue pour cette affaire : « Ajouter une ligne ».</div>'}</div>
+    <div style="text-align:right;margin-top:6px"><span class="mut" style="font-size:12.5px" id="faTot"></span></div>
+    <div class="formU" style="padding:10px 0 0">${faChamp('Observations (facultatif – vide par défaut : consigne indispensable absente du plan)',`<textarea id="faObs" rows="2" style="width:100%;border:1px solid var(--trait);border-radius:7px;padding:7px 9px;margin-top:3px;resize:vertical">${esc(v('faObs',''))}</textarea>`,true)}</div>
     <div class="mut" style="font-size:12px;margin-top:8px">PDF ${esc(`FA_${n}_${M.fic}.pdf`)} → ${/^https?:/.test(cde['Dossier SharePoint']||'')?'dossier SharePoint de l’affaire, 05_Commande/Fiches atelier/':'<b style="color:var(--err)">pas de « Dossier SharePoint » sur la commande : PDF téléchargé seulement</b>'} · lien ajouté dans les notes de la tâche.</div>`;
   }
   $('mCorps').innerHTML=h;
@@ -2308,25 +2339,41 @@ function faDessiner(){
   $('mCorps').querySelectorAll('[data-mo]').forEach(b=>b.onclick=()=>{faLire();FT.mode=b.dataset.mo;faDessiner()});
   if($('ftType'))$('ftType').onchange=()=>{const avant=FT.ch.ftType,c0=FT.CAT.find(c=>String(c.id)===String(avant));faLire();
     const c=FT.CAT.find(x=>String(x.id)===FT.ch.ftType);
-    if(!FT.ch.ftLib||FT.ch.ftLib===n+' – '||(c0&&FT.ch.ftLib===n+' – '+txt(c0.Nom))||(!c0&&FT.ch.ftLib===n+' – '))FT.ch.ftLib=c?n+' – '+txt(c.Nom):n+' – ';
+    if(!FT.ch.ftLib||FT.ch.ftLib===n+' – '||(c0&&FT.ch.ftLib===n+' – '+txt(c0.Nom)))FT.ch.ftLib=c?n+' – '+txt(c.Nom):n+' – ';
     const rd=ids(c?.['Référent par défaut'])[0];if(rd)FT.ch.ftRef=String(rd);faDessiner()};
   if($('faMet'))$('faMet').onchange=()=>{faLire();faMetier(FT.ch.faMet);faDessiner()};
   if($('faTache'))$('faTache').onchange=()=>{faLire();const t=FT.TT.find(r=>String(r.id)===FT.ch.faTache);if(t){if(t['Échéance'])FT.ch.faDelai=t['Échéance'];const r=ids(t['Référent'])[0];if(r)FT.ch.faRef=String(r)}faDessiner()};
   $('mCorps').querySelectorAll('input[name=faGrav]').forEach(e=>e.onchange=()=>{faLire();faDessiner()});
-  $('mCorps').querySelectorAll('input[type=checkbox][data-li]').forEach(e=>e.onchange=()=>{e.closest('tr').style.opacity=e.checked?'':'.55';faTotal()});
+  $('mCorps').querySelectorAll('input[type=checkbox][data-li]').forEach(e=>e.onchange=()=>{e.closest('tr').style.background=e.checked?'#F0FDF4':'';faTotal()});
   $('mCorps').querySelectorAll('input[data-c=qte]').forEach(e=>e.oninput=faTotal);
-  if($('faAj'))$('faAj').onclick=()=>{faLire();FT.lignes.push({sy:null,etape:'',rep:'',des:'',ref:'',qte:'',mat:'',trait:'',dim:'',four:'',reff:'',pour:'',aide:'',coche:true});faDessiner();
-    const L=$('mCorps').querySelectorAll('input[data-c=rep]');L[L.length-1]?.focus()};
+  const cocher=f=>{faLire();FT.lignes.forEach(l=>l.coche=f(l));faDessiner()};
+  if($('faTout'))$('faTout').onclick=()=>cocher(()=>true);
+  if($('faRien'))$('faRien').onclick=()=>cocher(()=>false);
+  if($('faEtape'))$('faEtape').onclick=()=>{const M=FA_METIERS[FT.metier];cocher(l=>l.coche||l.etapes.some(e=>M.etape.test(e)))};
+  $('mCorps').querySelectorAll('input[data-vig]').forEach(e=>e.onchange=async()=>{const f=e.files[0];if(!f)return;
+    try{const d=await faReduireImage(f);faLire();const l=FT.lignes[+e.dataset.vig];l.vig=d;l.coche=true;faDessiner()}catch(er){toast('Image illisible : '+er.message,true)}});
+  if($('faAj'))$('faAj').onclick=()=>{faLire();FT.lignes.push({orig:'Ajout',rep:'',des:'',ref:'',qte:'',mat:'',trait:'',dim:'',four:'',reff:'',pour:'',aide:'',vig:'',sy:[],etapes:[],coche:true});faDessiner();
+    const L=$('mCorps').querySelectorAll('input[data-c=rep]');L[L.length-1]?.scrollIntoView({block:'center'});L[L.length-1]?.focus()};
   faTotal();
   $('ftOk').onclick=()=>{faLire();(FT.mode==='tache'?faCreerTache():faCreerFiche()).catch(e=>{toast('Échec : '+e.message,true);console.error(e);if($('ftOk')){$('ftOk').disabled=false;$('ftOk').innerHTML=FT.mode==='tache'?'Créer la tâche':'Créer la fiche atelier'}})};
 }
 function faTotal(){if(!$('faTot'))return;const q=[...$('mCorps').querySelectorAll('input[type=checkbox][data-li]')].filter(e=>e.checked).map(e=>+($('mCorps').querySelector(`input[data-li="${e.dataset.li}"][data-c=qte]`)?.value)||0);
-  $('faTot').textContent=`${q.length} ligne(s) cochée(s) · ${nb(q.reduce((a,b)=>a+b,0))} ${FA_METIERS[FT.metier]?.achats?'article(s)':'pièce(s)'}`}
+  $('faTot').textContent=`${q.length} ligne(s) cochée(s) sur ${FT.lignes.length} · ${nb(q.reduce((a,b)=>a+b,0))} ${FA_METIERS[FT.metier]?.achats?'article(s)':'pièce(s)'}`}
+/* Image choisie → PNG 400 px max (data URI) */
+function faReduireImage(f){return new Promise((ok,ko)=>{const r=new FileReader();r.onerror=()=>ko(new Error('lecture'));r.onload=()=>{const im=new Image();im.onerror=()=>ko(new Error('format'));
+  im.onload=()=>{const k=Math.min(1,400/Math.max(im.width,im.height)),c=document.createElement('canvas');c.width=Math.round(im.width*k)||1;c.height=Math.round(im.height*k)||1;
+    const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/png'))};im.src=r.result};r.readAsDataURL(f)})}
+/* Vignette → {data (data URI PNG/JPEG), w, h} pour jsPDF ; URL distante lue par fetch (sinon ignorée) */
+async function faImage(src){if(!src)return null;
+  try{let d=src;if(!/^data:/.test(src)){const b=await (await fetch(src)).blob();d=await new Promise((ok,ko)=>{const r=new FileReader();r.onload=()=>ok(r.result);r.onerror=ko;r.readAsDataURL(b)})}
+    const im=await new Promise((ok,ko)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=ko;i.src=d});
+    if(!/^data:image\/(png|jpe?g)/i.test(d)){const c=document.createElement('canvas');c.width=im.width;c.height=im.height;const x=c.getContext('2d');x.fillStyle='#fff';x.fillRect(0,0,c.width,c.height);x.drawImage(im,0,0);d=c.toDataURL('image/png')}
+    return{data:d,w:im.width||1,h:im.height||1,fmt:/^data:image\/jpe?g/i.test(d)?'JPEG':'PNG'}}catch(e){console.warn('vignette',e);return null}}
 async function faApresCreation(){delete S.prom[MODS.taches.t];await charger(MODS.taches.t).catch(()=>{});
   if(SALE?.k==='commandes'&&SALE.row?.id===FT.cde.id&&!Object.keys(SALE.draft).length){dessinerFiche();const L=MODS.commandes.liees;dessinerLiees(Math.max(0,L.findIndex(x=>x.mod==='taches')))}}
 async function faCreerTache(){
   const c=FT.ch,lib=String(c.ftLib||'').trim(),manque=[];
-  if(!lib||lib===FT.n+' –')manque.push('Libellé');if(!c.ftEch)manque.push('Échéance');if(!c.ftRef)manque.push('Référent');
+  if(!lib||lib===FT.n+' –')manque.push('Libellé');if(!c.ftEch)manque.push('Échéance (jj/mm/aaaa)');if(!c.ftRef)manque.push('Référent');
   if(manque.length)return toast('À renseigner : '+manque.join(', '),true);
   $('ftOk').disabled=true;$('ftOk').textContent='Création…';
   const corps={'Libellé':lib,Commande:[FT.cde.id],'Échéance':c.ftEch,'Référent':[+c.ftRef],Notes:String(c.ftNotes||'').trim()};
@@ -2336,7 +2383,7 @@ async function faCreerTache(){
   const r=await api(`/rows/table/${MODS.taches.t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
   majRow(MODS.taches.t,r);fermerModal();toast(`Tâche « ${lib} » créée`);await faApresCreation();
 }
-/* PDF de la fiche (format des fiches atelier de la compétence, sans vignettes) */
+/* PDF de la fiche (format des fiches atelier de la compétence) */
 async function faConstruirePDF(D){
   await chargerScript(CF_JSPDF);
   const M=FA_METIERS[D.metier],ach=!!M.achats,{jsPDF}=window.jspdf;
@@ -2355,7 +2402,6 @@ async function faConstruirePDF(D){
     st(22,true);tx(D.n,DR,18.5,{align:'right'});
     st(10,false,GRIS);tx([D.client,'Édition du '+D.edition+(D.manuel?' (Akteev)':'')].filter(Boolean).join('  ·  '),DR,28.5,{align:'right'});
     y=36;
-    // Encadré délais / référent / dossier
     const cases=ach?[['Réception au plus tard',D.delai,true],['Délai atelier',D.delaiAt||'—'],['Expédition client',D.exp||'—'],['Référent achat',D.ref||'—'],['Dossier',D.dossier||'—']]
       :[['Délai atelier',D.delai,true],['Expédition client',D.exp||'—'],['Référent',D.ref||'—'],['Dossier',D.dossier||'—']];
     const lg=ach?[52,40,40,40]:[40,34,32];const reste=DR-G-lg.reduce((a,b)=>a+b,0);const ws=[...lg,reste];
@@ -2372,9 +2418,10 @@ async function faConstruirePDF(D){
       y+=12}
     else y+=1};
   const enteteSuite=()=>{st(12,true,COUL);tx(titreDoc,G,10);st(14,true);tx(D.n,DR,9.5,{align:'right'});trait(G,17,DR,17);y=20};
-  // Colonnes
-  const C=ach?[['rep','Rep.',14],['des','Désignation',0],['reff','Réf. fournisseur',36],['four','Fournisseur',30],['dim','Dimensions',30],['qte','Qté',12,'r'],['pour','Pour',33],['cmd','Commandé le',26],['recu','Reçu le',26]]
-    :[['rep','Rep.',16],['des','Désignation / réf.',0],['qte','Qté',12,'r'],['mat','Matière',32],['trait','Traitement',26],['dim','Dimensions finies',34]];
+  // Colonnes (Visuel = vignette)
+  const VIS=ach?20:24;
+  const C=ach?[['vis','Visuel',VIS],['rep','Rep.',14],['des','Désignation',0],['reff','Réf. fournisseur',34],['four','Fournisseur',28],['dim','Dimensions',28],['qte','Qté',12,'r'],['pour','Pour',30],['cmd','Commandé le',24],['recu','Reçu le',24]]
+    :[['vis','Visuel',VIS],['rep','Rep.',14],['des','Désignation / réf.',0],['qte','Qté',11,'r'],['mat','Matière',28],['trait','Traitement',24],['dim','Dimensions finies',30]];
   const fixe=C.reduce((a,c)=>a+c[2],0);C.forEach(c=>{if(!c[2])c[2]=DR-G-fixe});
   let xx=G;C.forEach(c=>{c[4]=xx;xx+=c[2]});
   const tete=()=>{st(9,true,COUL);C.forEach(c=>tx(c[1],c[3]?c[4]+c[2]-1.5:c[4]+1.5,y,c[3]?{align:'right'}:{}));y+=5;trait(G,y,DR,y,COUL,0.45);y+=1.8};
@@ -2382,24 +2429,25 @@ async function faConstruirePDF(D){
   const nouvellePage=()=>{doc.addPage();enteteSuite();tete()};
   enteteComplet();tete();
   const fmtQ=q=>q===''||q==null?'':String(q).replace('.',',');
+  const hVis=ach?16:20;
   for(const l of D.lignes){
     const cel={};let hl=0;
-    for(const c of C){const [k,,w]=c;let L;
+    for(const c of C){const [k,,w]=c;let L;if(k==='vis')continue;
       if(k==='des'&&!ach){const a=lignesDe(l.des,w-3,9.75,true),b=l.ref?lignesDe(l.ref,w-3,8.5,false):[];L={a,b};hl=Math.max(hl,a.length*9.75*PT*1.25+b.length*8.5*PT*1.25)}
       else{const t=k==='qte'?fmtQ(l.qte):l[k]||'';L=lignesDe(t,w-3,9.5,k==='rep'||k==='des');hl=Math.max(hl,L.length*9.5*PT*1.25)}
       cel[k]=L}
-    hl=Math.max(hl,ach?7:5)+2.2;
+    hl=Math.max(hl,l.img?hVis:(ach?7:5))+2.4;
     if(y+hl>BAS-8)nouvellePage();
-    const y0=y+0.6;
+    const y0=y+0.8;
     for(const c of C){const [k,,w,r,x]=c,L=cel[k];
+      if(k==='vis'){if(l.img){const bw=w-3,bh=hVis,s=Math.min(bw/l.img.w,bh/l.img.h),iw=l.img.w*s,ih=l.img.h*s;
+          try{doc.addImage(l.img.data,l.img.fmt,x+1.5+(bw-iw)/2,y0+(bh-ih)/2,iw,ih,undefined,'FAST')}catch(e){console.warn(e)}}continue}
       if(k==='des'&&!ach){let yy=y0;st(9.75,true);L.a.forEach(s=>{tx(s,x+1.5,yy);yy+=9.75*PT*1.25});st(8.5,false,GRIS);L.b.forEach(s=>{tx(s,x+1.5,yy);yy+=8.5*PT*1.25});continue}
       st(9.5,k==='rep'||k==='des'||k==='qte');L.forEach((s,j)=>tx(s,r?x+w-1.5:x+1.5,y0+j*9.5*PT*1.25,r?{align:'right'}:{}))}
     y+=hl;trait(G,y,DR,y);y+=0.6}
-  // Total
   if(y+9>BAS-8)nouvellePage();
   const tot=D.lignes.reduce((a,l)=>a+(+l.qte||0),0);
   st(10.5,true);const cq=C.find(c=>c[0]==='qte');tx(ach?'Total articles':'Total pièces',cq[4]-3,y+2,{align:'right'});tx(fmtQ(Math.round(tot*1000)/1000),cq[4]+cq[2]-1.5,y+2,{align:'right'});y+=9;
-  // Observations (seulement si saisies)
   if(D.obs){const L=lignesDe(D.obs,DR-G-8,9.5,false),h=L.length*9.5*PT*1.3+9;if(y+h>BAS-8)nouvellePage();
     doc.setDrawColor(...TRAIT);doc.setLineWidth(0.3);doc.roundedRect(G,y,DR-G,h,2,2,'S');st(8,true,GRIS);tx('OBSERVATIONS',G+3,y+2);st(9.5);L.forEach((s,i)=>tx(s,G+3,y+6+i*9.5*PT*1.3));y+=h+3}
   const N=doc.getNumberOfPages();
@@ -2411,17 +2459,19 @@ async function faConstruirePDF(D){
 async function faCreerFiche(){
   const c=FT.ch,M=FA_METIERS[FT.metier],ach=!!M.achats,{cde,n}=FT,manque=[];
   const L=FT.lignes.filter(l=>l.coche&&(String(l.des).trim()||String(l.rep).trim()));
-  if(!L.length)manque.push('au moins une ligne cochée');if(!c.faDelai)manque.push(ach?'Réception au plus tard':'Délai atelier');if(!c.faRef)manque.push('Référent');
+  if(!L.length)manque.push('au moins une ligne cochée');if(!c.faDelai)manque.push((ach?'Réception au plus tard':'Délai atelier')+' (jj/mm/aaaa)');if(!c.faRef)manque.push('Référent');
   if(!ach&&!c.faGrav)manque.push('Gravure (Non / Oui)');if(!ach&&c.faGrav==='oui'&&!String(c.faGravTxt||'').trim())manque.push('texte à graver');
   if(manque.length)return toast('À renseigner : '+manque.join(', '),true);
   const b=$('ftOk');b.disabled=true;b.textContent='Création du PDF…';
   const refR=FT.REF.find(r=>String(r.id)===String(c.faRef));
   const url=/^https?:/.test(cde['Dossier SharePoint']||'')?String(cde['Dossier SharePoint']):'';
   let dossier='';if(url){try{const s=decodeURIComponent(new URL(url).pathname).split('/').filter(Boolean);dossier=s.slice(-2).join(' / ')}catch(e){}}
+  const imgs=new Map();for(const s of new Set(L.map(l=>l.vig||FT.vigAff).filter(Boolean)))imgs.set(s,await faImage(s));
   const D={n,metier:FT.metier,client:txt(cde.Client),edition:new Date().toLocaleDateString('fr-FR'),manuel:true,delai:dfr(c.faDelai),delaiAt:dfr(c.faDelaiAt||''),exp:dfr(c.faExp||''),
     ref:refR?(txt(refR['Nom complet'])||titre(MODS.referents.t,refR)):'',dossier,obs:String(c.faObs||'').trim(),
     gravure:ach?null:{oui:c.faGrav==='oui',texte:String(c.faGravTxt||'').trim(),procede:c.faGrav==='oui'?c.faGravProc:''},
-    lignes:L.map(l=>({rep:String(l.rep).trim(),des:String(l.des).trim(),ref:String(l.ref||'').trim(),qte:l.qte===''?'':+String(l.qte).replace(',','.'),mat:l.mat,trait:l.trait,dim:l.dim,four:l.four,reff:l.reff,pour:l.pour}))};
+    lignes:L.map(l=>({rep:String(l.rep).trim(),des:String(l.des).trim(),ref:String(l.ref||'').trim(),qte:l.qte===''?'':+String(l.qte).replace(',','.'),mat:l.mat,trait:l.trait,dim:l.dim,four:l.four,reff:l.reff,pour:l.pour,
+      img:imgs.get(l.vig||FT.vigAff)||null}))};
   const {blob,pages}=await faConstruirePDF(D);
   let nom=`FA_${n}_${M.fic}.pdf`,lien='';
   if(url){try{b.textContent='Enregistrement dans SharePoint…';
@@ -2437,11 +2487,11 @@ async function faCreerFiche(){
       try{await graph(j,chemin(nom.replace(/\.pdf$/,'.json'))+':/content?@microsoft.graph.conflictBehavior=replace',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(js,null,1)})}catch(e){console.warn('JSON',e)}
     }catch(e){console.warn(e);toast('SharePoint indisponible ('+e.message+') : PDF téléchargé seulement, sans lien dans la tâche.',true)}}
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nom;if(!lien){document.body.appendChild(a);a.click();a.remove()}else window.open(a.href,'_blank');
-  // Tâche liée : notes (lien de la fiche) + pièces de la synthèse
+  // Tâche liée : notes (lien de la fiche) + pièces de la synthèse de l'étape du métier
   b.textContent='Mise à jour de la tâche…';
   const ligneFiche=`${ach?'Fiche d\'achats':'Fiche atelier'}${lien?' : '+lien:' : '+nom+' (non enregistrée dans SharePoint)'}`;
   const resume=`Fiche ${ach?'d\'achats':FT.metier} créée dans Akteev le ${D.edition} : ${D.lignes.map(l=>l.rep?'rep. '+l.rep:l.des).join(' ; ').slice(0,300)}`;
-  const syIds=L.map(l=>l.sy).filter(Boolean);
+  const syIds=[...new Set(L.flatMap(l=>l.sy.filter(s=>M.etape.test(s.etape)).map(s=>s.id)))];
   let t=FT.TT.find(r=>String(r.id)===String(c.faTache)),r;
   if(t){const notes=String(t.Notes||'');const corps={};
     if(!lien||!notes.includes(lien))corps.Notes=(notes.trim()?notes.replace(/\s+$/,'')+'\n':'')+(lien?ligneFiche:resume+'\n'+ligneFiche);
@@ -2453,7 +2503,8 @@ async function faCreerFiche(){
     r=await api(`/rows/table/${MODS.taches.t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)})}
   majRow(MODS.taches.t,r);
   $('mTitre').textContent=nom+' créée';
-  $('mCorps').innerHTML=`<div style="padding:8px 0;line-height:1.7">Fiche <b>${esc(nom)}</b> (${pages} page${pages>1?'s':''}, ${D.lignes.length} ligne(s), ${nb(D.lignes.reduce((s,l)=>s+(+l.qte||0),0))} ${ach?'article(s)':'pièce(s)'}) ${lien?'enregistrée dans <b>05_Commande/Fiches atelier</b>':'<b>téléchargée</b> (pas d’enregistrement SharePoint)'}.<br>Tâche ${t?'mise à jour':'créée'} : <a href="#/taches/${r.id}" onclick="fermerModal()">${esc(txt(r['Libellé']))}</a>.</div>`;
+  const sansVig=D.lignes.filter(l=>!l.img).length;
+  $('mCorps').innerHTML=`<div style="padding:8px 0;line-height:1.7">Fiche <b>${esc(nom)}</b> (${pages} page${pages>1?'s':''}, ${D.lignes.length} ligne(s), ${nb(D.lignes.reduce((s,l)=>s+(+l.qte||0),0))} ${ach?'article(s)':'pièce(s)'}${sansVig?`, ${sansVig} sans vignette`:''}) ${lien?'enregistrée dans <b>05_Commande/Fiches atelier</b>':'<b>téléchargée</b> (pas d’enregistrement SharePoint)'}.<br>Tâche ${t?'mise à jour':'créée'} : <a href="#/taches/${r.id}" onclick="fermerModal()">${esc(txt(r['Libellé']))}</a>.</div>`;
   $('mPied').innerHTML=`<button class="btn" onclick="fermerModal()">Fermer</button>${lien?`<a class="btn p" href="${esc(lien)}" target="_blank">${ico('pdf')}Ouvrir la fiche</a>`:''}`;
   toast(nom+' créée');await faApresCreation();
 }
