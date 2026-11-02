@@ -2033,16 +2033,60 @@ async function retrouverMail(j,ews){
   const id=t?.value?.[0]?.targetId;if(!id)return null;
   try{return await graph(j,`/me/messages/${encodeURIComponent(id)}?$select=id,subject,from,toRecipients`)}catch(e){if(e.status===404)return null;throw e}
 }
-function texteReponse(row,cli,ref){
-  const num=txt(row['N° devis']),objet=txt(row.Objet),v=+row['Validité (jours)']||10;
-  const L=[`<p>Bonjour,</p>`,
-    `<p>Suite à votre demande, veuillez trouver ci-joint notre offre <b>${esc(num)}</b>${objet?` pour : ${esc(objet)}`:''}.</p>`,
-    `<p>Montant total : <b>${eur(row['Total HT'])} HT</b>${txt(row['Délai'])?`<br>Délai : ${esc(txt(row['Délai']))}`:''}<br>Offre valable ${v} jours.</p>`,
-    `<p>Nous restons à votre disposition pour tout complément d'information.</p>`,
-    `<p>Cordialement,</p>`,
+/* Ton du mail au client (règles fixées par l'utilisateur, skill chiffrage-demande-prix, étape 10) :
+   contacts nommés + sociétés dont on tutoie tous les interlocuteurs (Coste, Sothim, 30/10/2026). */
+const TON_CONTACTS=[{n:/fouray/i,p:'Michael',tu:1},{n:/mertz/i,p:'Mikael',tu:0},{n:/billaud/i,p:'Anne',tu:1},{n:/gu[eé]rin/i,p:'Benoît',tu:1}];
+const TON_SOCIETES=/coste|sothim/i;
+function prenomDe(c){const nom=String(c?.name||'').trim(),adr=String(c?.address||'').toLowerCase();
+  let p=nom&&!/@/.test(nom)?nom.split(/\s+/)[0]:(adr.split('@')[0].split(/[._-]/)[0]||'');
+  if(!p||p.length<2)return'';return p.charAt(0).toUpperCase()+p.slice(1).toLowerCase()}
+function tonClient(cli,contact,ctxCli){
+  const nom=String(contact?.name||''),adr=String(contact?.address||'');
+  const c=TON_CONTACTS.find(x=>x.n.test(nom)||x.n.test(adr));
+  if(c)return{tu:!!c.tu,salut:`Bonjour ${c.p},`};
+  if(TON_SOCIETES.test(txt(cli?.Entreprise)+' '+txt(cli?.['Code client'])+' '+txt(ctxCli))||TON_SOCIETES.test(adr.split('@')[1]||'')){
+    const p=prenomDe(contact);return{tu:true,salut:p?`Bonjour ${p},`:'Bonjour,'}}
+  return{tu:false,salut:'Bonjour,'}}
+/* Texte de réponse : aucun prix ni montant dans le mail (le devis joint les porte) */
+function texteReponse(row,cli,ref,contact){
+  const num=txt(row['N° devis']),objet=txt(row.Objet),delai=txt(row['Délai']),ton=tonClient(cli,contact,row.Client);
+  const L=[`<p>${esc(ton.salut)}</p>`,
+    ton.tu?`<p>Suite à ta demande, tu trouveras ci-joint notre offre <b>${esc(num)}</b>${objet?` pour : ${esc(objet)}`:''}.${delai?`<br>Délai : ${esc(delai)}.`:''}</p>`
+      :`<p>Suite à votre demande, veuillez trouver ci-joint notre offre <b>${esc(num)}</b>${objet?` pour : ${esc(objet)}`:''}.${delai?`<br>Délai : ${esc(delai)}.`:''}</p>`,
+    ton.tu?`<p>Je reste à ta disposition pour tout complément d'information.</p><p>Bonne journée,</p>`
+      :`<p>Nous restons à votre disposition pour tout complément d'information.</p><p>Cordialement,</p>`,
     `<p>${esc(ref?txt(ref.Nom):'')}${ref?'<br>':''}<b>KTE</b><br>6 rue de la gatine – 49300 Cholet<br>${esc(txt(ref?.['Téléphone'])||'02-41-62-27-71')}${ref&&txt(ref['E-mail'])?' – '+esc(txt(ref['E-mail'])):''}<br>www.kte-fr.com</p>`];
   return `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${L.join('')}</div>`;
 }
+/* « Mail source » absent ou illisible : on cherche la demande du client (boîte de l'utilisateur + kte@) autour de la
+   date de réception et on laisse l'utilisateur la désigner — jamais de nouveau mail sans son choix. */
+const MOTS_VIDES=new Set('pour avec dans sans des les une sur par aux est rep réf ref suivant selon demande prix devis offre kte'.split(' '));
+function motsCles(s){return[...new Set(String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').split(/[^a-z0-9]+/).filter(w=>w.length>2&&!MOTS_VIDES.has(w)))]}
+async function chercherDemandes(j,row,cli){
+  const d0=new Date(txt(row['Date réception'])||txt(row.Date)||Date.now());if(isNaN(d0))return[];
+  const de=new Date(d0.getTime()-3*864e5).toISOString(),a=new Date(d0.getTime()+2*864e5).toISOString();
+  const q=`?$filter=receivedDateTime ge ${de} and receivedDateTime le ${a}&$select=id,subject,from,receivedDateTime,hasAttachments,isDraft,internetMessageId,bodyPreview&$orderby=receivedDateTime desc&$top=100`;
+  const bases=[['/me',j,'']];const moi=String(MSAL?.getActiveAccount()?.username||'').toLowerCase();
+  if(moi!=='kte@kte-fr.com'){try{bases.push([`/users/${encodeURIComponent('kte@kte-fr.com')}`,await jetonGraph(['Mail.Read.Shared']),'kte@'])}catch(e){console.warn('kte@',e)}}
+  const mots=motsCles(txt(row.Objet)+' '+txt(row['Commentaire interne']).slice(0,300));
+  const dom=(txt(cli?.['E-mail']).match(/@([\w.-]+)/)||[])[1]?.toLowerCase();
+  const nomCli=motsCles(txt(row.Client));
+  const R=[],vus=new Set();
+  for(const[base,jj,boite]of bases){let r;try{r=await graph(jj,`${base}/messages${q}`)}catch(e){console.warn('Recherche demande',base,e);continue}
+    for(const m of r?.value||[]){const ad=String(m.from?.emailAddress?.address||'').toLowerCase();
+      if(m.isDraft||!ad||/@kte-fr\.com$/i.test(ad)||vus.has(m.internetMessageId))continue;vus.add(m.internetMessageId);
+      const s=(m.subject||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''),pv=(m.bodyPreview||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+      let sc=0;mots.forEach(w=>{if(s.includes(w))sc+=3;else if(pv.includes(w))sc+=1});
+      if(dom&&ad.endsWith('@'+dom))sc+=6;if(nomCli.some(w=>ad.includes(w)))sc+=5;if(m.hasAttachments)sc+=1;
+      if(/^\s*(re|tr|fw|fwd)\s*:/i.test(m.subject||''))sc-=1;
+      R.push({...m,sc,boite,base,jj})}}
+  return R.sort((x,y)=>y.sc-x.sc||new Date(y.receivedDateTime)-new Date(x.receivedDateTime)).slice(0,12)}
+function choisirDemande(num,L){return new Promise(ok=>{
+  const lig=L.map((m,i)=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--ligne,#eee);cursor:pointer"><input type="radio" name="dem" value="${i}" ${i===0?'checked':''} style="margin-top:3px"><span><b>${esc(m.subject||'(sans objet)')}</b><br><span class="mut" style="font-size:12.5px">${esc(m.from?.emailAddress?.name||'')} &lt;${esc(m.from?.emailAddress?.address||'')}&gt; – ${esc(dtfr(m.receivedDateTime))}${m.boite?' – boîte '+esc(m.boite):''}${m.hasAttachments?' – 📎':''}</span></span></label>`).join('');
+  ouvrirModal('Répondre au client – '+num,`<div style="line-height:1.45;padding:4px 0">Le mail de demande du client n’est pas renseigné (ou introuvable) pour <b>${esc(num)}</b>. Choisissez la demande à laquelle répondre :</div><div style="max-height:52vh;overflow:auto">${lig||'<div class="mut" style="padding:8px">Aucun mail client trouvé autour de la date de réception.</div>'}</div>`,
+    `<button class="btn" id="dmAnn">Annuler</button><button class="btn" id="dmNouv" title="Nouveau mail au client, hors du fil de la demande">Nouveau mail</button>${L.length?`<button class="btn p" id="dmOk">${ico('mail')}Répondre à ce mail</button>`:''}`);
+  $('dmAnn').onclick=()=>{fermerModal();ok(null)};$('dmNouv').onclick=()=>{fermerModal();ok('nouveau')};
+  if($('dmOk'))$('dmOk').onclick=()=>{const v=document.querySelector('input[name=dem]:checked');fermerModal();ok(v?L[+v.value]:null)}})}
 /* Brouillon déjà préparé pour ce devis (mémorisé dans le navigateur) : s'il existe encore dans Outlook (pas supprimé,
    pas envoyé), on propose de l'ouvrir ou d'en créer un nouveau ; s'il a été supprimé ou envoyé, on en recrée un. */
 const brouillonsRep=()=>ls.get('brouillons_rep',{});
@@ -2060,15 +2104,19 @@ function choixBrouillon(num,mem){return new Promise(ok=>{
   $('brAnn').onclick=()=>{fermerModal();ok(null)};$('brNouv').onclick=()=>{fermerModal();ok('nouveau')};$('brOuv').onclick=()=>{fermerModal();ok('ouvrir')}})}
 async function repondreClient(row,forcer){
   const num=txt(row['N° devis']);
+  const b=$('bRep');const finBouton=()=>{if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}};
+  // relire le devis dans Baserow : la page garde en mémoire la version chargée à l'ouverture (Mail source corrigé entre-temps…)
+  try{const p=await api(`/rows/table/${MODS.devis.t}/${row.id}/?user_field_names=true`);if(p?.id){majRow(MODS.devis.t,p);row=p;if(SALE?.k==='devis'&&SALE.id===p.id)SALE.row=p}}
+  catch(e){console.warn('Relecture du devis',e)}
   if(!row.PDF){toast(`Pas de PDF pour ${num} : ouvrez le devis dans l’éditeur et cliquez sur « 📄 PDF » (ou validez-le).`,true);return}
   if(String(txt(row['Contrôle version'])).startsWith('⚠')||modifLocale(MODS.devis.t,row)){toast(`${num} a été modifié depuis sa validation : validez la nouvelle version dans l’éditeur avant de l’envoyer.`,true);return}
-  const b=$('bRep');if(b){b.disabled=true;b.textContent='Préparation du mail…'}
+  if(b){b.disabled=true;b.textContent='Préparation du mail…'}
   try{
     const j=await jetonGraph(['Mail.ReadWrite','Files.ReadWrite.All']);
     const mem=brouillonsRep()[row.id];
     if(mem&&!forcer){const ex=await brouillonValide(j,mem);
       if(!ex)memoBrouillon(row.id,null);
-      else{if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}
+      else{finBouton();
         const c=await choixBrouillon(num,mem);
         if(c==='ouvrir'){window.open(ex.webLink,'_blank')||toast('Autorisez les fenêtres surgissantes pour ouvrir le brouillon.',true);return}
         if(c!=='nouveau')return;
@@ -2077,27 +2125,40 @@ async function repondreClient(row,forcer){
     const cli=(S.rows[MODS.clients.t]||[]).find(r=>r.id===row.Client?.[0]?.id);
     const ref=(S.rows[MODS.referents.t]||[]).find(r=>r.id===row['Référent KTE']?.[0]?.id);
     const mailCli=txt(cli?.['E-mail']).split(/[;, ]+/).filter(x=>/@/.test(x));
-    // 1. PDF du devis depuis SharePoint
-    const it=await graph(j,'/shares/u!'+b64url(txt(row.PDF))+'/driveItem');
-    const dl=it['@microsoft.graph.downloadUrl'];if(!dl)throw new Error('PDF introuvable dans SharePoint');
-    const pdf=await (await fetch(dl)).blob();
-    // 2. Brouillon : réponse au mail d'origine, sinon nouveau mail au client
-    let brouillon=null,mode='nouveau',partage=null;
+    // 1. Mail de la demande : « Mail source » (Message-ID ou ancien lien OWA), sinon recherche + choix de l'utilisateur
+    let orig=null,partage=null,contact=null;
     const ews=idMailSource(row['Mail source']),src=srcMail(row['Mail source']);
-    const repondreA=async orig=>{brouillon=await graph(j,`/me/messages/${encodeURIComponent(orig.id)}/createReply`,{method:'POST',body:'{}'});mode='réponse'};
-    if(src){try{const orig=await mailParId(j,'/me',src.id);if(orig)await repondreA(orig)}catch(e){console.warn('Mail source',e)}
-      // mail reçu seulement dans une autre boîte (ex. kte@) : on le lit là-bas pour répondre depuis sa propre boîte
-      if(!brouillon&&src.box&&src.box.toLowerCase()!==String(MSAL?.getActiveAccount()?.username||'').toLowerCase()){
+    if(src){try{orig=await mailParId(j,'/me',src.id)}catch(e){console.warn('Mail source',e)}
+      if(!orig&&src.box&&src.box.toLowerCase()!==String(MSAL?.getActiveAccount()?.username||'').toLowerCase()){
         try{const j2=await jetonGraph(['Mail.Read.Shared']);const base=`/users/${encodeURIComponent(src.box)}`;const o=await mailParId(j2,base,src.id);
           if(o)partage=await graph(j2,`${base}/messages/${encodeURIComponent(o.id)}?$select=subject,from,toRecipients,ccRecipients,body,receivedDateTime`)}
         catch(e){console.warn('Mail source (boîte '+src.box+')',e)}}}
-    else if(ews){try{const orig=await retrouverMail(j,ews);if(orig)await repondreA(orig)}
-      catch(e){console.warn('Mail source',e)}}
-    if(brouillon){
+    else if(ews){try{orig=await retrouverMail(j,ews)}catch(e){console.warn('Mail source',e)}}
+    let nouveauMail=false;
+    if(!orig&&!partage){
+      if(b)b.textContent='Recherche de la demande…';
+      const L=await chercherDemandes(j,row,cli);finBouton();
+      const c=await choisirDemande(num,L);
+      if(!c)return;
+      if(b){b.disabled=true;b.textContent='Préparation du mail…'}
+      if(c==='nouveau')nouveauMail=true;
+      else if(!c.boite){orig=await graph(j,`/me/messages/${encodeURIComponent(c.id)}?$select=id,subject,from,toRecipients`)}
+      else partage=await graph(c.jj,`${c.base}/messages/${encodeURIComponent(c.id)}?$select=subject,from,toRecipients,ccRecipients,body,receivedDateTime`);
+      if(c&&c!=='nouveau')console.info('Demande choisie pour',num,':',`${c.boite||'m'}@ | ${c.internetMessageId}`);
+    }
+    contact=(orig||partage)?.from?.emailAddress||null;
+    // 2. PDF du devis depuis SharePoint
+    const it=await graph(j,'/shares/u!'+b64url(txt(row.PDF))+'/driveItem');
+    const dl=it['@microsoft.graph.downloadUrl'];if(!dl)throw new Error('PDF introuvable dans SharePoint');
+    const pdf=await (await fetch(dl)).blob();
+    // 3. Brouillon : réponse dans le fil de la demande
+    let brouillon=null,mode='nouveau';
+    if(orig){
+      brouillon=await graph(j,`/me/messages/${encodeURIComponent(orig.id)}/createReply`,{method:'POST',body:'{}'});mode='réponse';
       const internes=(brouillon.toRecipients||[]).every(r=>/@kte-fr\.com$/i.test(r.emailAddress?.address||''));
       const d=await graph(j,`/me/messages/${brouillon.id}?$select=body,subject`);
       const html=d.body.contentType==='html'?d.body.content:`<pre>${esc(d.body.content)}</pre>`;
-      const corps=/<body[^>]*>/i.test(html)?html.replace(/<body[^>]*>/i,m=>m+texteReponse(row,cli,ref)):texteReponse(row,cli,ref)+html;
+      const corps=/<body[^>]*>/i.test(html)?html.replace(/<body[^>]*>/i,m=>m+texteReponse(row,cli,ref,contact)):texteReponse(row,cli,ref,contact)+html;
       const maj={body:{contentType:'HTML',content:corps}};
       if(!(d.subject||'').includes(num))maj.subject=`${d.subject||'RE:'} – ${num}`;
       if(internes&&mailCli.length)maj.toRecipients=mailCli.map(a=>({emailAddress:{address:a}}));
@@ -2107,24 +2168,24 @@ async function repondreClient(row,forcer){
       const de=partage.from?.emailAddress||{},adr=a=>(a||[]).map(r=>esc(r.emailAddress?.name||r.emailAddress?.address||'')).join('; ');
       const obj=(partage.subject||'').replace(/^\s*(re|tr|fw|fwd)\s*:\s*/i,'');
       const cite=`<hr style="border:none;border-top:1px solid #E1E1E1"><div style="font-family:Calibri,Arial,sans-serif;font-size:11pt"><b>De :</b> ${esc(de.name||'')} &lt;${esc(de.address||'')}&gt;<br><b>Envoyé :</b> ${esc(new Date(partage.receivedDateTime).toLocaleString('fr-FR'))}<br><b>À :</b> ${adr(partage.toRecipients)}${partage.ccRecipients?.length?`<br><b>Cc :</b> ${adr(partage.ccRecipients)}`:''}<br><b>Objet :</b> ${esc(partage.subject||'')}</div><br>`;
-      const orig=partage.body?.contentType==='html'?(partage.body.content.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1]??partage.body.content):`<pre>${esc(partage.body?.content||'')}</pre>`;
+      const og=partage.body?.contentType==='html'?(partage.body.content.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1]??partage.body.content):`<pre>${esc(partage.body?.content||'')}</pre>`;
       const a=de.address&&!/@kte-fr\.com$/i.test(de.address)?[de.address]:mailCli;
       brouillon=await graph(j,'/me/messages',{method:'POST',body:JSON.stringify({subject:`RE: ${obj}${obj.includes(num)?'':' – '+num}`,
-        body:{contentType:'HTML',content:texteReponse(row,cli,ref)+cite+orig},toRecipients:a.map(x=>({emailAddress:{address:x}}))})});
+        body:{contentType:'HTML',content:texteReponse(row,cli,ref,contact)+cite+og},toRecipients:a.map(x=>({emailAddress:{address:x}}))})});
       mode='réponse';
-    }else{
+    }else if(nouveauMail){
       brouillon=await graph(j,'/me/messages',{method:'POST',body:JSON.stringify({subject:`Offre KTE ${num}${txt(row.Objet)?' – '+txt(row.Objet):''}`,
-        body:{contentType:'HTML',content:texteReponse(row,cli,ref)},toRecipients:mailCli.map(a=>({emailAddress:{address:a}}))})});
-    }
-    // 3. Pièce jointe
+        body:{contentType:'HTML',content:texteReponse(row,cli,ref,null)},toRecipients:mailCli.map(a=>({emailAddress:{address:a}}))})});
+    }else throw new Error('demande du client introuvable');
+    // 4. Pièce jointe
     await graph(j,`/me/messages/${brouillon.id}/attachments`,{method:'POST',body:JSON.stringify({'@odata.type':'#microsoft.graph.fileAttachment',name:it.name||`Devis_${num}.pdf`,contentType:'application/pdf',contentBytes:await versB64(pdf)})});
     const w=await graph(j,`/me/messages/${brouillon.id}?$select=webLink,toRecipients`);
     const dest=(w.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean).join(', ')||'(destinataire à compléter)';
     memoBrouillon(row.id,{id:brouillon.id,t:new Date().toISOString()});
     const ouvert=window.open(w.webLink,'_blank');
-    if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}
+    finBouton();
     toast(`Brouillon ${mode==='réponse'?'de réponse ':''}prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}.${ouvert?'':' Recliquez sur « Répondre au client » pour l’ouvrir.'} Après l’envoi, passez le devis à « Envoyé ».`);
-  }catch(e){console.error(e);toast('Réponse au client : '+e.message,true);if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Répondre au client`}}
+  }catch(e){console.error(e);toast('Réponse au client : '+e.message,true);finBouton()}
 }
 async function pdfTaches(cde,TT){
   if(!JSPDF){await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');JSPDF=window.jspdf.jsPDF}
