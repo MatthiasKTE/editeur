@@ -1025,13 +1025,14 @@ async function construirePDF(){
   }
   const hCond=8+blocs.reduce((s,[t,b])=>s+(t?hauteurTexte(t,wc,tc,b,lhc):lgc),0);
   const lhT=9.75*PT*1.2+3.7;
-  const hTot=TYPE==='bl'?(12.75*PT*1.3+2+ 3+12*lgc+3):TYPE==='devis'?(3*lhT+4+lt+6+2*12.75*PT*1.3+2+26):3*lhT;
+  const hRec=3+lgc+lgc+0.5*lgc+lgc+2*lgc+3,ecRec=3; // BL : cadre « Réception client » (reçu le, par, réserves) au-dessus du colisage
+  const hTot=TYPE==='bl'?(hRec+ecRec+hCond):TYPE==='devis'?(3*lhT+4+lt+6+2*12.75*PT*1.3+2+26):3*lhT;
   y+=6;
   if(y+Math.max(hCond,hTot)>BAS){nouvellePage()}
   if(TYPE==='bl')y=BAS-Math.max(hCond,hTot); // BL : colisage + réception toujours calés en bas de la dernière page
-  const yb=y;let yy=yb+4;
+  const yb=y,yCol=TYPE==='bl'?yb+hRec+ecRec:yb;let yy=yCol+4;
   for(const [t,b] of blocs){yy=t?para(t,G+4,yy,wc,{taille:tc,gras:b,lh:lhc}):yy+lgc}
-  cadre(G,yb,85,hCond);
+  cadre(G,yCol,85,hCond);
   const xt=DR-78;
   if(TYPE!=='bl'){
     const ht=lignes.reduce((s,l)=>s+(+l['Prix unitaire HT']||0)*(+l['Quantité']||0),0),htr=Math.round(ht*100)/100;
@@ -1047,10 +1048,10 @@ async function construirePDF(){
       cadre(xt,yt2,78,26);style(9.75);ecrire('Fait à :',xt+3,yt2+3);ecrire('Le :',DR-3-20-larg('Le :',9.75),yt2+3);
     }
   }else{
-    let yt2=yb;const lb=12.75*PT*1.3;style(12.75,false,BLEU);ecrire('Réception client',xt+39,yt2,{align:'center'});yt2+=lb+2;
-    const hr=3+4*lgc+4*lgc+4*lgc+3;cadre(xt,yt2,78,hr);let yr=yt2+3;style(tc);
-    ecrire('Reçu le :',xt+3,yr);ecrire('Par :',xt+3+larg('Reçu le :',tc)+30,yr);yr+=2*lgc;
-    style(tc);ecrire('Réserves éventuelles :',xt+3,yr);yr+=4*lgc;style(tc);ecrire('Signature et cachet :',xt+3,yr);
+    // À gauche : cadre Réception client (au-dessus du colisage) ; à droite : signature et cachet, même hauteur que les 2 cadres de gauche
+    cadre(G,yb,85,hRec);let yr=yb+3;style(tc,true,BLEU);ecrire('Réception client',G+4,yr);yr+=lgc;
+    style(tc);ecrire('Reçu le :',G+4,yr);ecrire('Par :',G+4+45,yr);yr+=1.5*lgc;ecrire('Réserves éventuelles :',G+4,yr);
+    cadre(xt,yb,78,hTot);style(tc,true);ecrire('Signature et cachet :',xt+3,yb+3);
   }
 
   /* ---- Numéros de page ---- */
