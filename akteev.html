@@ -1211,7 +1211,7 @@ function dessinerListe(k){
     h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
       const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
       const prim=m.sansPrim?c===cols[0]:c===sc.prim;
-      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${c===m.statut&&k==='taches'&&peutEcrire(k)?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
+      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${k==='bl'&&c==='PDF'?boutonPdfBL(r):c===m.statut&&k==='taches'&&peutEcrire(k)?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
     h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
     if(!L.length)h+='<div class="vide">Aucun résultat</div>';
     if(L.length>E.lim)h+=`<div class="plus"><button class="btn" id="bPlus">Afficher plus (${L.length-E.lim} restants)</button></div>`;
@@ -1308,7 +1308,7 @@ function dessinerFiche(){
   let h=`<div class="entete"><a class="btn" href="#/${k}" title="Retour à la liste">${ico('retour')}</a><h1>${esc(nom)}</h1>
     ${stF&&!nouveau&&!ecr?badge(val(m.statut)):''}${stF&&!nouveau&&ecr?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
     <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
-    <div class="act">${lienEditeur?`<a class="btn p" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
+    <div class="act">${k==='bl'&&!nouveau?boutonPdfBL(row,true):''}${lienEditeur?`<a class="btn ${k==='bl'?'':'p'}" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>${/^FA_.+\.pdf$/i.test(x.fichier)&&peutEcrire('taches')&&ids(row.Commande).length?`<button class="btn vert" data-fat="${esc(x.fichier)}" title="Rouvrir et modifier ${esc(x.fichier)}">${ico('crayon')}Modifier</button>`:''}`).join(''):''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn p" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn ${n>1?'p':''}" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
@@ -1498,7 +1498,7 @@ async function dessinerLiees(i){
   const cible=x.mod;
   const a=auj();
   let h=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c];return`<th class="${f?.type==='number'?'n':''}" style="cursor:default">${esc(c)}</th>`}).join('')}</tr></thead><tbody>`;
-  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='taches'&&c===MODS[cible].statut&&peutEcrire(cible)?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
+  h+=F.map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c];const ret=cible&&c===MODS[cible].date&&r[c]&&r[c]<a&&tacheOuverte(r);return`<td class="${(sansPrim?c===cols[0]:c===sc.prim)?'prim':''} ${f?.type==='number'||((f?.type==='formula'||f?.type==='rollup')&&estMonnaie(c))?'n':''} ${ret?'retard':''}">${cible==='bl'&&c==='PDF'?boutonPdfBL(r):cible==='taches'&&c===MODS[cible].statut&&peutEcrire(cible)?celluleStatut(cible,r):f?.relatif?delaiRel(r,r[c]):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,r[c],true)}</span>`:rendu(f,r[c],true)}</td>`}).join('')}</tr>`).join('');
   h+='</tbody></table></div>';
   if(!F.length)h+='<div class="vide">Rien pour le moment</div>';
   if(x.ajout&&cible==='taches'&&k==='commandes'&&peutEcrire(cible))h+=`<div class="plus"><button class="btn vert" id="bAjT">${ico('plus')}Ajouter une tâche</button> <button class="btn vert" id="bAjF">${ico('pdf')}Créer une fiche atelier</button> <button class="btn vert" id="bModF">${ico('crayon')}Modifier une fiche</button></div>`;
@@ -1878,7 +1878,7 @@ async function documentsAffaire(cde){
   const cli=[];
   const devis=D.devis?D.devis.filter(r=>lie(r,'Commande')||ids(cde.Devis).includes(r.id)||txt(r['N° devis'])===n).sort(tri('devis')):[];
   const ligneEd=(k,r)=>{const m=MODS[k],num=txt(r[m.num]),v=r.Version?' v.'+nb(r.Version):'';
-    cli.push(doc({k,id:r.id,ico:m.ico,lab:num,sous:v,url:r.PDF||'',nom:num+'.pdf',ed:!r.PDF&&m.editeur?`${EDITEUR}?${m.editeur}=${encodeURIComponent(num)}`:''}))};
+    cli.push(doc({k,id:r.id,ico:m.ico,lab:num,sous:v,url:r.PDF||'',nom:num+'.pdf',gen:k==='bl'&&!r.PDF&&blValide(r)?()=>genererPdfBL(r):null,ed:!r.PDF&&m.editeur?`${EDITEUR}?${m.editeur}=${encodeURIComponent(num)}`:''}))};
   devis.forEach(r=>ligneEd('devis',r));
   if(peutVoir('devis')&&cde['PDF devis Axonaut'])cli.push(doc({ico:'pdf',lab:'Devis Axonaut',url:cde['PDF devis Axonaut']}));
   if(D.arc)D.arc.filter(r=>lie(r,'Affaire')||txt(r['N° ARC'])==='ARC-'+n).sort(tri('arc')).forEach(r=>ligneEd('arc',r));
@@ -1936,9 +1936,51 @@ async function documentsAffaire(cde){
 /* Un fichier : généré → blob ; SharePoint → lien « ?download=1 » suivi dans la page (le serveur répond en pièce jointe :
    la page reste affichée et la session SharePoint de l'utilisateur est utilisée) ; autre → cadre caché. */
 async function telechargerDoc(d){
-  if(d.gen){const b=await d.gen();const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=d.nom||'document.pdf';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return}
+  if(d.gen){const g=await d.gen(),b=g&&g.blob||g;const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=g&&g.nom||d.nom||'document.pdf';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);return}
   if(/sharepoint\.com/i.test(d.url)){const a=document.createElement('a');a.href=urlDl(d.url);document.body.appendChild(a);a.click();a.remove();return}
   const f=document.createElement('iframe');f.style.display='none';f.src=d.url;document.body.appendChild(f);setTimeout(()=>f.remove(),120000)}
+/* ---------- PDF d'un BL en un clic (liste des BL, onglet BL d'une affaire / d'un client, fiche BL) ----------
+   PDF enregistré (champ « PDF », SharePoint) → téléchargé tel quel. Sinon, BL validé et non modifié depuis →
+   le PDF est construit par l'éditeur ouvert dans un cadre caché (même origine, même mise en page que « 📄 PDF »)
+   puis téléchargé ; rien n'est écrit. Brouillon ou modifié depuis la validation → à valider dans l'éditeur. */
+function blValide(r){const c=txt(r['Contrôle version']);return !!r['Validé le']&&!/brouillon|annul/i.test(txt(r.Statut))&&!c.startsWith('⚠')}
+function boutonPdfBL(r,grand){const ok=!!r.PDF||blValide(r);
+  return`<button class="btn${grand?' p':''}" ${grand?'':'style="padding:3px 9px"'} data-blpdf="${r.id}" ${ok?'':'disabled'} title="${r.PDF?'Télécharger le PDF enregistré':ok?'Créer et télécharger le PDF de la version validée':'Brouillon ou modifié depuis la validation : validez le BL dans l’éditeur'}">${ico('dl')}${grand?'Télécharger le PDF':'PDF'}</button>`}
+let FILE_BL=Promise.resolve();
+function genererPdfBL(r){const p=FILE_BL.catch(()=>{}).then(()=>pdfBLEditeur(r));FILE_BL=p;return p}
+async function pdfBLEditeur(r){
+  const num=txt(r['N° BL']),dodo=t=>new Promise(o=>setTimeout(o,t));
+  const f=document.createElement('iframe');f.setAttribute('aria-hidden','true');f.tabIndex=-1;
+  f.style.cssText='position:fixed;left:-12000px;top:0;width:1100px;height:1500px;border:0;visibility:hidden';
+  f.src=`${EDITEUR}?bl=${encodeURIComponent(num)}`;document.body.appendChild(f);
+  try{const t0=Date.now();let w=null;
+    for(;;){await dodo(300);
+      w=f.contentWindow;const d=w.document,b=d.getElementById('bPdfV');
+      if(b&&!b.disabled&&w.eval&&w.eval(`typeof cur!=='undefined'&&!!cur&&cur['N° BL']===${JSON.stringify(num)}`))break;
+      const cfg=d.getElementById('cfg'),m=d.getElementById('msg');
+      if(cfg&&cfg.style.display==='block')throw new Error('connexion requise : ouvrez une fois l’éditeur pour vous connecter');
+      if(m&&m.className==='err'&&m.textContent)throw new Error(m.textContent);
+      if(Date.now()-t0>60000)throw new Error('l’éditeur ne répond pas (délai dépassé)')}
+    if(!w.eval(`!!cur['Validé le']&&!modifie()`))throw new Error(`${num} a été modifié depuis sa validation : validez-le dans l’éditeur`);
+    const jg=w.jetonGraph;if(jg)w.jetonGraph=()=>jg(true);   // pas de fenêtre de connexion depuis le cadre caché
+    const res=await w.construirePDF();
+    if(res.manque)toast(`${num} : ${res.manque.n} vignette(s) absente(s) du PDF`,true);
+    return {blob:res.blob,nom:res.nom||num+'.pdf'}}
+  finally{setTimeout(()=>f.remove(),1500)}
+}
+async function pdfBL(id,b){
+  const r=(SALE?.row?.id==id&&SALE.k==='bl'?SALE.row:null)||(S.rows[MODS.bl.t]||[]).find(x=>x.id==id);if(!r)return toast('BL introuvable',true);
+  const num=txt(r['N° BL']);
+  if(r.PDF)return telechargerDoc({url:r.PDF,nom:num+'.pdf'});
+  if(!blValide(r))return toast(`${num} n’est pas validé : validez-le dans l’éditeur pour avoir le PDF.`,true);
+  const avant=b?b.innerHTML:'';if(b){b.disabled=true;b.innerHTML=`${ico('dl')}Création…`}
+  toast(`Création du PDF ${num}…`);
+  try{await telechargerDoc({gen:()=>genererPdfBL(r),nom:num+'.pdf'});toast(`${num} : PDF téléchargé`)}
+  catch(e){toast(`PDF ${num} : ${e.message}`,true)}
+  finally{if(b&&b.isConnected){b.disabled=false;b.innerHTML=avant}}
+}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-blpdf]');if(!b)return;
+  e.preventDefault();e.stopPropagation();if(!b.disabled)pdfBL(+b.dataset.blpdf,b)},true);
 async function toutTelecharger(L){
   const b=$('dlTout');if(b)b.disabled=true;let ok=0;
   for(const [i,d] of L.entries()){if(b)b.innerHTML=`${ico('dl')}Téléchargement ${i+1} / ${L.length}…`;
