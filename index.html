@@ -351,8 +351,8 @@ function modifie(){
   return !!t&&Date.parse(t)>Date.parse(cur['Validé le']);
 }
 function txtControle(){return modifie()&&!(cur['Contrôle version']||'').startsWith('⚠')?'⚠ Modifié depuis la validation : nouvelle version à éditer':(cur['Contrôle version']||'')}
-// Validé (ou ancien document déjà émis) : la date est celle de la version. Brouillon : « Date de version » renseignée = date imposée.
-function estValide(){return !!cur['Validé le']||((cur.Statut&&cur.Statut.value)||'Brouillon')!=='Brouillon'}
+// Validé (ou ancien document déjà émis) : la date est celle de la version. Brouillon / Consultation SST : « Date de version » renseignée = date imposée.
+function estValide(){return !!cur['Validé le']||!/^(|brouillon|consultation.*)$/i.test(((cur.Statut&&cur.Statut.value)||'').trim())}
 function afficher(){
   $('page').style.display='block';
   const v=+cur.Version||1,n=cur[D().num];
@@ -754,7 +754,7 @@ async function fichiersVignettes(url,silencieux){
 /* Même nom que le fichier Baserow, sinon même repère (_RepNN_) */
 function trouverVignette(F,l){
   const im=(l.Vignette||[])[0],nomB=sansAccent(im&&im.visible_name);
-  const rep=String(l.Rep??'').replace(/\D/g,''),re=rep?new RegExp('_rep0*'+rep+'(?:[_.-]|$)'):null;
+  const rep=String(l.Rep??'').replace(/\D/g,''),re=rep?new RegExp('_(?:rep|pos|m|p)?0*'+rep+'(?:[_.-]|$)'):null;
   return (nomB&&F.find(x=>sansAccent(x.name)===nomB))||(re&&F.find(x=>re.test(sansAccent(x.name))))||null;
 }
 /* Pour une liste de lignes : {position: data URL} trouvées dans SharePoint */
@@ -841,8 +841,8 @@ async function vignettesPDF(){
       const sp=await vignettesSPLignes(url,manq.map(i=>lignes[i]),false);
       for(const k in sp){const i=manq[k],t=await dimsImage(sp[k]);if(t){vign[i]={d:sp[k],...t};lignes[i]['Vignette PDF']=sp[k];lignes[i]._vsp=1}}}
     catch(e){console.warn(e);raison=e.message}}
-  // Alerte seulement pour les lignes qui avaient une vignette dans Baserow
-  manq=manq.filter(i=>!vign[i]&&((lignes[i].Vignette||[]).length||lignes[i]['Vignette PDF']));
+  // Alerte pour toute ligne de devis / ARC sans image (BL : seulement si une vignette était prévue) – règle du 04/11/2026, D265093
+  manq=manq.filter(i=>!vign[i]&&(TYPE!=='bl'||(lignes[i].Vignette||[]).length||lignes[i]['Vignette PDF']));
   vign.manque=manq.length?{n:manq.length,reps:manq.map(i=>lignes[i].Rep||i+1),raison}:null;
   return vign;
 }
