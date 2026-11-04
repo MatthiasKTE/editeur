@@ -1130,6 +1130,9 @@ async function publierPDF(){
   msg('Création du PDF…');
   const {blob,nom,pages,manque}=await construirePDF();
   const alerte=manque?` ⚠ ${manque.n} vignette(s) absente(s) du PDF (rep. ${manque.reps.join(', ')}${manque.raison?' – '+manque.raison:''} : vérifiez ${DOSSIER_VIGN} dans SharePoint puis « 📄 PDF »).`:'';
+  // Vignette absente : on bloque au lieu d'un simple message (règle du 04/11/2026 – D265092 enregistré sans sa vignette)
+  if(manque&&window.top===window&&!confirm(`⚠ ${manque.n} vignette(s) n'ont pas pu être mises dans le PDF (rep. ${manque.reps.join(', ')}${manque.raison?' – '+manque.raison:''}).\n\nCause habituelle : l'image n'existe que dans Baserow (champ « Vignette ») ; elle doit aussi être dans « Vignette PDF » ou dans ${DOSSIER_VIGN} du dossier SharePoint, sous le même nom.\n\nOK : enregistrer quand même le PDF sans ces vignettes.\nAnnuler : ne rien enregistrer.`))
+    return {ok:false,texte:`PDF non enregistré : ${manque.n} vignette(s) manquante(s) (rep. ${manque.reps.join(', ')}). Ajoutez-les puis « 📄 PDF ».`};
   if(TYPE==='devis'&&MS_CLIENT&&(cur['Dossier SharePoint']||'').trim()){
     try{msg('Enregistrement du PDF dans SharePoint…');
       const lien=await deposerSP(blob,nom,DOSSIER_PDF[TYPE]);
