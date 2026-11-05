@@ -2076,8 +2076,10 @@ async function retrouverMail(j,ews){
   try{return await graph(j,`/me/messages/${encodeURIComponent(id)}?$select=id,subject,from,toRecipients`)}catch(e){if(e.status===404)return null;throw e}
 }
 /* Ton du mail au client (règles fixées par l'utilisateur, skill chiffrage-demande-prix, étape 10) :
-   contacts nommés + sociétés dont on tutoie tous les interlocuteurs (Coste, Sothim, 30/10/2026). */
-const TON_CONTACTS=[{n:/fouray/i,p:'Michael',tu:1},{n:/mertz/i,p:'Mikael',tu:0},{n:/billaud/i,p:'Anne',tu:1},{n:/gu[eé]rin/i,p:'Benoît',tu:1}];
+   contacts nommés + sociétés dont on tutoie tous les interlocuteurs (Coste, Sothim, 30/10/2026) ;
+   Kevin Thibault et Nicolas Aumont tutoyés (05/11/2026). */
+const TON_CONTACTS=[{n:/fouray/i,p:'Michael',tu:1},{n:/mertz/i,p:'Mikael',tu:0},{n:/billaud/i,p:'Anne',tu:1},{n:/gu[eé]rin/i,p:'Benoît',tu:1},
+  {n:/thibault/i,p:'Kevin',tu:1},{n:/aumont/i,p:'Nicolas',tu:1}];
 const TON_SOCIETES=/coste|sothim/i;
 function prenomDe(c){const nom=String(c?.name||'').trim(),adr=String(c?.address||'').toLowerCase();
   let p=nom&&!/@/.test(nom)?nom.split(/\s+/)[0]:(adr.split('@')[0].split(/[._-]/)[0]||'');
@@ -2089,14 +2091,26 @@ function tonClient(cli,contact,ctxCli){
   if(TON_SOCIETES.test(txt(cli?.Entreprise)+' '+txt(cli?.['Code client'])+' '+txt(ctxCli))||TON_SOCIETES.test(adr.split('@')[1]||'')){
     const p=prenomDe(contact);return{tu:true,salut:p?`Bonjour ${p},`:'Bonjour,'}}
   return{tu:false,salut:'Bonjour,'}}
-/* Texte de réponse : aucun prix ni montant dans le mail (le devis joint les porte) */
+/* Fin de mail variée, plus « humaine » (05/11/2026) : phrase de disponibilité tournante (choisie par le n° du devis)
+   + salutation selon le moment (fin de journée l'après-midi, fin de semaine le jeudi après-midi et le vendredi). */
+function finMail(tu,cle){
+  const DISPO=tu?["Je reste à ta disposition pour tout complément d'information.","N'hésite pas à revenir vers moi si tu as la moindre question.",
+      "Je reste à ta disposition si besoin.","Si tu as besoin de précisions, je suis joignable sans souci."]
+    :["Nous restons à votre disposition pour tout complément d'information.","N'hésitez pas à revenir vers nous pour toute question.",
+      "Je reste à votre disposition si besoin.","Si vous avez besoin de précisions, je suis joignable sans souci."];
+  let h=0;for(const ch of String(cle||Date.now()))h=(h*31+ch.charCodeAt(0))>>>0;
+  const d=new Date(),j=d.getDay(),pm=d.getHours()>=14;
+  const SAL=(j===5||(j===4&&pm))?['Bonne fin de semaine,','Bon week-end par avance,']:pm?['Bonne fin de journée,','Bonne soirée,']
+    :tu?['Bonne journée,','À bientôt,']:['Bonne journée,','Bien cordialement,'];
+  return{dispo:DISPO[h%DISPO.length],sal:SAL[(h>>3)%SAL.length]}}
+/* Texte de réponse : aucun prix ni montant dans le mail (le devis joint les porte), ni durée de validité de l'offre
+   (05/11/2026 : elle figure sur le devis seulement) */
 function texteReponse(row,cli,ref,contact){
   const num=txt(row['N° devis']),objet=txt(row.Objet),delai=txt(row['Délai']),ton=tonClient(cli,contact,row.Client);
   const L=[`<p>${esc(ton.salut)}</p>`,
     ton.tu?`<p>Suite à ta demande, tu trouveras ci-joint notre offre <b>${esc(num)}</b>${objet?` pour : ${esc(objet)}`:''}.${delai?`<br>Délai : ${esc(delai)}.`:''}</p>`
       :`<p>Suite à votre demande, veuillez trouver ci-joint notre offre <b>${esc(num)}</b>${objet?` pour : ${esc(objet)}`:''}.${delai?`<br>Délai : ${esc(delai)}.`:''}</p>`,
-    ton.tu?`<p>Je reste à ta disposition pour tout complément d'information.</p><p>Bonne journée,</p>`
-      :`<p>Nous restons à votre disposition pour tout complément d'information.</p><p>Cordialement,</p>`,
+    (f=>`<p>${esc(f.dispo)}</p><p>${esc(f.sal)}</p>`)(finMail(ton.tu,num)),
     `<p>${esc(ref?txt(ref.Nom):'')}${ref?'<br>':''}<b>KTE</b><br>6 rue de la gatine – 49300 Cholet<br>${esc(txt(ref?.['Téléphone'])||'02-41-62-27-71')}${ref&&txt(ref['E-mail'])?' – '+esc(txt(ref['E-mail'])):''}<br>www.kte-fr.com</p>`];
   return `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${L.join('')}</div>`;
 }
