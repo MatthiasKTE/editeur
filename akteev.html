@@ -295,7 +295,7 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
    liees : listes affichées en onglets dans la fiche (table + champ lien vers la fiche). */
 const MODS={
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
-   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé'],solde:['Accepté','Refusé'],soldeVerbe:'clôturer'},
+   liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
    liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
@@ -590,8 +590,10 @@ function graphe(C,dateCde){
 /* ---------- DDP en cours (demandes de prix en consultation chez les sous-traitants) ----------
    Une DDP = un devis au statut Brouillon ou Consultation SST. Ses consultations viennent de la table
    « Consultations SST » (une ligne par sous-traitant consulté). Réponses = offres reçues + refus. */
-const DDP_STATUTS=['Brouillon','Consultation SST'];
-const DDP_ETATS=[['complet','Toutes les réponses'],['partiel','Réponses partielles'],['aucune','Aucune réponse'],['sans','Pas encore consulté']];
+/* Une DDP reste « en cours » jusqu'à l'envoi du devis au client (05/11/2026) : Brouillon, Consultation SST et Validé
+   (prêt mais pas encore envoyé). Elle sort au statut Envoyé, Accepté, Refusé ou Annulé. */
+const DDP_STATUTS=['Brouillon','Consultation SST','Validé'];
+const DDP_ETATS=[['envoyer','Validé – à envoyer'],['complet','Toutes les réponses'],['partiel','Réponses partielles'],['aucune','Aucune réponse'],['sans','Pas encore consulté']];
 function delaiRelance(iso){const j=new Date(iso).getDay();return(j>=4&&j<=6?96:48)*36e5} // jeudi, vendredi, samedi : 96 h
 function ddpConsult(c){
   const rep=txt(c['Réponse'])||'En attente',base=c['Dernière relance']||c['Envoyée le'];
@@ -634,10 +636,11 @@ async function vueDDP(){
 function dessinerDDP(){
   const T=ddpListe(S.rows[MODS.devis.t],S.rows[MODS.consult.t]),cpt={};T.forEach(x=>cpt[x.etat]=(cpt[x.etat]||0)+1);
   const q=norm($('dq')?.value||'').split(/\s+/).filter(Boolean),ordre={complet:0,partiel:1,aucune:2,sans:3};
-  const L=T.filter(x=>(!DDPF||x.etat===DDPF)&&(!q.length||q.every(w=>norm([x.d['N° devis'],txt(x.d.Client),x.d.Objet,txt(x.d['Référent KTE']),...x.C.map(y=>y.four)].join(' ')).includes(w))))
-    .sort((a,b)=>ordre[a.etat]-ordre[b.etat]||String(a.d['Date réception']||a.d.Date||'').localeCompare(String(b.d['Date réception']||b.d.Date||'')));
+  const aEnv=x=>txt(x.d.Statut)==='Validé';cpt.envoyer=T.filter(aEnv).length;
+  const L=T.filter(x=>(!DDPF||(DDPF==='envoyer'?aEnv(x):x.etat===DDPF))&&(!q.length||q.every(w=>norm([x.d['N° devis'],txt(x.d.Client),x.d.Objet,txt(x.d['Référent KTE']),...x.C.map(y=>y.four)].join(' ')).includes(w))))
+    .sort((a,b)=>aEnv(b)-aEnv(a)||ordre[a.etat]-ordre[b.etat]||String(a.d['Date réception']||a.d.Date||'').localeCompare(String(b.d['Date réception']||b.d.Date||'')));
   const nbRel=T.reduce((s,x)=>s+x.relances,0);
-  let h=`<div class="entete"><h1>DDP en cours</h1><span class="sous">${T.length} demande(s) · ${cpt.complet||0} avec toutes les réponses${nbRel?` · <span style="color:#DC2626">${nbRel} relance(s) à faire</span>`:''}</span><div class="act">
+  let h=`<div class="entete"><h1>DDP en cours</h1><span class="sous">${T.length} demande(s) · ${cpt.envoyer?`<span style="color:#C2410C;font-weight:600">${cpt.envoyer} devis validé(s) à envoyer</span> · `:''}${cpt.complet||0} avec toutes les réponses${nbRel?` · <span style="color:#DC2626">${nbRel} relance(s) à faire</span>`:''}</span><div class="act">
     <button class="btn" id="dMaj">${ico('cal')}Actualiser</button><a class="btn" href="#/consult">${ico('ddp')}Toutes les consultations</a></div></div>
   <div class="card"><div class="outils">
     <div class="rech">${ico('loupe')}<input id="dq" placeholder="Filtrer (n°, client, sous-traitant…)" value="${esc($('dq')?.value||'')}"></div>
@@ -645,9 +648,9 @@ function dessinerDDP(){
   </div><div class="tw"><table class="l"><thead><tr><th style="cursor:default">Réponses</th><th style="cursor:default">N° devis</th><th style="cursor:default">Client</th><th style="cursor:default">Objet</th><th style="cursor:default">Sous-traitants consultés</th>${montants()?'<th class="n" style="cursor:default">Meilleure offre</th>':''}<th style="cursor:default">Reçue le</th><th style="cursor:default">Référent</th><th style="cursor:default">Statut</th></tr></thead><tbody>`;
   h+=L.map(x=>{const d=x.d;return`<tr data-id="${d.id}"><td>${badgeReponses(x)}</td><td class="prim">${esc(txt(d['N° devis']))}</td><td>${esc(txt(d.Client))}</td><td title="${esc(txt(d.Objet))}">${esc(String(txt(d.Objet)).slice(0,70))}${String(txt(d.Objet)).length>70?'…':''}</td>
     <td>${x.C.map(puceSST).join('')||'<span class="mut">Aucune consultation enregistrée</span>'}</td>${montants()?`<td class="n">${x.prix?`${eur(x.prix.c.Montant)}<div class="mut" style="font-size:11.5px">${esc(x.prix.four)}</div>`:'<span class="mut">—</span>'}</td>`:''}
-    <td>${dateReception(d)}</td><td>${esc(txt(d['Référent KTE']))||'<span class="mut">—</span>'}</td><td>${badge(d.Statut)}</td></tr>`}).join('');
+    <td>${dateReception(d)}</td><td>${esc(txt(d['Référent KTE']))||'<span class="mut">—</span>'}</td><td>${badge(d.Statut)}${aEnv(x)?'<div style="font-size:11.5px;color:#C2410C;font-weight:600;margin-top:2px">à envoyer au client</div>':''}</td></tr>`}).join('');
   h+=`</tbody></table></div>${L.length?'':'<div class="vide">Aucune DDP dans ce filtre</div>'}
-  <div class="plus mut" style="font-size:12.5px;text-align:left">✔ offre reçue · ✕ refus · ? question du sous-traitant · ⏳ en attente (encadré rouge : relance due, 48 h après l’envoi, 96 h si envoyé un jeudi, vendredi ou samedi). Date de réception en rouge : pas de réponse au client sous 48 h (hors samedi et dimanche). Mise à jour automatique toutes les heures (8 h – 19 h) à partir des boîtes kte@ et de Matthias.</div></div>`;
+  <div class="plus mut" style="font-size:12.5px;text-align:left">✔ offre reçue · ✕ refus · ? question du sous-traitant · ⏳ en attente (encadré rouge : relance due, 48 h après l’envoi, 96 h si envoyé un jeudi, vendredi ou samedi). Date de réception en rouge : pas de réponse au client sous 48 h (hors samedi et dimanche). Une DDP reste dans la liste jusqu’à l’envoi du devis au client (statut Envoyé), ou si elle passe Accepté, Refusé ou Annulé. Mise à jour automatique toutes les heures (8 h – 19 h) à partir des boîtes kte@ et de Matthias, y compris le passage à Envoyé quand le devis part depuis Outlook.</div></div>`;
   $('main').innerHTML=h;
   const dq=$('dq');dq.oninput=()=>{dessinerDDP();const n=$('dq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
   document.querySelectorAll('.puce[data-e]').forEach(b=>b.onclick=()=>{DDPF=b.dataset.e;ls.set('ddpf',DDPF);dessinerDDP()});
@@ -1150,7 +1153,7 @@ async function vueListe(k){
   if(m.ref)charger(MODS.referents.t).catch(()=>{});
   dessinerListe(k);
 }
-// statut(s) qui soldent / clôturent : retirés de la liste même en recherche (tâche Fait, devis Accepté / Refusé)
+// statut(s) qui soldent / clôturent : retirés de la liste même en recherche (tâche Fait, devis Accepté / Refusé / Annulé)
 function estSolde(m,v){return !!m.solde&&(Array.isArray(m.solde)?m.solde.includes(v):m.solde===v)}
 function soldeMots(m){const v=m.soldeVerbe||'solder';return{v,pp:v.replace(/er$/,'é')+(m.fem?'e':'')}}
 function filtrer(k){
@@ -2256,7 +2259,7 @@ async function repondreClient(row,forcer){
     memoBrouillon(row.id,{id:brouillon.id,t:new Date().toISOString()});
     const ouvert=window.open(w.webLink,'_blank');
     finBouton();
-    toast(`Brouillon ${mode==='réponse'?'de réponse ':''}prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}.${ouvert?'':' Recliquez sur « Répondre au client » pour l’ouvrir.'} Après l’envoi, passez le devis à « Envoyé ».`);
+    toast(`Brouillon ${mode==='réponse'?'de réponse ':''}prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}.${ouvert?'':' Recliquez sur « Répondre au client » pour l’ouvrir.'} Une fois le mail envoyé, le devis passe à « Envoyé » tout seul (contrôle des Éléments envoyés toutes les heures, 8 h – 19 h).`);
   }catch(e){console.error(e);toast('Réponse au client : '+e.message,true);finBouton()}
 }
 async function pdfTaches(cde,TT){
