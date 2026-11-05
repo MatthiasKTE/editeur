@@ -2090,7 +2090,23 @@ function tonClient(cli,contact,ctxCli){
   if(c)return{tu:!!c.tu,salut:`Bonjour ${c.p},`};
   if(TON_SOCIETES.test(txt(cli?.Entreprise)+' '+txt(cli?.['Code client'])+' '+txt(ctxCli))||TON_SOCIETES.test(adr.split('@')[1]||'')){
     const p=prenomDe(contact);return{tu:true,salut:p?`Bonjour ${p},`:'Bonjour,'}}
-  return{tu:false,salut:'Bonjour,'}}
+  return{tu:false,salut:salutVous(contact)}}
+/* Contact absent du tableau (règle alignée sur chiffrage-demande-prix, 05/11/2026) : « Bonjour Monsieur <Nom>, » ou
+   « Bonjour Madame <Nom>, » + vouvoiement ; civilité déduite du prénom (listes ci-dessous). Prénom inconnu ou nom
+   introuvable : « Bonjour Madame, Monsieur, » (à corriger dans le brouillon avant envoi). */
+const PRENOMS_F=new Set('anne annie audrey aurelie aurore beatrice brigitte camille carole caroline catherine cecile celine chantal charlotte christelle christine claire claudine coralie corinne delphine elisabeth elise elodie emilie emma estelle eva fabienne florence francoise gaelle helene ingrid isabelle jacqueline jeanne johanna julie juliette justine karine laetitia laura laurence lea lucie magali manon marie marine marion martine mathilde melanie monique muriel myriam nadia nathalie nicole noemie oceane pascale patricia pauline peggy sabrina sandra sandrine sarah severine sophie stephanie sylvie valerie vanessa veronique virginie yvonne'.split(' '));
+const PRENOMS_M=new Set('adrien alain alexandre alexis anthony antoine arnaud arthur aurelien baptiste benjamin benoit bernard bruno cedric charles christian christophe claude clement cyril damien daniel david denis didier dominique eric emmanuel etienne fabien fabrice florian francis francois franck frederic gael gerard gilles gregory guillaume herve hugo jacques jean jeremy jerome joel jonathan jordan julien kevin laurent lionel loic louis luc lucas ludovic marc marcel mathieu matthias maxime michael michel mickael mikael nicolas olivier pascal patrice patrick paul philippe pierre quentin raphael regis remi richard robert romain sebastien serge simon stephane sylvain theo thierry thomas tony valentin vincent william xavier yann yannick yves'.split(' '));
+function sansAccent(x){return String(x||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase()}
+function capNom(x){return String(x||'').toLowerCase().replace(/(^|[\s-])(\p{L})/gu,(m,a,b)=>a+b.toUpperCase())}
+function salutVous(c){
+  const nom=String(c?.name||'').trim(),adr=String(c?.address||'').toLowerCase();let pre='',fam='';
+  if(nom&&!/@/.test(nom)){const t=nom.replace(/[,;()]/g,' ').split(/\s+/).filter(Boolean);
+    const maj=t.filter(w=>w.length>1&&w===w.toUpperCase()&&/\p{L}/u.test(w));
+    if(maj.length&&maj.length<t.length){fam=maj.join(' ');pre=t.find(w=>!maj.includes(w))||''}
+    else if(t.length>1){pre=t[0];fam=t.slice(1).join(' ')}}
+  else{const m=adr.split('@')[0].split(/[._]/);if(m.length===2&&m[0].length>1&&m[1].length>1){pre=m[0];fam=m[1]}}
+  const k=sansAccent(pre.split('-')[0]);const civ=PRENOMS_F.has(k)?'Madame':PRENOMS_M.has(k)?'Monsieur':'';
+  return civ&&fam?`Bonjour ${civ} ${capNom(fam)},`:'Bonjour Madame, Monsieur,'}
 /* Fin de mail variée, plus « humaine » (05/11/2026) : phrase de disponibilité tournante (choisie par le n° du devis)
    + salutation selon le moment (fin de journée l'après-midi, fin de semaine le jeudi après-midi et le vendredi). */
 function finMail(tu,cle){
