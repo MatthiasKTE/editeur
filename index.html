@@ -680,14 +680,15 @@ window.addEventListener('beforeprint',()=>{
   if(TYPE==='bl'){const p=partiel();$('tLignes').classList.toggle('complet',!p);$('thLiv').textContent=p?'Livré':'Quantité'}
 });
 /* ---------- PDF vectoriel (jsPDF) + enregistrement SharePoint (Microsoft Graph) ----------
-   À la validation d'un devis : le PDF est construit à partir de la page (texte vectoriel, police Carlito),
-   déposé dans <Dossier SharePoint>/04_Offre/Devis_<n°>_v<v>.pdf et son lien écrit dans le champ « PDF ».
+   À la validation d'un devis, d'un ARC ou d'un BL : le PDF est construit à partir de la page (texte vectoriel, police Carlito),
+   déposé dans <Dossier SharePoint>/04_Offre/Devis_<n°>_v<v>.pdf (devis) ou 05_Commande/ARC_… / BL_…_v<v>.pdf
+   (ARC et BL, dossier de l'affaire) et son lien écrit dans le champ « PDF ».
    Sans configuration Microsoft (MS_CLIENT vide) ou sans dossier SharePoint : le PDF est téléchargé. */
 const MS_CLIENT='df485947-9a53-4c7f-a009-6a40dbe2ebe2',MS_TENANT='46f9fddb-e4bc-4978-bc72-0b45ac34c145';   // ID d'application (client) et ID d'annuaire (locataire) Entra « Akteev »
 const LIB_JSPDF='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
 const LIB_MSAL=['https://cdn.jsdelivr.net/npm/@azure/msal-browser@3.28.1/lib/msal-browser.min.js','https://unpkg.com/@azure/msal-browser@3.28.1/lib/msal-browser.min.js'];
 const POLICE_URL='https://raw.githubusercontent.com/google/fonts/main/ofl/carlito/Carlito-';
-const DOSSIER_PDF={devis:'04_Offre',arc:'05_Commande',bl:'06_Livraison'};
+const DOSSIER_PDF={devis:'04_Offre',arc:'05_Commande',bl:'05_Commande'};   // ARC et BL validés : enregistrés dans 05_Commande (règle du 06/11/2026)
 function chargerScript(u){return new Promise((ok,ko)=>{if(document.querySelector(`script[data-src="${u}"]`))return ok();const s=document.createElement('script');s.src=u;s.dataset.src=u;s.onload=ok;s.onerror=()=>{s.remove();ko(new Error('chargement impossible : '+u))};document.head.appendChild(s)})}
 let POLICE=null;
 async function policePDF(doc){
@@ -1119,7 +1120,8 @@ async function dossierSP(jeton,url){
     return it}
 }
 async function deposerSP(blob,nom,sous){
-  const url=(cur['Dossier SharePoint']||'').trim();if(!url)throw new Error('pas de « Dossier SharePoint » sur la fiche');
+  // Devis : son propre « Dossier SharePoint » ; ARC / BL : celui de l'affaire (ou du devis), via dossierDoc()
+  const url=String((await dossierDoc())||'').trim();if(!url)throw new Error('pas de « Dossier SharePoint » sur la fiche ni sur l\'affaire');
   const j=await jetonGraph();
   const dos=await dossierSP(j,url);const drive=dos.parentReference.driveId;
   const f=await graph(j,`/drives/${drive}/items/${dos.id}:/${encodeURIComponent(sous)}/${encodeURIComponent(nom)}:/content?@microsoft.graph.conflictBehavior=replace`,{method:'PUT',headers:{'Content-Type':'application/pdf'},body:blob});
@@ -1128,22 +1130,27 @@ async function deposerSP(blob,nom,sous){
 /* Construit le PDF, le dépose dans SharePoint et renseigne le champ PDF (repli : téléchargement) */
 async function publierPDF(){
   msg('Création du PDF…');
-  const {blob,nom,pages,manque}=await construirePDF();
+  let {blob,nom,pages,manque}=await construirePDF();
   const alerte=manque?` ⚠ ${manque.n} vignette(s) absente(s) du PDF (rep. ${manque.reps.join(', ')}${manque.raison?' – '+manque.raison:''} : vérifiez ${DOSSIER_VIGN} dans SharePoint puis « 📄 PDF »).`:'';
   // Vignette absente : on bloque au lieu d'un simple message (règle du 04/11/2026 – D265092 enregistré sans sa vignette)
   if(manque&&window.top===window&&!confirm(`⚠ ${manque.n} vignette(s) n'ont pas pu être mises dans le PDF (rep. ${manque.reps.join(', ')}${manque.raison?' – '+manque.raison:''}).\n\nCause habituelle : l'image n'existe que dans Baserow (champ « Vignette ») ; elle doit aussi être dans « Vignette PDF » ou dans ${DOSSIER_VIGN} du dossier SharePoint, sous le même nom.\n\nOK : enregistrer quand même le PDF sans ces vignettes.\nAnnuler : ne rien enregistrer.`))
     return {ok:false,texte:`PDF non enregistré : ${manque.n} vignette(s) manquante(s) (rep. ${manque.reps.join(', ')}). Ajoutez-les puis « 📄 PDF ».`};
-  if(TYPE==='devis'&&MS_CLIENT&&(cur['Dossier SharePoint']||'').trim()){
+  // Devis, ARC et BL : PDF déposé dans SharePoint et lié à la fiche (ARC / BL : règle du 06/11/2026, 05_Commande)
+  const lienDoc={devis:'au devis',arc:"à l'ARC",bl:'au BL'}[TYPE]||'à la fiche';
+  let dossier='';if(MS_CLIENT){try{dossier=String((await dossierDoc())||'').trim()}catch(e){console.warn('dossier SharePoint',e)}}
+  if(MS_CLIENT&&dossier){
     try{msg('Enregistrement du PDF dans SharePoint…');
+      // Nom SharePoint au format maison : ARC_D265xxx_v1.pdf, BL_D265xxx-01_v1.pdf (comme les ARC déjà rangés)
+      nom=nom.replace(/^(ARC|BL)-/,'$1_');
       const lien=await deposerSP(blob,nom,DOSSIER_PDF[TYPE]);
-      // « Validé le » suit l'écriture du lien : sinon la formule « Contrôle version » croirait le devis modifié
+      // « Validé le » suit l'écriture du lien : sinon la formule « Contrôle version » croirait le document modifié
       const vl=new Date().toISOString();await api(`/rows/table/${D().table}/${cur.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({PDF:lien,'Validé le':vl})});
       cur.PDF=lien;cur['Validé le']=vl;majLienPDF();
-      return {ok:!alerte,texte:`PDF ${nom} (${pages} p.) enregistré dans ${DOSSIER_PDF[TYPE]} et lié au devis.`+alerte}}
-    catch(e){console.error(e);telecharger(blob,nom);return {ok:false,texte:`PDF ${nom} téléchargé (SharePoint : ${e.message}).`+alerte}}
+      return {ok:!alerte,texte:`PDF ${nom} (${pages} p.) enregistré dans ${DOSSIER_PDF[TYPE]} et lié ${lienDoc}.`+alerte}}
+    catch(e){console.error(e);telecharger(blob,nom);return {ok:false,texte:`⚠ PDF ${nom} NON enregistré dans SharePoint (${e.message}) : il a seulement été téléchargé. Réessayez « 📄 PDF ».`+alerte}}
   }
   telecharger(blob,nom);
-  return {ok:!alerte,texte:`PDF ${nom} (${pages} p.) téléchargé`+(TYPE!=='devis'?'.':!MS_CLIENT?' (enregistrement SharePoint pas encore configuré).':' (pas de « Dossier SharePoint » sur la fiche).')+alerte};
+  return {ok:false,texte:`⚠ PDF ${nom} (${pages} p.) seulement téléchargé, pas enregistré dans SharePoint`+(!MS_CLIENT?' (enregistrement SharePoint pas configuré).':' (aucun « Dossier SharePoint » sur la fiche, l\'affaire ou le devis).')+alerte};
 }
 function majLienPDF(){const a=$('lPdf');if(!a)return;const u=cur&&cur.PDF;a.style.display=u?'':'none';if(u)a.href=u}
 $('bPdfV').onclick=async()=>{if(sale){msg('Enregistrez d\'abord les modifications.','warn');return}
