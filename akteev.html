@@ -823,7 +823,7 @@ function techForm(l){const o=techLigne(l),v=x=>esc(x==null?'':x);
 const margeTxt=(pv,c)=>!vide(pv)&&+pv>0&&!vide(c)?Math.round((pv-c)/pv*100)+' %':'';
 async function comparerSST(dv){
   ouvrirModal('Comparer les SST – '+txt(dv['N° devis']),'<div class="charge">Chargement des offres…</div>','<button class="btn" onclick="fermerModal()">Fermer</button>');
-  $('modal').querySelector('.box').style.width='min(1280px,97vw)';$('modal').querySelector('.box').style.maxHeight='88vh';$('modal').style.paddingTop='4vh';
+  $('modal').dataset.fixe='1';$('modal').querySelector('.box').style.width='min(1280px,97vw)';$('modal').querySelector('.box').style.maxHeight='88vh';$('modal').style.paddingTop='4vh';
   let P;
   try{await Promise.all([charger(T_LDV,true),charger(MODS.consult.t,true)]);P=await charger(T_PSST,true)}
   catch(e){$('mCorps').innerHTML=`<div class="vide">Impossible de lire la table « Prix SST » (${esc(e.message)}).<br>Vérifiez que le jeton Baserow donne accès à cette table.</div>`;return}
@@ -2902,9 +2902,12 @@ async function faCreerFiche(){
 }
 
 /* ---------- Fenêtre modale ---------- */
-function ouvrirModal(t,c,p){const bx=$('modal').querySelector('.box');bx.style.width='';bx.style.maxHeight='';$('modal').style.paddingTop='';$('mTitre').textContent=t;$('mCorps').innerHTML=c;$('mPied').innerHTML=p;$('modal').style.display='flex'}
+function ouvrirModal(t,c,p){delete $('modal').dataset.fixe;const bx=$('modal').querySelector('.box');bx.style.width='';bx.style.maxHeight='';$('modal').style.paddingTop='';$('mTitre').textContent=t;$('mCorps').innerHTML=c;$('mPied').innerHTML=p;$('modal').style.display='flex'}
 function fermerModal(){$('modal').style.display='none';const z=document.getElementById('cmpZoom');if(z)z.style.display='none'}
-$('modal').onclick=e=>{if(e.target.id==='modal')fermerModal()};
+/* Fermeture par clic sur le fond : seulement si le clic a commencé ET fini sur le fond (sinon une sélection de texte
+   relâchée hors de la fenêtre la fermait), et jamais pour les fenêtres de travail (comparatif SST : data-fixe). */
+let MODAL_DOWN=null;$('modal').addEventListener('mousedown',e=>{MODAL_DOWN=e.target});
+$('modal').onclick=e=>{const d=MODAL_DOWN;MODAL_DOWN=null;if(e.target.id==='modal'&&d===e.target&&!$('modal').dataset.fixe)fermerModal()};
 
 /* ---------- Recherche globale ---------- */
 const GMODS0=['devis','commandes','clients','taches','cf','fournisseurs','arc','bl'];
