@@ -183,6 +183,16 @@ table.cmp td.cmpMin{background:#DCFCE7;color:#15803D;font-weight:700}
 table.cmp td.cmpMax{background:#FEF2F2;color:#B91C1C}
 table.cmp td.cmpRet{box-shadow:inset 0 0 0 2px #16A34A}
 table.cmp .cmpEc{font-size:11px;color:var(--mut);font-weight:400}
+table.cmp .cmpTech{font-size:11.5px;line-height:1.35;color:#4A5366;margin-top:3px}
+table.cmp .cmpTech b{font-weight:600;color:#1F2937}
+table.cmp .cmpTech .tt{color:#7C3AED}
+table.cmp .cmpTech .est{color:var(--mut)}
+table.cmp .cmpTech .vd{color:#B0B6C3;font-style:italic}
+table.cmp .cmpTech .ed{display:inline;margin:0;width:auto;min-width:0;border:0;background:none;color:var(--mut);cursor:pointer;padding:0 2px;font-size:11.5px}
+table.cmp .cmpTech .ed:hover{color:#2F6FED}
+table.cmp .cmpTechF{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px;font-size:11.5px}
+table.cmp .cmpTechF input{font:inherit;border:1px solid #D5DAE3;border-radius:5px;padding:3px 5px;min-width:0}
+table.cmp .cmpTechF div{grid-column:1/-1;display:flex;gap:6px}
 table.cmp tfoot td{border-top:2px solid var(--trait);vertical-align:top;padding-top:8px}
 .btn.mini{padding:2px 8px;font-size:11.5px;margin-top:4px;min-height:0;height:auto}
 table.cmp th.cmpPV,table.cmp td.cmpPV{background:#FFF1DE}
@@ -760,6 +770,52 @@ const estEUR=d=>!d||/^(eur|€)$/i.test(String(d).trim());
 let CMPC=Object.assign({coef:1.3,pas:1,sens:'sup'},ls.get('cmpc',{}));
 const vide=v=>v==null||v==='';
 function arrondiPV(c){const x=+c*(+CMPC.coef||0),p=+CMPC.pas||1;return CMPC.sens==='inf'?Math.floor(x/p+1e-9)*p:Math.ceil(x/p-1e-9)*p}
+/* Caractéristiques techniques d'une ligne (sous la désignation) : champs Matière, Dimensions, Poids (kg), Traitements
+   des Lignes de devis ; à défaut, lecture dans Précisions / Description. Poids absent → estimation ≈ encombrement × densité. */
+const TECH_CH=['Matière','Dimensions','Poids (kg)','Traitements'];
+const TECH_TT=/tremp|HRC|revêt|revet|anodi|oxydation|nickel|zing|chrom|nitru|cément|cement|carbonitru|phosphat|bruni|passiv|peint|\blaqu|TiCN|TiAlN|\bTiN\b|\bDLC\b|galva|traitement|recuit|revenu|sabl|microbill|grenaill|polissage|électropol|electropol|cataphor|thermolaqu|alodine|PVD|CVD|teflon|téflon/i;
+function techLue(l){
+  const P=String(txt(l['Précisions'])||''),D=String(txt(l.Description)||''),T=P+'\n'+D,o={};
+  let m=P.match(/Mati[eè]re\s*:\s*([^\n–;]+)/i);
+  if(m)o.mat=m[1].replace(/\s+-\s.*$/,'').trim();
+  else if((m=D.match(/\sen\s+((?:alu(?:minium)?\s+)?[A-Za-z0-9][\w.\-/]*(?:\s+\d[\w.\-/]*)?)/i))&&!/^(option|cours|plus|stock|l'?état|vue)$/i.test(m[1]))o.mat=m[1].trim();
+  const segs=T.split(/\n|\s[–—]\s|;|\s-\s|\(|\)/).map(x=>x.replace(/^[-•\s]+/,'').trim()).filter(Boolean),tt=[];
+  for(const seg of segs)for(let x of seg.split(/,\s+|\s+et\s+/)){x=x.replace(/^Mati[eè]re\s*:\s*/i,'').trim();if(!TECH_TT.test(x)||/^réf/i.test(x))continue;
+    let v=x;if(v.length>32){const m=v.match(new RegExp('(?:'+TECH_TT.source+')\\S*(?:\\s+[\\w/.-]+){0,3}','i'));v=m?m[0]:v.slice(0,30)+'…'}
+    v=v.replace(/^.*?\b[A-Z0-9.]{3,}\s+(?=tremp)/i,'');const k=norm(v).replace(/[^a-z]/g,'').slice(0,5);
+    if(!tt.some(y=>norm(y).replace(/[^a-z]/g,'').slice(0,5)===k))tt.push(v)}
+  if(tt.length)o.tt=tt.join(', ');
+  const N='\\d+(?:[.,]\\d+)?',re=new RegExp(`(?:Ø\\s*${N}(?:\\s*/\\s*Ø?\\s*${N})?\\s*[x×]\\s*${N}|(?<![\\w.,Ø])${N}\\s*[x×]\\s*${N}(?:\\s*[x×]\\s*${N})?)(?![\\d°])(\\s*mm)?`,'i');
+  if((m=T.match(re)))o.dim=m[0].replace(/\s*mm$/i,'').replace(/\s*[x×]\s*/g,' × ').trim();
+  else if((m=T.match(/[ée]p(?:aisseur|\.)?\s*(\d+(?:[.,]\d+)?)\s*mm/i)))o.dim='ép. '+m[1];
+  if((m=T.match(/(\d+(?:[.,]\d+)?)\s*kg\b(?!\s*\/)/i)))o.kg=+m[1].replace(',','.');
+  return o;
+}
+function densite(mat){const s=norm(mat||'');if(!s)return null;
+  const R=[[/pehd|polyeth/,0.95],[/pom|delrin|acetal|hostaform/,1.41],[/peek/,1.31],[/ptfe|teflon/,2.2],[/pa ?6|nylon|polyamide/,1.14],[/pmma|plexi/,1.19],[/pvc/,1.4],[/\bpp\b|polypro/,0.91],[/titane|ta6v|tia6v/,4.43],
+    [/laiton|cuzn/,8.5],[/bronze|cusn|cual/,8.8],[/cuivre|cu ?a1|\bcu\b/,8.9],[/inox|17.?4 ?ph|\b30[34]|\b316|\b1\.4\d{3}|x\d+cr/,7.9],
+    [/\b2017|\b2024|\b7075|au4g|az5gu|zicral/,2.8],[/\b5083|\b5754|ag3|\b6061|\b6082|\b6060|alu/,2.7],[/fonte|\bft\b|\bfgl|\bfgs/,7.2],
+    [/z\d|xc\d|\bc\d{2}|1\.[0-9]{4}|\d{2}c[dnm]|s235|s355|e24|acier|tole|clinquant|stavax|toolox|hardox|100cr6|35ncd|40cmd|16nc|20mc/,7.85]];
+  for(const [r,d] of R)if(r.test(s))return d;return null}
+function poidsEstime(dim,mat){const d=densite(mat);if(!d||!dim)return null;const n=String(dim).replace(/,/g,'.').match(/\d+(?:\.\d+)?/g)||[];let v=null;
+  if(/Ø/.test(dim)){const D=+n[0],L=+n[n.length-1];if(n.length>=2&&D&&L)v=Math.PI*D*D/4*L}
+  else if(n.length===3)v=n[0]*n[1]*n[2];
+  return v?v*d/1e6:null}
+const kgTxt=k=>(k<1?(Math.round(k*1000)/1000):k<10?Math.round(k*100)/100:Math.round(k*10)/10).toLocaleString('fr-FR')+' kg';
+function techLigne(l){const a=techLue(l),f=k=>{const v=l[k];return v==null||v===''?null:v};
+  const o={mat:f('Matière')??a.mat,dim:f('Dimensions')??a.dim,tt:f('Traitements')??a.tt,kg:f('Poids (kg)')!=null?+f('Poids (kg)'):a.kg,
+    lu:{mat:f('Matière')==null&&!!a.mat,dim:f('Dimensions')==null&&!!a.dim,tt:f('Traitements')==null&&!!a.tt}};
+  if(o.kg==null){o.est=poidsEstime(o.dim,o.mat)}return o}
+function techHTML(l,ecr){const o=techLigne(l),ok=TECH_CH.every(k=>k in sch(T_LDV).par||k in l),lu=' title="Lu dans les précisions / la désignation"';
+  const p=[o.mat?`<b${o.lu.mat?lu:''}>${esc(o.mat)}</b>`:'<span class="vd">matière ?</span>',
+    o.dim?`<span${o.lu.dim?lu:''}>${esc(o.dim)}${/mm|Ø|ép/.test(o.dim)?'':' mm'}</span>`:'<span class="vd">dimensions ?</span>',
+    o.kg!=null?`<span title="Poids saisi (masse du 3D client quand il est fourni)">${kgTxt(o.kg)}</span>`:o.est?`<span class="est" title="Estimation : encombrement × densité de la matière (pas de 3D ni de poids saisi)">≈ ${kgTxt(o.est)}</span>`:'<span class="vd">poids ?</span>',
+    o.tt?`<span class="tt"${o.lu.tt?lu:''}>${esc(o.tt)}</span>`:'<span class="vd">sans traitement</span>'];
+  return`<div class="cmpTech" data-tech="${l.id}">${p.join(' · ')}${ecr&&ok?` <button class="ed" data-ted="${l.id}" title="Modifier matière, dimensions, poids, traitements">✎</button>`:''}</div>`}
+function techForm(l){const o=techLigne(l),v=x=>esc(x==null?'':x);
+  return`<div class="cmpTechF" data-tf="${l.id}"><input data-k="Matière" placeholder="Matière" value="${v(o.mat)}"><input data-k="Dimensions" placeholder="Dimensions (mm) ex. 120 × 80 × 30, Ø40 × 60" value="${v(o.dim)}">
+    <input data-k="Poids (kg)" inputmode="decimal" placeholder="Poids kg (3D)" value="${v(l['Poids (kg)']??'')}"><input data-k="Traitements" placeholder="Traitements" value="${v(o.tt)}">
+    <div><button class="btn mini p" data-tok="${l.id}">Enregistrer</button><button class="btn mini" data-tno>Annuler</button></div></div>`}
 const margeTxt=(pv,c)=>!vide(pv)&&+pv>0&&!vide(c)?Math.round((pv-c)/pv*100)+' %':'';
 async function comparerSST(dv){
   ouvrirModal('Comparer les SST – '+txt(dv['N° devis']),'<div class="charge">Chargement des offres…</div>','<button class="btn" onclick="fermerModal()">Fermer</button>');
@@ -799,10 +855,10 @@ function dessinerComparatif(dv){
    ${cols.map(x=>`<th class="n" style="cursor:default;min-width:118px"><a href="#/consult/${x.c.id}" onclick="fermerModal()" style="color:inherit">${esc(x.four)}</a>${x.c['Délai']?`<div class="mut" style="font-weight:400;font-size:11px">${esc(x.c['Délai'])}</div>`:''}${ecr?`<button class="btn mini" data-tout="${x.c.id}" title="Retenir ${esc(x.four)} pour toutes ses lignes chiffrées">Tout retenir</button>`:''}</th>`).join('')}
    <th class="n" style="cursor:default" title="Coût unitaire (interne) de la ligne de devis">Coût retenu</th><th class="n cmpPV" style="cursor:default" title="Prix unitaire HT de vente (lignes du devis)">PV unitaire</th></tr></thead><tbody>`;
   lignes.forEach((x,i)=>{
-    const pe=cols.map(c=>x.par[c.c.id]).filter(p=>p&&p['PU HT']!=null&&p['PU HT']!==''&&estEUR(p.Devise||c.c.Devise)).map(p=>+p['PU HT']);
+    const pe=cols.map(c=>[x.par[c.c.id],c]).filter(([p,c])=>p&&p['PU HT']!=null&&p['PU HT']!==''&&estEUR(p.Devise||c.c.Devise)).map(([p])=>+p['PU HT']);
     const min=pe.length?Math.min(...pe):null,max=pe.length>1?Math.max(...pe):null;
     const cout=x.l?x.l['Coût unitaire (interne)']:null,pv=x.l?x.l['Prix unitaire HT']:null;
-    h+=`<tr style="cursor:default"><td>${esc(x.l?txt(x.l.Rep):txt(x.rep))}</td><td style="white-space:normal;max-width:340px">${x.l?esc(txt(x.l.Description)):`<i class="mut">${esc(x.des||'Hors devis')}</i> <span class="badge" style="background:#FFEDD5;color:#C2410C" title="Repère absent des lignes du devis">hors devis</span>`}</td><td class="n">${x.l?nb(q(x)):'—'}</td>`;
+    h+=`<tr style="cursor:default"><td>${esc(x.l?txt(x.l.Rep):txt(x.rep))}</td><td style="white-space:normal;max-width:340px">${x.l?esc(txt(x.l.Description))+techHTML(x.l,ecr):`<i class="mut">${esc(x.des||'Hors devis')}</i> <span class="badge" style="background:#FFEDD5;color:#C2410C" title="Repère absent des lignes du devis">hors devis</span>`}</td><td class="n">${x.l?nb(q(x)):'—'}</td>`;
     for(const c of cols){const p=x.par[c.c.id];
       if(!p||p['PU HT']==null||p['PU HT']===''){h+=`<td class="n mut">${p?'<span title="'+esc(txt(p.Commentaire)||'Prix non lu')+'">à saisir</span>':'—'}</td>`;continue}
       const pu=+p['PU HT'],dev=p.Devise||c.c.Devise,eu=estEUR(dev),best=eu&&min!=null&&pu===min&&pe.length>1,pire=eu&&max!=null&&pu===max&&max>min;
@@ -819,6 +875,14 @@ function dessinerComparatif(dv){
   <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »).</div>`;
   $('mCorps').innerHTML=h;
   $('mCorps').querySelectorAll('button[data-ret]').forEach(b=>b.onclick=()=>retenirSST(dv,[[+b.dataset.l,+b.dataset.ret]]));
+  $('mCorps').querySelectorAll('button[data-ted]').forEach(b=>b.onclick=()=>{const l=(S.rows[T_LDV]||[]).find(r=>r.id==b.dataset.ted);if(!l)return;
+    const d=b.closest('.cmpTech');d.style.display='none';d.insertAdjacentHTML('afterend',techForm(l));const f=d.nextElementSibling;f.querySelector('input').focus();
+    f.querySelector('[data-tno]').onclick=()=>{f.remove();d.style.display=''};
+    f.querySelectorAll('input').forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')f.querySelector('[data-tok]').click();if(e.key==='Escape')f.querySelector('[data-tno]').click()});
+    f.querySelector('[data-tok]').onclick=async()=>{if(dv['Validé le']&&!confirm('Ce devis est validé : modifier ses lignes le marquera « Modifié depuis la validation » (nouvelle version à éditer). Continuer ?'))return;const it={};f.querySelectorAll('input').forEach(i=>{let v=i.value.trim();if(i.dataset.k==='Poids (kg)'){v=v===''?null:Math.round(+v.replace(',','.')*1000)/1000;if(v!=null&&!(v>=0))v=undefined}else v=v||''; if(v!==undefined)it[i.dataset.k]=v});
+      f.querySelectorAll('button').forEach(x=>x.disabled=true);
+      try{const r=await api(`/rows/table/${T_LDV}/${l.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(it)});majRow(T_LDV,r);toast('Caractéristiques enregistrées')}catch(e){toast('Échec : '+e.message,true)}
+      dessinerComparatif(dv)}});
   $('mCorps').querySelectorAll('input[data-pv]').forEach(i=>{i.onkeydown=e=>{if(e.key==='Enter')i.blur()};i.onchange=()=>{const v=i.value.trim()===''?null:Math.round(+i.value.replace(',','.')*100)/100;
     if(v!=null&&!(v>=0))return toast('Prix invalide',true);enregistrerPV(dv,[{id:+i.dataset.pv,'Prix unitaire HT':v}])}});
   const prefs=()=>{CMPC={coef:+String($('cCoef').value).replace(',','.')||0,pas:+$('cPas').value,sens:$('cSens').value};ls.set('cmpc',CMPC);
