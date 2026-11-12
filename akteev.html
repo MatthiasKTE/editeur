@@ -27,6 +27,8 @@ input,select,textarea{font:inherit;color:inherit}
 #side a.it{display:flex;align-items:center;gap:11px;margin:1px 10px;padding:8px 10px;border-radius:8px;color:var(--sideTxt);font-weight:500;position:relative}
 #side a.it:hover{background:var(--side2);color:#fff}
 #side a.it.on{background:var(--accent);color:#fff}
+#side a.it.alerteO{background:#F59E0B;color:#fff}#side a.it.alerteR{background:#DC2626;color:#fff}#side a.it.alerteO.on,#side a.it.alerteR.on{box-shadow:inset 0 0 0 2px rgba(255,255,255,.55)}
+.nonlu{display:inline-block;font-size:10.5px;font-weight:700;color:#fff;background:#F59E0B;border-radius:4px;padding:1px 5px;vertical-align:1px;margin-right:4px}
 #side a.it svg{width:18px;height:18px;flex:none;opacity:.9}
 #side a.it .nb:empty{display:none}
 #side a.it .nb{margin-left:auto;font-size:11px;background:rgba(255,255,255,.12);padding:1px 7px;border-radius:10px}
@@ -307,7 +309,8 @@ const I={
  cal:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
  stats:'<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',crayon:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13.5 6.5 4 4"/>',
  nc:'<path d="M12 3 4 6v6c0 5 3.4 8 8 9 4.6-1 8-4 8-9V6z"/><path d="M12 8v5M12 16h.01"/>',
- cle:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>'
+ cle:'<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+ ampoule:'<path d="M9 18h6M10 21h4"/><path d="M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>'
 };
 const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" ${s}>${I[n]||''}</svg>`;
 
@@ -340,6 +343,9 @@ const MODS={
  referents:{t:1260243,nom:'Référents',un:'référent',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Téléphone',"Référent d'affaire"],
    liees:[{nom:'Tâches',mod:'taches',lien:'Référent'},{nom:'Commandes',mod:'commandes',lien:'Référent KTE'}]},
  catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']},
+ amelio:{t:1315880,nom:'Améliorations Akteev',un:'amélioration',fem:true,ico:'ampoule',grp:'Paramètres',cols:['Titre',"Partie d'Akteev",'Priorité','Proposée par','Proposée le','Statut','Décision','Décidée le'],
+   statut:'Statut',date:'Proposée le',ref:'Proposée par',requis:['Titre'],cacheStatuts:['Faite','Refusée'],faitLe:'Décidée le',faitRe:/^(retenue|refus|report)/i,faitMaj:true,
+   libOuverts:'Ouvertes',ordreStatuts:['Nouvelle','À discuter','Reportée','Retenue','En cours','Faite','Refusée'],ordreForm:['Titre','Description',"Partie d'Akteev",'Priorité','Proposée par','Proposée le','Statut','Décision','Décidée le','Lue par']},
  utilisateurs:{t:1281481,nom:'Utilisateurs',un:'utilisateur',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Profil','Actif','Dernière connexion','Commentaire']}
 };
 for(const k in MODS)MODS[k].k=k;
@@ -347,7 +353,7 @@ const MOD_DE_TABLE={};for(const k in MODS)MOD_DE_TABLE[MODS[k].t]=k;
 /* Cibles des liens si l'API des champs n'est pas lisible avec le jeton (secours). */
 const LIENS_SECOURS={'Client':1260239,'Référent KTE':1260243,'Référent':1260243,'Demandeur':1260243,'Référent par défaut':1260243,'Commande':1260240,'Affaire':1260240,
  'Fournisseur':1260241,'Intervenant':1260241,'Type de tâche':1261119,'Devis':1261170,'ARC':1261374,'BL':1261382,'Commande fournisseur':1263348,'Tâche':1261600,
- 'Lignes de devis':1261171,'Consultations SST':1274941,'Non-conformités':1284881,'Responsable':1260243,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349};
+ 'Lignes de devis':1261171,'Consultations SST':1274941,'Non-conformités':1284881,'Responsable':1260243,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349,'Proposée par':1260243,'Lue par':1260243};
 const RO_TYPES=new Set(['formula','lookup','rollup','count','created_on','last_modified','created_by','last_modified_by','autonumber','uuid','file','multiple_collaborators','ai','password']);
 
 /* ---------- Utilitaires ---------- */
@@ -475,7 +481,7 @@ function triVal(f,v){
    Direction et au Commercial). Les profils ci-dessous adaptent seulement l'affichage (menus, boutons). */
 const PROFILS={
  admin:{nom:'Direction / Admin',voir:'*',ecrire:'*',montants:true,admin:true},
- commercial:{nom:'Commercial',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','nc','cf','fournisseurs','referents','catalogue'],ecrire:['devis','consult','commandes','arc','bl','clients','taches','synthese','nc','cf','fournisseurs','referents','catalogue'],montants:true},
+ commercial:{nom:'Commercial',voir:['devis','consult','commandes','arc','bl','clients','taches','synthese','nc','cf','fournisseurs','referents','catalogue','amelio'],ecrire:['devis','consult','commandes','arc','bl','clients','taches','synthese','nc','cf','fournisseurs','referents','catalogue','amelio'],montants:true},
  atelier:{nom:'Atelier',voir:['taches','synthese','nc','commandes','bl','cf','consult','fournisseurs','referents','catalogue'],ecrire:['taches','synthese','nc','cf','consult','catalogue'],montants:true}
 };
 let SESSION=null;try{SESSION=JSON.parse(localStorage.getItem('akteev_session')||'null')}catch(e){}
@@ -511,6 +517,7 @@ function majCompteurs(){
     e.textContent=n||'';e.title=k==='taches'?'tâches en retard':'en cours'}
   const eD=$('nb_ddp'),RD=S.rows[MODS.devis.t],RC=S.rows[MODS.consult.t];
   if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
+  const eA=$('nb_amelio'),RA=S.rows[MODS.amelio.t];if(eA&&RA){const n=RA.filter(amelioAuJour).length;eA.textContent=n||'';const it=eA.parentElement,s=amelioEtatMenu();it.classList.remove('alerteO','alerteR');if(s.c)it.classList.add(s.c);it.title=[s.t,n+' amélioration(s) à l’ordre du jour'].filter(Boolean).join(' · ')}
   const eN=$('nb_nc'),RN=S.rows[MODS.nc.t];if(eN&&RN){const n=RN.filter(ncOuverte).length;eN.textContent=n||'';eN.title=n+' non-conformité(s) à traiter'}
   majMoi();
 }
@@ -1305,6 +1312,7 @@ async function vueListe(k){
   await charger(m.t);
   if(m.virt)await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));
   if(m.ref)charger(MODS.referents.t).catch(()=>{});
+  if(k==='amelio')await charger(T_REUNIONS).catch(()=>{});
   dessinerListe(k);
 }
 // statut(s) qui soldent / clôturent : retirés de la liste même en recherche (tâche Fait, devis Accepté / Refusé / Annulé)
@@ -1347,17 +1355,18 @@ function dessinerListe(k){
   const cols=colonnes(k);
   const L=trier(k,filtrer(k));
   const stF=m.statut&&sc.par[m.statut];
-  const opts=stF?(stF.select_options?.length?stF.select_options:optsVues(R.map(r=>r[m.statut]).filter(Boolean))):[];
+  let opts=stF?(stF.select_options?.length?stF.select_options:optsVues(R.map(r=>r[m.statut]).filter(Boolean))):[];
+  if(m.ordreStatuts){const o=v=>{const i=m.ordreStatuts.indexOf(v);return i<0?99:i};opts=[...opts].sort((x,y)=>o(x.value)-o(y.value))}
   const cpt={};R.forEach(r=>{const s=txt(r[m.statut]);cpt[s]=(cpt[s]||0)+1});
   const neuf=!peutEcrire(k)?'':k==='bl'?`<button class="btn p" onclick="nouveauBL()">${ico('plus')}Nouveau BL</button>`:m.editeur||k==='commandes'?`<a class="btn p" href="${EDITEUR}" target="_blank" title="${k==='commandes'?'Une commande se crée depuis le devis (bouton « Commande reçue » de l’éditeur)':'Numérotation et mise en page dans l’éditeur'}">${ico('plus')}${k==='commandes'?'Commande reçue (éditeur)':nouv(m)}</a>`:`<a class="btn p" href="#/${k}/nouveau">${ico('plus')}${nouv(m)}</a>`;
   const refs=S.rows[MODS.referents.t]||[];
   let h=`<div class="entete"><h1>${m.nom}</h1><span class="sous">${L.length} sur ${R.length}</span><div class="act">
-    ${k==='utilisateurs'&&peutVoir('droits')?`<a class="btn" href="#/droits">${ico('cle')}Droits d’accès par onglet</a>`:''}<button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>
+    ${k==='utilisateurs'&&peutVoir('droits')?`<a class="btn" href="#/droits">${ico('cle')}Droits d’accès par onglet</a>`:''}<button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>${k==='amelio'?amelioBandeau(R):''}
   <div class="card"><div class="outils">
     <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
     ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
     ${m.ref&&sc.par[m.ref]?`<select id="lref"><option value="">Tous les référents</option>${MOI?`<option value="${MOI}">Moi</option>`:''}${refs.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('')}</select>`:''}
-    ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout&&!(E.q.trim()||nbCf(E))?'En cours':'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
+    ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout&&!(E.q.trim()||nbCf(E))?(m.libOuverts||'En cours'):'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
     ${stF?`<div class="bascule"><button data-v="liste" class="${E.vue==='liste'?'on':''}">${ico('liste')}Liste</button><button data-v="kanban" class="${E.vue==='kanban'?'on':''}">${ico('kanban')}Tableau</button></div>`:''}
   </div>`;
   if(E.vue==='kanban'&&stF){h+=`</div><div style="margin-top:14px">${kanban(k,L,opts)}</div>`}
@@ -1390,7 +1399,65 @@ function dessinerListe(k){
   if(E.vue==='kanban'&&peutEcrire(k))brancherKanban(k);
   if(E.vue==='kanban'&&!peutEcrire(k))document.querySelectorAll('.kcard').forEach(c=>{c.draggable=false;c.onclick=()=>location.hash=`#/${k}/${c.dataset.id}`});
   brancherStatuts($('main'),()=>dessinerListe(k));
+  if(k==='amelio')brancherAmelio();
 }
+
+/* ---------- Améliorations Akteev (Paramètres) ----------
+   Idées proposées par Matthias, Sébastien et William, revues en réunion (dates planifiées par Matthias, table « Réunions Akteev »).
+   Ordre du jour = statuts Nouvelle / À discuter / Reportée ; décision = Retenue / Refusée / Reportée (+ « Décidée le »).
+   Onglet du menu : orange s'il y a une proposition non lue par « Je suis » (champ « Lue par »), rouge la veille et le jour de la réunion. */
+const T_REUNIONS=1315898;
+const AMELIO_JOUR=['Nouvelle','À discuter','Reportée'];
+const amelioAuJour=r=>AMELIO_JOUR.includes(txt(r.Statut));
+const amelioNonLue=r=>!!MOI&&!/^(faite|refus)/i.test(txt(r.Statut))&&!ids(r['Lue par']).includes(MOI)&&!ids(r['Proposée par']).includes(MOI);
+function reunionsAVenir(){const a=auj();return(S.rows[T_REUNIONS]||[]).map(r=>r.Date).filter(d=>d&&d>=a).sort()}
+const prochaineReunion=()=>reunionsAVenir()[0]||null;
+function joursAvant(iso){return Math.round((new Date(iso+'T12:00:00')-new Date(auj()+'T12:00:00'))/864e5)}
+const dateLongue=iso=>new Date(iso+'T12:00:00').toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+function amelioTri(L){const P={Haute:0,Moyenne:1,Basse:2};return[...L].sort((x,y)=>(P[txt(x['Priorité'])]??1)-(P[txt(y['Priorité'])]??1)||String(x['Proposée le']||'').localeCompare(String(y['Proposée le']||'')))}
+function amelioLigne(r,dec){const t=txt(r.Titre)||'(sans titre)',p=txt(r["Partie d'Akteev"]),q=txt(r['Proposée par']),pr=txt(r['Priorité']);
+  return`- ${t}${p?' ('+p+')':''}${dec?(r['Décision']?' : '+String(r['Décision']).trim().replace(/\s*\n\s*/g,' '):''):(pr||q?' – '+[pr&&'priorité '+pr.toLowerCase(),q&&'proposée par '+q].filter(Boolean).join(', '):'')}`}
+function amelioOrdreDuJour(R){const d=prochaineReunion(),L=amelioTri(R.filter(amelioAuJour));
+  let t=`Réunion Améliorations Akteev${d?' du '+dateLongue(d):''}\n\nOrdre du jour (${L.length} point${L.length>1?'s':''})\n`;
+  for(const s of AMELIO_JOUR){const G=L.filter(r=>txt(r.Statut)===s);if(G.length)t+=`\n${s==='Nouvelle'?'Nouvelles idées':s==='Reportée'?'Points reportés':'À discuter'}\n`+G.map(r=>amelioLigne(r)).join('\n')+'\n'}
+  const C=R.filter(r=>txt(r.Statut)==='En cours');if(C.length)t+=`\nPoint d'avancement (en cours)\n`+C.map(r=>amelioLigne(r)).join('\n')+'\n';
+  return t.trim()}
+function amelioCompteRendu(R){const der=R.map(r=>r['Décidée le']).filter(Boolean).sort().pop();if(!der)return null;
+  const L=R.filter(r=>r['Décidée le']===der);let t=`Compte rendu – Réunion Améliorations Akteev du ${dateLongue(der)}\n`;
+  for(const [s,lib] of [['Retenue','Retenues'],['En cours','En cours'],['Faite','Faites'],['Reportée','Reportées'],['Refusée','Refusées']]){const G=amelioTri(L.filter(r=>txt(r.Statut)===s));if(G.length)t+=`\n${lib}\n`+G.map(r=>amelioLigne(r,true)).join('\n')+'\n'}
+  const d=prochaineReunion();return(t+(d&&d>der?`\nProchaine réunion : ${dateLongue(d)}`:'')).trim()}
+function amelioBandeau(R){const V=reunionsAVenir(),d=V[0],j=d?joursAvant(d):null;
+  const n=R.filter(amelioAuJour).length,ret=R.filter(r=>/^(retenue|en cours)/i.test(txt(r.Statut))).length,nl=R.filter(amelioNonLue).length;
+  const coulJ=d&&j<=1?'color:var(--err)':'';
+  return`<div class="card" style="display:flex;flex-wrap:wrap;gap:12px 28px;align-items:center;padding:14px 16px;margin-bottom:14px">
+   <div style="flex:1 1 240px"><div class="mut" style="font-size:11.5px;text-transform:uppercase;letter-spacing:.06em">Prochaine réunion</div>
+    ${d?`<div style="font-size:16px;font-weight:600;${coulJ}">${esc(dateLongue(d).replace(/^./,c=>c.toUpperCase()))}</div><div class="mut" style="font-size:12.5px;${coulJ}">${j===0?'Aujourd’hui':j===1?'Demain':'Dans '+j+' jours'}${V.length>1?' · ensuite : '+V.slice(1,4).map(x=>dfr(x)).join(', '):''}</div>`
+       :`<div style="font-size:16px;font-weight:600">Aucune réunion planifiée</div>`}</div>
+   <div><div class="mut" style="font-size:11.5px">À l’ordre du jour</div><div style="font-size:20px;font-weight:600">${n}</div></div>
+   <div><div class="mut" style="font-size:11.5px">Non lues</div><div style="font-size:20px;font-weight:600;${nl?'color:#D97706':''}">${MOI?nl:'—'}</div></div>
+   <div><div class="mut" style="font-size:11.5px">Retenues / en cours</div><div style="font-size:20px;font-weight:600">${ret}</div></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">${estAdmin()?`<button class="btn" id="amPlan">${ico('cal')}Planifier une réunion</button>`:''}<button class="btn" id="amOdj">${ico('liste')}Copier l’ordre du jour</button><button class="btn" id="amCr">${ico('pdf')}Copier le compte rendu</button></div></div>
+   ${MOI?'':`<p class="mut" style="margin:-6px 0 12px;font-size:12.5px">Choisissez « Je suis » en bas du menu pour suivre les propositions non lues.</p>`}`}
+async function copierTexte(t,ok){try{await navigator.clipboard.writeText(t);toast(ok)}catch(e){ouvrirModal('Texte à copier',`<textarea style="width:100%;min-height:320px;font:13px/1.5 inherit">${esc(t)}</textarea>`,'<button class="btn" onclick="fermerModal()">Fermer</button>')}}
+function planifierReunion(){const V=reunionsAVenir();
+  ouvrirModal('Planifier une réunion',`<label class="mut" style="font-size:13px">Date de la réunion</label><br><input type="date" id="amDate" min="${auj()}" style="margin-top:6px;border:1px solid var(--trait);border-radius:6px;padding:7px 9px;font-size:14px">
+   ${V.length?`<p class="mut" style="font-size:12.5px;margin-top:14px">Déjà planifiées : ${V.map(x=>esc(dateLongue(x))).join(' ; ')}</p>`:''}`,
+   '<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="amDateOk">Enregistrer</button>');
+  $('amDateOk').onclick=async()=>{const d=$('amDate').value;if(!d){toast('Choisissez une date',true);return}if(V.includes(d)){toast('Cette date est déjà planifiée',true);return}
+    $('amDateOk').disabled=true;
+    try{const r=await api(`/rows/table/${T_REUNIONS}/?user_field_names=true`,{method:'POST',body:JSON.stringify({'Réunion':'Réunion Améliorations Akteev','Date':d})});majRow(T_REUNIONS,r);fermerModal(true);toast('Réunion planifiée le '+dfr(d));majCompteurs();dessinerListe('amelio')}
+    catch(e){toast('Enregistrement impossible : '+e.message,true);$('amDateOk').disabled=false}}}
+async function amelioMarquerLue(row){if(!MOI||!row?.id||!amelioNonLue(row)||!peutEcrire('amelio'))return;
+  try{const r=await api(`/rows/table/${MODS.amelio.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Lue par':[...ids(row['Lue par']),MOI]})});
+    majRow(MODS.amelio.t,r);if(SALE&&SALE.k==='amelio'&&SALE.id===row.id)SALE.row['Lue par']=r['Lue par'];majCompteurs()}catch(e){console.warn('Lue par',e)}}
+function amelioEtatMenu(){const R=S.rows[MODS.amelio.t],d=prochaineReunion(),j=d!=null?joursAvant(d):99,nl=(R||[]).filter(amelioNonLue).length;
+  return j<=1?{c:'alerteR',t:`Réunion ${j===0?'aujourd’hui':'demain'}`}:nl?{c:'alerteO',t:nl+' proposition(s) non lue(s)'}:{c:'',t:''}}
+function brancherAmelio(){const R=S.rows[MODS.amelio.t]||[];
+  if($('amPlan'))$('amPlan').onclick=planifierReunion;
+  if($('amOdj'))$('amOdj').onclick=()=>copierTexte(amelioOrdreDuJour(R),'Ordre du jour copié : à coller dans le mail ou l’invitation');
+  if($('amCr'))$('amCr').onclick=()=>{const t=amelioCompteRendu(R);if(!t){toast('Aucune décision enregistrée pour l’instant',true);return}copierTexte(t,'Compte rendu de la dernière réunion copié')};
+  const NL=new Set(R.filter(amelioNonLue).map(r=>String(r.id)));
+  document.querySelectorAll('table.l tbody tr[data-id], .kcard[data-id]').forEach(e=>{if(!NL.has(e.dataset.id))return;const c=e.querySelector('td.prim, .t');if(c&&!c.querySelector('.nonlu'))c.insertAdjacentHTML('afterbegin','<span class="nonlu" title="Non lue">Non lue</span> ')})}
 function ligneFiltres(k,cols){
   const m=MODS[k],E=etat(k),sc=sch(m.t),R=S.rows[m.t]||[];
   return`<tr class="filtres">${cols.map(c=>{const f=sc.par[c],v=(E.cf||{})[c]||'';
@@ -1419,7 +1486,7 @@ function brancherKanban(k){
 }
 async function changerStatut(k,row,oid,val){
   const m=MODS[k],corps={[m.statut]:oid>0?oid:val};
-  if(m.faitLe&&sch(m.t).par[m.faitLe]&&faitRe(m).test(val)&&!row[m.faitLe])corps[m.faitLe]=auj();
+  if(m.faitLe&&sch(m.t).par[m.faitLe]&&faitRe(m).test(val)&&(m.faitMaj||!row[m.faitLe]))corps[m.faitLe]=auj();
   const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
   majRow(m.t,r);majCompteurs();toast(estSolde(m,val)?`${titre(m.t,r)} → ${val} : ${m.un} ${soldeMots(m).pp}, retiré${m.fem?'e':''} de la liste`:`${titre(m.t,r)} → ${val}`);return r;
 }
@@ -1446,9 +1513,15 @@ async function vueFiche(k,id){
     if(m.statut&&sc.par[m.statut]&&!SALE.draft[m.statut]){const o=sc.par[m.statut].select_options?.[0];if(o)SALE.draft[m.statut]=o}
     if(k==='nc'){if(!SALE.draft['Date de détection'])SALE.draft['Date de détection']=auj();
       if(MOI&&!SALE.draft['Responsable']){const me=(S.rows[MODS.referents.t]||[]).find(r=>r.id===MOI);if(me)SALE.draft['Responsable']=[{id:MOI,value:titre(MODS.referents.t,me)}]}}
+    if(k==='amelio'){const opt=(n,v)=>(sc.par[n]?.select_options||[]).find(o=>o.value===v);
+      if(opt('Statut','Nouvelle')&&!params().Statut)SALE.draft.Statut=opt('Statut','Nouvelle');if(opt('Priorité','Moyenne')&&!SALE.draft['Priorité'])SALE.draft['Priorité']=opt('Priorité','Moyenne');
+      if(!SALE.draft['Proposée le'])SALE.draft['Proposée le']=auj();
+      if(MOI&&sc.par['Lue par']&&!SALE.draft['Lue par']){const me=(S.rows[MODS.referents.t]||[]).find(r=>r.id===MOI);SALE.draft['Lue par']=[{id:MOI,value:me?titre(MODS.referents.t,me):''}]}
+      if(MOI&&!SALE.draft['Proposée par']){const me=(S.rows[MODS.referents.t]||[]).find(r=>r.id===MOI);if(me)SALE.draft['Proposée par']=[{id:MOI,value:titre(MODS.referents.t,me)}]}}
     if(k==='taches'&&MOI&&!SALE.draft['Référent']){const R=S.rows[MODS.referents.t]||[];const me=R.find(r=>r.id===MOI);if(me)SALE.draft['Référent']=[{id:MOI,value:titre(MODS.referents.t,me)}]}
   }
   dessinerFiche();
+  if(k==='amelio'&&!nouveau)amelioMarquerLue(row);
 }
 function val(n){return n in SALE.draft?SALE.draft[n]:SALE.row[n]}
 function dessinerFiche(){
@@ -1618,7 +1691,7 @@ async function enregistrer(){
   const manq=(m.requis||[]).filter(n=>sc.par[n]&&!txt(val(n)));
   if(manq.length){toast('Champs obligatoires : '+manq.join(', '),true);return}
   const corps={};for(const [n,v] of Object.entries(SALE.draft)){const f=sc.par[n];if(f)corps[n]=versApi(f,v)}
-  if(m.faitLe&&sc.par[m.faitLe]&&m.statut in SALE.draft&&faitRe(m).test(txt(SALE.draft[m.statut]))&&!val(m.faitLe))corps[m.faitLe]=auj();
+  if(m.faitLe&&sc.par[m.faitLe]&&m.statut in SALE.draft&&faitRe(m).test(txt(SALE.draft[m.statut]))&&(m.faitMaj?!(m.faitLe in SALE.draft):!val(m.faitLe)))corps[m.faitLe]=auj();
   if(k==='nc'&&!SALE.id&&!txt(corps['N° NC']))corps['N° NC']=await prochainNC();
   $('beEnr').disabled=true;
   try{
@@ -3076,11 +3149,11 @@ const ONGLETS_ACCES=[
  ['devis','Devis','avec les lignes de devis'],['consult','Consultations SST / DDP','avec les prix SST'],['commandes','Commandes',''],
  ['arc','ARC','avec les lignes'],['bl','Bons de livraison','avec les lignes'],['clients','Clients',''],['taches','Tâches',''],
  ['synthese','Synthèse pièces',''],['nc','Non-conformités','et Synthèse NC'],['cf','Commandes fournisseurs','avec les lignes'],
- ['fournisseurs','Fournisseurs',''],['referents','Référents','nécessaire aux tâches et à « Je suis »'],['catalogue','Catalogue de tâches',''],['stats','Statistiques','onglet pas encore réactivé']];
+ ['fournisseurs','Fournisseurs',''],['referents','Référents','nécessaire aux tâches et à « Je suis »'],['catalogue','Catalogue de tâches',''],['amelio','Améliorations Akteev','idées à revoir en réunion'],['stats','Statistiques','onglet pas encore réactivé']];
 const PROFILS_ACCES=[['commercial','Commercial'],['atelier','Atelier']];
 /* Niveaux par défaut (= ceux codés dans la passerelle quand rien n'est réglé). */
-const DEF_ACCES={commercial:{devis:'E',consult:'E',commandes:'E',arc:'E',bl:'E',clients:'E',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'E',referents:'E',catalogue:'E',stats:'N'},
- atelier:{devis:'N',consult:'E',commandes:'L',arc:'N',bl:'L',clients:'L',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'L',referents:'L',catalogue:'E',stats:'N'}};
+const DEF_ACCES={commercial:{devis:'E',consult:'E',commandes:'E',arc:'E',bl:'E',clients:'E',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'E',referents:'E',catalogue:'E',amelio:'E',stats:'N'},
+ atelier:{devis:'N',consult:'E',commandes:'L',arc:'N',bl:'L',clients:'L',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'L',referents:'L',catalogue:'E',amelio:'N',stats:'N'}};
 const NIV={E:'Écriture',L:'Lecture',N:'Aucun'};
 const lireNiv=s=>{const o={};for(const m of String(s||'').replace(/\\/g,'').matchAll(/([a-z]+)\s*[:=]\s*([ELN])/gi)){const k=m[1].toLowerCase();if(ONGLETS_ACCES.some(x=>x[0]===k))o[k]=m[2].toUpperCase()}return o};
 const ecrireNiv=o=>ONGLETS_ACCES.filter(([k])=>o[k]).map(([k])=>k+':'+o[k]).join(' ');
@@ -3201,7 +3274,7 @@ function lancer(){
   document.body.classList.remove('deconnecte');GMODS=GMODS0.filter(peutVoir);
   if(SESSION?.referent&&!MOI){MOI=SESSION.referent;ls.set('moi',MOI)}
   dessinerMenu();route();charger(MODS.referents.t).then(R=>{if(!MOI&&SESSION?.login&&Array.isArray(R)){const r=R.find(x=>String(x['E-mail']||'').toLowerCase().trim()===SESSION.login);if(r){MOI=r.id;ls.set('moi',MOI);majMoi()}}}).catch(()=>{});
-  setTimeout(()=>['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{})),300)}
+  setTimeout(()=>{['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{}));if(peutVoir('amelio'))charger(T_REUNIONS).catch(()=>{}).then(()=>charger(MODS.amelio.t)).catch(()=>{})},300)}
 (async()=>{
   if(PASSERELLE){try{await ouvrirSession()}catch(e){ecranConnexionMS(e.message==='CONNEXION'?'':'Accès refusé : '+e.message)}return}
   ACCES=await lireAcces();
