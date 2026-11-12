@@ -183,6 +183,10 @@ table.cmp td.cmpMin{background:#DCFCE7;color:#15803D;font-weight:700}
 table.cmp td.cmpMax{background:#FEF2F2;color:#B91C1C}
 table.cmp td.cmpRet{box-shadow:inset 0 0 0 2px #16A34A}
 table.cmp .cmpEc{font-size:11px;color:var(--mut);font-weight:400}
+table.cmp td.cmpVig{width:56px;padding-right:4px}
+table.cmp td.cmpVig img{display:block;width:52px;height:52px;object-fit:contain;background:#fff;border:1px solid var(--trait);border-radius:6px;cursor:zoom-in}
+#cmpZoom{position:fixed;z-index:1000;width:240px;height:240px;object-fit:contain;background:#fff;border:1px solid var(--trait);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.2);pointer-events:none;display:none}
+table.cmp td.cmpVig .vv{width:52px;height:52px;border:1px dashed var(--trait);border-radius:6px}
 table.cmp .cmpTech{font-size:11.5px;line-height:1.35;color:#4A5366;margin-top:3px}
 table.cmp .cmpTech b{font-weight:600;color:#1F2937}
 table.cmp .cmpTech .tt{color:#7C3AED}
@@ -851,14 +855,15 @@ function dessinerComparatif(dv){
     arrondi <select id="cPas"><option value="1" ${+CMPC.pas===1?'selected':''}>à l’euro</option><option value="10" ${+CMPC.pas===10?'selected':''}>à la dizaine</option></select>
     <select id="cSens"><option value="sup" ${CMPC.sens!=='inf'?'selected':''}>supérieur</option><option value="inf" ${CMPC.sens==='inf'?'selected':''}>inférieur</option></select>
     <button class="btn mini p" id="cApp" title="Remplit le PV unitaire des lignes qui ont un coût retenu">Appliquer</button><span class="mut" style="font-size:12px">ou saisissez le PV à la main dans la colonne orange (enregistré dans le devis, visible dans l’éditeur)</span></div>`;
-  h+=`<div class="tw"><table class="l cmp"><thead><tr><th style="cursor:default">Rep</th><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Qté</th>
+  h+=`<div class="tw"><table class="l cmp"><thead><tr><th style="cursor:default"></th><th style="cursor:default">Rep</th><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Qté</th>
    ${cols.map(x=>`<th class="n" style="cursor:default;min-width:118px"><a href="#/consult/${x.c.id}" onclick="fermerModal()" style="color:inherit">${esc(x.four)}</a>${x.c['Délai']?`<div class="mut" style="font-weight:400;font-size:11px">${esc(x.c['Délai'])}</div>`:''}${ecr?`<button class="btn mini" data-tout="${x.c.id}" title="Retenir ${esc(x.four)} pour toutes ses lignes chiffrées">Tout retenir</button>`:''}</th>`).join('')}
    <th class="n" style="cursor:default" title="Coût unitaire (interne) de la ligne de devis">Coût retenu</th><th class="n cmpPV" style="cursor:default" title="Prix unitaire HT de vente (lignes du devis)">PV unitaire</th></tr></thead><tbody>`;
   lignes.forEach((x,i)=>{
     const pe=cols.map(c=>[x.par[c.c.id],c]).filter(([p,c])=>p&&p['PU HT']!=null&&p['PU HT']!==''&&estEUR(p.Devise||c.c.Devise)).map(([p])=>+p['PU HT']);
     const min=pe.length?Math.min(...pe):null,max=pe.length>1?Math.max(...pe):null;
     const cout=x.l?x.l['Coût unitaire (interne)']:null,pv=x.l?x.l['Prix unitaire HT']:null;
-    h+=`<tr style="cursor:default"><td>${esc(x.l?txt(x.l.Rep):txt(x.rep))}</td><td style="white-space:normal;max-width:340px">${x.l?esc(txt(x.l.Description))+techHTML(x.l,ecr):`<i class="mut">${esc(x.des||'Hors devis')}</i> <span class="badge" style="background:#FFEDD5;color:#C2410C" title="Repère absent des lignes du devis">hors devis</span>`}</td><td class="n">${x.l?nb(q(x)):'—'}</td>`;
+    const vg=x.l&&String(x.l['Vignette PDF']||'');
+    h+=`<tr style="cursor:default"><td class="cmpVig">${vg&&/^data:image\//.test(vg)?`<img src="${esc(vg)}" alt="" title="${esc(txt(x.l.Description))}">`:'<div class="vv"></div>'}</td><td>${esc(x.l?txt(x.l.Rep):txt(x.rep))}</td><td style="white-space:normal;max-width:340px">${x.l?esc(txt(x.l.Description))+techHTML(x.l,ecr):`<i class="mut">${esc(x.des||'Hors devis')}</i> <span class="badge" style="background:#FFEDD5;color:#C2410C" title="Repère absent des lignes du devis">hors devis</span>`}</td><td class="n">${x.l?nb(q(x)):'—'}</td>`;
     for(const c of cols){const p=x.par[c.c.id];
       if(!p||p['PU HT']==null||p['PU HT']===''){h+=`<td class="n mut">${p?'<span title="'+esc(txt(p.Commentaire)||'Prix non lu')+'">à saisir</span>':'—'}</td>`;continue}
       const pu=+p['PU HT'],dev=p.Devise||c.c.Devise,eu=estEUR(dev),best=eu&&min!=null&&pu===min&&pe.length>1,pire=eu&&max!=null&&pu===max&&max>min;
@@ -869,12 +874,14 @@ function dessinerComparatif(dv){
     const prop=!vide(cout)&&+CMPC.coef>0?arrondiPV(cout):'';
     h+=`<td class="n">${!vide(cout)?eur(cout):'<span class="mut">—</span>'}</td><td class="n cmpPV">${x.l&&ecr?`<input type="number" step="0.01" min="0" data-pv="${x.l.id}" value="${vide(pv)?'':+pv}" placeholder="${prop}" title="${prop!==''?'Proposition : '+eur(prop):''}">`:x.l&&!vide(pv)?eur(pv):'<span class="mut">—</span>'}${x.l&&margeTxt(pv,cout)?`<div class="cmpEc">marge ${margeTxt(pv,cout)}</div>`:''}</td></tr>`});
   const nL=lignes.filter(x=>x.l).length,tv=cols.filter(c=>nbL[c.c.id]===nL).map(c=>tot[c.c.id]),tmin=tv.length>1?Math.min(...tv):null;
-  h+=`</tbody><tfoot><tr><td></td><td><b>Total HT</b> <span class="mut" style="font-size:11.5px">(PU × quantité du devis)</span></td><td></td>${cols.map(c=>{const t=tot[c.c.id],cplt=nbL[c.c.id]===nL;
+  h+=`</tbody><tfoot><tr><td></td><td></td><td><b>Total HT</b> <span class="mut" style="font-size:11.5px">(PU × quantité du devis)</span></td><td></td>${cols.map(c=>{const t=tot[c.c.id],cplt=nbL[c.c.id]===nL;
     return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}<td></td><td class="n cmpPV">${(()=>{const LL=lignes.filter(x=>x.l),v=LL.reduce((s,x)=>s+(+x.l['Prix unitaire HT']||0)*q(x),0),c=LL.reduce((s,x)=>s+(+x.l['Coût unitaire (interne)']||0)*q(x),0),ok=LL.filter(x=>!vide(x.l['Prix unitaire HT'])).length;
     return`<b>${v?eur(v):'—'}</b><div class="cmpEc">${ok}/${LL.length} lignes</div>${v&&c?`<div class="cmpEc">marge ${Math.round((v-c)/v*100)} % (${eur(v-c)})</div>`:''}`})()}</td></tr></tfoot></table></div>
   <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »).</div>`;
   $('mCorps').innerHTML=h;
   $('mCorps').querySelectorAll('button[data-ret]').forEach(b=>b.onclick=()=>retenirSST(dv,[[+b.dataset.l,+b.dataset.ret]]));
+  let zm=document.getElementById('cmpZoom');if(!zm){zm=document.createElement('img');zm.id='cmpZoom';document.body.appendChild(zm)}zm.style.display='none';
+  $('mCorps').querySelectorAll('td.cmpVig img').forEach(im=>{im.onmouseenter=()=>{const r=im.getBoundingClientRect();zm.src=im.src;zm.style.left=(r.right+8)+'px';zm.style.top=Math.max(8,Math.min(innerHeight-250,r.top+r.height/2-120))+'px';zm.style.display='block'};im.onmouseleave=()=>{zm.style.display='none'}});
   $('mCorps').querySelectorAll('button[data-ted]').forEach(b=>b.onclick=()=>{const l=(S.rows[T_LDV]||[]).find(r=>r.id==b.dataset.ted);if(!l)return;
     const d=b.closest('.cmpTech');d.style.display='none';d.insertAdjacentHTML('afterend',techForm(l));const f=d.nextElementSibling;f.querySelector('input').focus();
     f.querySelector('[data-tno]').onclick=()=>{f.remove();d.style.display=''};
@@ -2896,7 +2903,7 @@ async function faCreerFiche(){
 
 /* ---------- Fenêtre modale ---------- */
 function ouvrirModal(t,c,p){const bx=$('modal').querySelector('.box');bx.style.width='';bx.style.maxHeight='';$('modal').style.paddingTop='';$('mTitre').textContent=t;$('mCorps').innerHTML=c;$('mPied').innerHTML=p;$('modal').style.display='flex'}
-function fermerModal(){$('modal').style.display='none'}
+function fermerModal(){$('modal').style.display='none';const z=document.getElementById('cmpZoom');if(z)z.style.display='none'}
 $('modal').onclick=e=>{if(e.target.id==='modal')fermerModal()};
 
 /* ---------- Recherche globale ---------- */
