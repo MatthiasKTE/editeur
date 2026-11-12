@@ -57,6 +57,8 @@ h1{font-size:21px;margin:0;font-weight:700}
 .btn{border:1px solid var(--trait);background:#fff;border-radius:8px;padding:7px 13px;font-weight:500;display:inline-flex;align-items:center;gap:6px;color:var(--txt);white-space:nowrap}
 .btn:hover{background:var(--hover)}
 .btn.p{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.dg1{background:#7EA7F5;border-color:#7EA7F5;color:#fff}.btn.dg2{background:#5689F1;border-color:#5689F1;color:#fff}.btn.dg3{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.dg1:hover,.btn.dg2:hover,.btn.dg3:hover{filter:brightness(.95)}
 .btn.p:hover{filter:brightness(.95)}
 .btn.d{color:var(--err)}
 .btn.vert{background:#DCFCE7;border-color:#86EFAC;color:#166534}
@@ -202,6 +204,10 @@ table.cmp tfoot td{border-top:2px solid var(--trait);vertical-align:top;padding-
 table.cmp th.cmpPV,table.cmp td.cmpPV{background:#FFF1DE}
 table.cmp td.cmpPV input{width:96px;text-align:right;border:1px solid #F3C98B;border-radius:6px;padding:4px 6px;font:inherit;background:#fff}
 table.cmp td.cmpPV input.prop::placeholder{color:#9A6B2F;font-style:italic}
+table.cmp th.cmpDHL,table.cmp td.cmpDHL{background:#F5F1FC;color:#5B4A86}
+table.cmp th.cmpDHL{color:#6D5A9C}
+.cmpOutils .cmpDhlOut{background:#F5F1FC;color:#5B4A86;border:1px solid #DCD0F2;border-radius:6px;padding:2px 6px}
+.cmpOutils .cmpDhlOut input{border-color:#DCD0F2}
 table.cmp .cmpProp{color:#9A6B2F;font-style:italic}
 table.cmp td.cmpPV input:focus{outline:2px solid #F59E0B;border-color:#F59E0B}
 .cmpOutils{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:#FFF1DE;border:1px solid #F3C98B;border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:13px}
@@ -773,7 +779,12 @@ function dessinerNCSynth(){
    « Retenir » : coût unitaire (interne) de la ligne de devis = PU du sous-traitant, et case « Retenu » cochée. */
 const T_PSST=1278828;
 const estEUR=d=>!d||/^(eur|€)$/i.test(String(d).trim());
-let CMPC=Object.assign({coef:1.3,pas:1,sens:'sup'},ls.get('cmpc',{}));
+let CMPC=Object.assign({coef:1.3,pas:1,sens:'sup',dhl:12},ls.get('cmpc',{}));if(!(+CMPC.dhl>=0))CMPC.dhl=12;
+/* Transport DHL estimé pour les pièces retenues chez un fournisseur chinois (Pays = Chine / China / CN, comme la passerelle) :
+   poids unitaire (champ Poids (kg), sinon estimation ≈) × CMPC.dhl €/kg × quantité ; ajouté au coût de revient pour la marge.
+   Pas de DHL si l'incoterm du fournisseur indique un transport payé (DAP, DDP, CPT, CIP, franco, port payé). */
+const estChine=f=>/^(chine|china|cn)$/i.test(String(txt(f&&f.Pays)||'').trim());
+const transportPaye=f=>/\b(DAP|DDP|DPU|CPT|CIP)\b|franco|port pay|rendu/i.test(String(txt(f&&f.Incoterm)||''));
 const vide=v=>v==null||v==='';
 const CMP_CIBLE={}; // par devis : 'vide' (lignes sans PV), 'tout', ou 'c<id consultation>' (lignes retenues chez ce SST)
 function arrondiPV(c){const x=+c*(+CMPC.coef||0),p=+CMPC.pas||1;return CMPC.sens==='inf'?Math.floor(x/p+1e-9)*p:Math.ceil(x/p-1e-9)*p}
@@ -828,7 +839,7 @@ async function comparerSST(dv){
   ouvrirModal('Comparer les SST – '+txt(dv['N° devis']),'<div class="charge">Chargement des offres…</div>','<button class="btn" onclick="fermerModal()">Fermer</button>');
   $('modal').dataset.fixe='1';$('modal').querySelector('.box').style.width='min(1280px,97vw)';$('modal').querySelector('.box').style.maxHeight='88vh';$('modal').style.paddingTop='4vh';
   let P;
-  try{await Promise.all([charger(T_LDV,true),charger(MODS.consult.t,true)]);P=await charger(T_PSST,true)}
+  try{await Promise.all([charger(T_LDV,true),charger(MODS.consult.t,true),charger(MODS.fournisseurs.t).catch(()=>null)]);P=await charger(T_PSST,true)}
   catch(e){$('mCorps').innerHTML=`<div class="vide">Impossible de lire la table « Prix SST » (${esc(e.message)}).<br>Vérifiez que le jeton Baserow donne accès à cette table.</div>`;return}
   dessinerComparatif(dv);
 }
@@ -880,11 +891,12 @@ function dessinerComparatif(dv){
   if(ecr)h+=`<div class="cmpOutils"><b>Prix de vente</b> = coût retenu × <input id="cCoef" type="number" step="0.01" min="0" value="${esc(CMPC.coef)}" style="width:70px">
     arrondi <select id="cPas"><option value="1" ${+CMPC.pas===1?'selected':''}>à l’euro</option><option value="10" ${+CMPC.pas===10?'selected':''}>à la dizaine</option></select>
     <select id="cSens"><option value="sup" ${CMPC.sens!=='inf'?'selected':''}>supérieur</option><option value="inf" ${CMPC.sens==='inf'?'selected':''}>inférieur</option></select>
+    <span class="cmpDhlOut" title="Transport DHL estimé pour les pièces retenues chez un fournisseur chinois">DHL Chine <input id="cDhl" type="number" step="0.5" min="0" value="${esc(CMPC.dhl)}" style="width:58px"> €/kg</span>
     pour <select id="cCible"><option value="vide" ${cible==='vide'?'selected':''}>les lignes sans PV</option>${cols.map(c=>`<option value="c${c.c.id}" ${cible==='c'+c.c.id?'selected':''}>les lignes retenues chez ${esc(c.four)}</option>`).join('')}<option value="tout" ${cible==='tout'?'selected':''}>toutes les lignes</option></select>
     <button class="btn mini p" id="cApp" title="Écrit le PV proposé (gris) dans les lignes choisies">Appliquer</button><span class="mut" style="font-size:12px">Les propositions grises comptent déjà dans le total ; un PV saisi à la main est toujours prioritaire.</span></div>`;
   h+=`<div class="tw"><table class="l cmp"><thead><tr><th style="cursor:default"></th><th style="cursor:default">Rep</th><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Qté</th>
    ${cols.map(x=>`<th class="n" style="cursor:default;min-width:118px"><a href="#/consult/${x.c.id}" onclick="fermerModal()" style="color:inherit">${esc(x.four)}</a>${x.c['Délai']?`<div class="mut" style="font-weight:400;font-size:11px">${esc(x.c['Délai'])}</div>`:''}${ecr?`<button class="btn mini" data-tout="${x.c.id}" title="Retenir ${esc(x.four)} pour toutes ses lignes chiffrées">Tout retenir</button>`:''}</th>`).join('')}
-   <th class="n" style="cursor:default" title="Coût unitaire (interne) de la ligne de devis">Coût retenu</th><th class="n cmpPV" style="cursor:default" title="Prix unitaire HT de vente (lignes du devis) ; en gris : proposition coût × coef, pas encore enregistrée">PV unitaire</th><th class="n cmpPV" style="cursor:default" title="PV unitaire × quantité du devis">PV total</th></tr></thead><tbody>`;
+   <th class="n" style="cursor:default" title="Coût unitaire (interne) de la ligne de devis">Coût retenu</th><th class="n cmpDHL" style="cursor:default" title="Transport DHL estimé, pièces retenues chez un fournisseur chinois : poids × ${esc(CMPC.dhl)} €/kg × quantité (ajouté au coût de revient)">DHL</th><th class="n cmpPV" style="cursor:default" title="Prix unitaire HT de vente (lignes du devis) ; en gris : proposition coût × coef, pas encore enregistrée">PV unitaire</th><th class="n cmpPV" style="cursor:default" title="PV unitaire × quantité du devis">PV total</th></tr></thead><tbody>`;
   lignes.forEach((x,i)=>{
     const pe=cols.map(c=>[x.par[c.c.id],c]).filter(([p,c])=>p&&p['PU HT']!=null&&p['PU HT']!==''&&estEUR(p.Devise||c.c.Devise)).map(([p])=>+p['PU HT']);
     const min=pe.length?Math.min(...pe):null,max=pe.length>1?Math.max(...pe):null;
@@ -898,10 +910,10 @@ function dessinerComparatif(dv){
       const tip=[p['Quantité']!=null&&p['Quantité']!==''?'Qté offre : '+nb(p['Quantité']):'',p['Délai']?'Délai : '+p['Délai']:'',txt(p.Source)?'Source : '+txt(p.Source):'',txt(p['Désignation SST'])?'Désignation SST : '+txt(p['Désignation SST']):'',txt(p.Commentaire)].filter(Boolean).join('\n');
       h+=`<td class="n ${best?'cmpMin':pire?'cmpMax':''} ${p.Retenu?'cmpRet':''}" title="${esc(tip)}">${eu?eur(pu):nb(pu)+' '+esc(dev)}${txt(p.Source)==='À vérifier'?' <span style="color:#C2410C" title="Prix à vérifier">●</span>':''}
         ${eu&&min&&pu>min?`<div class="cmpEc">+${Math.round((pu-min)/min*100)} %</div>`:''}${p.Retenu?'<div class="cmpEc" style="color:#15803D;font-weight:700">✓ retenu</div>':ecr&&x.l&&eu?`<button class="btn mini" data-ret="${p.id}" data-l="${x.l.id}">Retenir</button>`:''}</td>`}
-    h+=`<td class="n">${!vide(cout)?eur(cout):'<span class="mut">—</span>'}</td><td class="n cmpPV">${x.l&&ecr?`<input type="number" step="0.01" min="0" data-pv="${x.l.id}" value="${vide(pv)?'':+pv}">`:x.l&&!vide(pv)?eur(pv):'<span class="mut">—</span>'}${x.l?`<div class="cmpEc" data-pvm="${x.l.id}"></div>`:''}</td><td class="n cmpPV" ${x.l?`data-pvt="${x.l.id}"`:''}>${x.l?'':'<span class="mut">—</span>'}</td></tr>`});
+    h+=`<td class="n">${!vide(cout)?eur(cout):'<span class="mut">—</span>'}</td><td class="n cmpDHL" ${x.l?`data-dhl="${x.l.id}"`:''}></td><td class="n cmpPV">${x.l&&ecr?`<input type="number" step="0.01" min="0" data-pv="${x.l.id}" value="${vide(pv)?'':+pv}">`:x.l&&!vide(pv)?eur(pv):'<span class="mut">—</span>'}${x.l?`<div class="cmpEc" data-pvm="${x.l.id}"></div>`:''}</td><td class="n cmpPV" ${x.l?`data-pvt="${x.l.id}"`:''}>${x.l?'':'<span class="mut">—</span>'}</td></tr>`});
   const nL=lignes.filter(x=>x.l).length,tv=cols.filter(c=>nbL[c.c.id]===nL).map(c=>tot[c.c.id]),tmin=tv.length>1?Math.min(...tv):null;
   h+=`</tbody><tfoot><tr><td></td><td></td><td><b>Total HT</b> <span class="mut" style="font-size:11.5px">(PU × quantité du devis)</span></td><td></td>${cols.map(c=>{const t=tot[c.c.id],cplt=nbL[c.c.id]===nL;
-    return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}<td></td><td class="n cmpPV" id="cTotU"></td><td class="n cmpPV" id="cTotT"></td></tr></tfoot></table></div>
+    return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}<td></td><td class="n cmpDHL" id="cTotD"></td><td class="n cmpPV" id="cTotU"></td><td class="n cmpPV" id="cTotT"></td></tr></tfoot></table></div>
   <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »).</div>`;
   $('mCorps').innerHTML=h;
   $('mCorps').querySelectorAll('button[data-ret]').forEach(b=>b.onclick=()=>retenirSST(dv,[[+b.dataset.l,+b.dataset.ret]]));
@@ -922,15 +934,24 @@ function dessinerComparatif(dv){
   const propDe=(x,cb)=>{const c=x.l['Coût unitaire (interne)'];return !vide(c)&&+CMPC.coef>0&&dansCible(x,cb)?arrondiPV(c):null};
   const pvDe=x=>{const i=$('mCorps').querySelector(`input[data-pv="${x.l.id}"]`);const s=i?i.value.trim():(vide(x.l['Prix unitaire HT'])?'':String(x.l['Prix unitaire HT']));
     if(s!==''&&+s.replace(',','.')>=0)return{v:+s.replace(',','.'),prop:false};const p=propDe(x,cible);return p==null?null:{v:p,prop:true}};
-  const majPV=()=>{let tv=0,tc=0,n=0,np=0;
+  const FOUR=S.rows[MODS.fournisseurs.t]||[],fourDe=cid=>{const c=cols.find(y=>y.c.id===cid);return c?FOUR.find(f=>ids(c.c.Fournisseur).includes(f.id)):null};
+  const dhlDe=x=>{const cid=retChez(x);if(cid==null)return null;const f=fourDe(cid);if(!f||!estChine(f))return null;
+    const nom=txt(f.Nom)||'';if(transportPaye(f))return{u:0,inclus:true,nom};
+    const t=techLigne(x.l),kg=t.kg!=null?+t.kg:t.est;if(!(kg>0))return{u:null,nom};return{u:kg*(+CMPC.dhl||0),kg,est:t.kg==null,nom}};
+  const majPV=()=>{let tv=0,tc=0,n=0,np=0,tdh=0,dm=0;
     for(const x of LL){const e=pvDe(x),qq=q(x),c=x.l['Coût unitaire (interne)'],i=$('mCorps').querySelector(`input[data-pv="${x.l.id}"]`),p=propDe(x,cible);
+      const d=dhlDe(x),du=d&&d.u>0?d.u:0,cd=$('mCorps').querySelector(`[data-dhl="${x.l.id}"]`);
+      if(cd)cd.innerHTML=!d?'':d.inclus?`<span class="cmpEc" title="Incoterm ${esc(txt(fourDe(retChez(x))?.Incoterm))} : transport compris">compris</span>`:d.u==null?'<span class="cmpEc" title="Poids inconnu : renseigner le poids (✎) pour estimer le DHL">poids ?</span>'
+        :`<span title="${esc(d.nom)} – ${nb(d.kg)} kg${d.est?' (estimé)':''} × ${nb(CMPC.dhl)} €/kg × ${nb(qq)}">${eur(du*qq)}</span><div class="cmpEc">${d.est?'≈ ':''}${nb(Math.round(d.kg*1000)/1000)} kg × ${nb(qq)}</div>`;
+      if(d&&d.u==null)dm++;tdh+=du*qq;
       if(i){i.placeholder=p==null?'':p;i.title=p==null?'':'Proposition : '+eur(p)+' (coût retenu × '+CMPC.coef+')';i.classList.toggle('prop',!i.value.trim()&&p!=null)}
       const td=$('mCorps').querySelector(`[data-pvt="${x.l.id}"]`),m=$('mCorps').querySelector(`[data-pvm="${x.l.id}"]`);
       if(td)td.innerHTML=e?`<span class="${e.prop?'cmpProp':''}" title="${e.prop?'Proposition non enregistrée':''}">${eur(e.v*qq)}</span>`:'<span class="mut">—</span>';
-      if(m)m.textContent=e&&!vide(c)?'marge '+margeTxt(e.v,+c):'';
-      if(e){tv+=e.v*qq;n++;if(e.prop)np++;if(!vide(c))tc+=+c*qq}}
+      if(m){m.textContent=e&&!vide(c)?'marge '+margeTxt(e.v,+c+du):'';m.title=du?'Coût de revient = coût retenu + DHL estimé ('+eur(+c+du)+' / pièce)':''}
+      if(e){tv+=e.v*qq;n++;if(e.prop)np++;if(!vide(c))tc+=(+c+du)*qq}}
+    if($('cTotD'))$('cTotD').innerHTML=tdh||dm?`<b>${tdh?eur(tdh):'—'}</b>${dm?`<div class="cmpEc">${dm} poids manquant${dm>1?'s':''}</div>`:''}`:'';
     if($('cTotU'))$('cTotU').innerHTML=`<div class="cmpEc">${n}/${LL.length} lignes avec PV${np?`<br>dont ${np} proposé${np>1?'s':''} (gris)`:''}</div>`;
-    if($('cTotT'))$('cTotT').innerHTML=`<b>${tv?eur(tv):'—'}</b>${tv&&tc?`<div class="cmpEc">marge ${Math.round((tv-tc)/tv*100)} % (${eur(tv-tc)})</div>`:''}${n<LL.length?`<div class="cmpEc" style="color:#C2410C">${LL.length-n} ligne${LL.length-n>1?'s':''} sans prix</div>`:''}`};
+    if($('cTotT'))$('cTotT').innerHTML=`<b>${tv?eur(tv):'—'}</b>${tv&&tc?`<div class="cmpEc" title="${tdh?'Coût de revient = coûts retenus + DHL estimé ('+eur(tdh)+')':''}">marge ${Math.round((tv-tc)/tv*100)} % (${eur(tv-tc)})${tdh?' DHL inclus':''}</div>`:''}${n<LL.length?`<div class="cmpEc" style="color:#C2410C">${LL.length-n} ligne${LL.length-n>1?'s':''} sans prix</div>`:''}`};
   majPV();CMP_MAJ=majPV;
   /* Propositions grises non enregistrées (lignes sans PV, ni saisi ni en base) : proposées à l'enregistrement à la fermeture */
   const enAttente=()=>LL.filter(x=>{const i=$('mCorps').querySelector(`input[data-pv="${x.l.id}"]`);return !(i&&i.value.trim())&&vide(x.l['Prix unitaire HT'])&&propDe(x,cible)!=null})
@@ -948,8 +969,8 @@ function dessinerComparatif(dv){
     return false}:null;
   $('mCorps').querySelectorAll('input[data-pv]').forEach(i=>{i.oninput=majPV;i.onkeydown=e=>{if(e.key==='Enter')i.blur()};i.onchange=()=>{const v=i.value.trim()===''?null:Math.round(+i.value.replace(',','.')*100)/100;
     if(v!=null&&!(v>=0))return toast('Prix invalide',true);enregistrerPV(dv,[{id:+i.dataset.pv,'Prix unitaire HT':v}],true)}});
-  const prefs=()=>{CMPC={coef:+String($('cCoef').value).replace(',','.')||0,pas:+$('cPas').value,sens:$('cSens').value};ls.set('cmpc',CMPC);majPV()};
-  if($('cCoef')){$('cCoef').oninput=prefs;$('cPas').onchange=prefs;$('cSens').onchange=prefs;
+  const prefs=()=>{const dh=+String($('cDhl').value).replace(',','.');CMPC={coef:+String($('cCoef').value).replace(',','.')||0,pas:+$('cPas').value,sens:$('cSens').value,dhl:dh>=0?dh:12};ls.set('cmpc',CMPC);majPV()};
+  if($('cCoef')){$('cCoef').oninput=prefs;$('cDhl').oninput=prefs;$('cPas').onchange=prefs;$('cSens').onchange=prefs;
     $('cCible').onchange=()=>{cible=CMP_CIBLE[dv.id]=$('cCible').value;majPV()};
     $('cApp').onclick=()=>{prefs();if(!(CMPC.coef>0))return toast('Coefficient invalide',true);
       const L=LL.filter(x=>!vide(x.l['Coût unitaire (interne)'])&&dansCible(x,cible)&&(cible!=='vide'||vide(x.l['Prix unitaire HT'])));
@@ -1444,10 +1465,12 @@ function dessinerFiche(){
   let h=`<div class="entete"><a class="btn" href="#/${k}" title="Retour à la liste">${ico('retour')}</a><h1>${esc(nom)}</h1>
     ${stF&&!nouveau&&!ecr?badge(val(m.statut)):''}${stF&&!nouveau&&ecr?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
     <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
-    <div class="act">${k==='bl'&&!nouveau?boutonPdfBL(row,true):''}${lienEditeur?`<a class="btn ${k==='bl'?'':'p'}" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
+    <div class="act">${k==='bl'&&!nouveau?boutonPdfBL(row,true):''}${lienEditeur&&k!=='devis'?`<a class="btn ${k==='bl'?'':'p'}" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>${/^FA_.+\.pdf$/i.test(x.fichier)&&peutEcrire('taches')&&ids(row.Commande).length?`<button class="btn vert" data-fat="${esc(x.fichier)}" title="Rouvrir et modifier ${esc(x.fichier)}">${ico('crayon')}Modifier</button>`:''}`).join(''):''}
-    ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn p" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
-    ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn ${n>1?'p':''}" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
+    ${/* Devis : ordre de travail = comparatif SST → éditeur → réponse au client, dégradé de bleu clair → bleu Akteev */''}
+    ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn dg1" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
+    ${k==='devis'&&lienEditeur?`<a class="btn dg2" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
+    ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn dg3" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='utilisateurs'&&!nouveau&&peutVoir('droits')&&row['E-mail']?`<a class="btn p" href="#/droits?u=${encodeURIComponent(String(row['E-mail']).trim().toLowerCase())}">${ico('cle')}Droits d’accès</a>`:''}
     ${k==='cf'&&!nouveau?`<a class="btn" href="#/affecter/${row.id}" title="Affecter la commande à une affaire, au stock, à la maintenance, aux investissements, ou ligne par ligne">Affecter les lignes</a>`:''}
     ${k==='cf'&&!nouveau&&peutEcrire('cf')?`<button class="btn" id="bCfPdf" title="Crée le PDF de la commande et l’enregistre dans SharePoint (registre + dossier de chaque affaire)">${ico('pdf')}Éditer la commande</button><button class="btn p" id="bCfEnv" title="${row.PDF?'Mail au fournisseur avec la commande en pièce jointe':'Éditez d’abord la commande (PDF)'}" ${row.PDF?'':'disabled'}>${ico('mail')}Envoyer au fournisseur</button>`:''}
