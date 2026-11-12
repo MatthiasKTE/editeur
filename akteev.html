@@ -519,7 +519,7 @@ let SALE=null; // brouillon en cours {t,id,draft}
 window.addEventListener('hashchange',()=>{if(SALE&&Object.keys(SALE.draft).length&&!confirm('Des modifications ne sont pas enregistrées. Quitter quand même ?')){history.back();return}route()});
 function params(){const q=location.hash.split('?')[1]||'';return Object.fromEntries(new URLSearchParams(q))}
 async function route(){
-  SALE=null;barre();fermerModal();$('gres').style.display='none';
+  SALE=null;barre();fermerModal(true);$('gres').style.display='none';
   const h=(location.hash.replace(/^#\/?/,'').split('?')[0])||'accueil';
   const [k,id]=h.split('/');
   actif(k);$('main').scrollTop=0;
@@ -932,6 +932,20 @@ function dessinerComparatif(dv){
     if($('cTotU'))$('cTotU').innerHTML=`<div class="cmpEc">${n}/${LL.length} lignes avec PV${np?`<br>dont ${np} proposé${np>1?'s':''} (gris)`:''}</div>`;
     if($('cTotT'))$('cTotT').innerHTML=`<b>${tv?eur(tv):'—'}</b>${tv&&tc?`<div class="cmpEc">marge ${Math.round((tv-tc)/tv*100)} % (${eur(tv-tc)})</div>`:''}${n<LL.length?`<div class="cmpEc" style="color:#C2410C">${LL.length-n} ligne${LL.length-n>1?'s':''} sans prix</div>`:''}`};
   majPV();CMP_MAJ=majPV;
+  /* Propositions grises non enregistrées (lignes sans PV, ni saisi ni en base) : proposées à l'enregistrement à la fermeture */
+  const enAttente=()=>LL.filter(x=>{const i=$('mCorps').querySelector(`input[data-pv="${x.l.id}"]`);return !(i&&i.value.trim())&&vide(x.l['Prix unitaire HT'])&&propDe(x,cible)!=null})
+    .map(x=>({id:x.l.id,'Prix unitaire HT':propDe(x,cible)}));
+  const piedFermer=$('mPied').innerHTML;
+  MODAL_AVANT=ecr?()=>{const it=enAttente();if(!it.length)return true;
+    $('mPied').innerHTML=`<span style="margin-right:auto;color:#9A6B2F;font-size:13px"><b>${it.length} prix proposé${it.length>1?'s':''}</b> (coût × ${CMPC.coef}, en gris) ${it.length>1?'ne sont pas enregistrés':'n’est pas enregistré'} dans le devis : ${it.length>1?'ils n’apparaîtront':'il n’apparaîtra'} pas dans l’éditeur.</span>
+      <button class="btn" id="cfRev">Revenir</button><button class="btn" id="cfSans">Fermer sans enregistrer</button><button class="btn p" id="cfEnr">Enregistrer et fermer</button>`;
+    $('cfRev').onclick=()=>{$('mPied').innerHTML=piedFermer};
+    $('cfSans').onclick=()=>fermerModal(true);
+    $('cfEnr').onclick=async()=>{$('mPied').querySelectorAll('button').forEach(b=>b.disabled=true);
+      try{const r=await api(`/rows/table/${T_LDV}/batch/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({items:it})});(r.items||[]).forEach(x=>majRow(T_LDV,x));
+        toast(`${it.length} prix de vente enregistré${it.length>1?'s':''}`);fermerModal(true)}
+      catch(e){toast('Échec : '+e.message,true);$('mPied').innerHTML=piedFermer}};
+    return false}:null;
   $('mCorps').querySelectorAll('input[data-pv]').forEach(i=>{i.oninput=majPV;i.onkeydown=e=>{if(e.key==='Enter')i.blur()};i.onchange=()=>{const v=i.value.trim()===''?null:Math.round(+i.value.replace(',','.')*100)/100;
     if(v!=null&&!(v>=0))return toast('Prix invalide',true);enregistrerPV(dv,[{id:+i.dataset.pv,'Prix unitaire HT':v}],true)}});
   const prefs=()=>{CMPC={coef:+String($('cCoef').value).replace(',','.')||0,pas:+$('cPas').value,sens:$('cSens').value};ls.set('cmpc',CMPC);majPV()};
@@ -2951,8 +2965,11 @@ async function faCreerFiche(){
 }
 
 /* ---------- Fenêtre modale ---------- */
-function ouvrirModal(t,c,p){delete $('modal').dataset.fixe;const bx=$('modal').querySelector('.box');bx.style.width='';bx.style.maxHeight='';$('modal').style.paddingTop='';$('mTitre').textContent=t;$('mCorps').innerHTML=c;$('mPied').innerHTML=p;$('modal').style.display='flex'}
-function fermerModal(){$('modal').style.display='none';const z=document.getElementById('cmpZoom');if(z)z.style.display='none'}
+function ouvrirModal(t,c,p){MODAL_AVANT=null;delete $('modal').dataset.fixe;const bx=$('modal').querySelector('.box');bx.style.width='';bx.style.maxHeight='';$('modal').style.paddingTop='';$('mTitre').textContent=t;$('mCorps').innerHTML=c;$('mPied').innerHTML=p;$('modal').style.display='flex'}
+/* MODAL_AVANT : contrôle avant fermeture (ex. comparatif SST : prix proposés non enregistrés) ; renvoie false pour garder
+   la fenêtre ouverte. fermerModal(true) force (navigation). Remis à zéro par ouvrirModal. */
+let MODAL_AVANT=null;
+function fermerModal(force){if(!force&&$('modal').style.display!=='none'&&typeof MODAL_AVANT==='function'&&MODAL_AVANT()===false)return;MODAL_AVANT=null;$('modal').style.display='none';const z=document.getElementById('cmpZoom');if(z)z.style.display='none'}
 /* Fermeture par clic sur le fond : seulement si le clic a commencé ET fini sur le fond (sinon une sélection de texte
    relâchée hors de la fenêtre la fermait), et jamais pour les fenêtres de travail (comparatif SST : data-fixe). */
 let MODAL_DOWN=null;$('modal').addEventListener('mousedown',e=>{MODAL_DOWN=e.target});
