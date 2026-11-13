@@ -404,7 +404,7 @@ const MODS={
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
-   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Charges machines',mod:'plan',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
+   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Charges machines',mod:'plan',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'Factures fournisseurs',mod:'ffact',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
    liees:[{nom:'Lignes',t:1261373,lien:'ARC',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'}]},
  bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut','PDF'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
@@ -421,10 +421,13 @@ const MODS={
    statut:'Statut',date:'Date de détection',ref:'Responsable',num:'N° NC',virt:'nc',requis:['Affaire','Origine','Secteur','Description'],cacheStatuts:['Annulée'],faitLe:'Soldée le',faitRe:/^sold/i,
    ordreForm:['N° NC','Affaire','Date de détection','Origine','Secteur','Fournisseur','Repère / pièce','Quantité','Description','Décision','Plan d\'action','Responsable','Échéance','Coût direct','Statut','Soldée le']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
-   liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant','Affectation','Affaire'],ordre:'Ordre',ajout:true}],cacheStatuts:['Annulée']},
+   liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant','Affectation','Affaire'],ordre:'Ordre',ajout:true},{nom:'Factures',mod:'ffact',lien:'CF'}],cacheStatuts:['Annulée']},
+ ffact:{t:1318208,nom:'Factures fournisseurs',un:'facture fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['Échéance','Fournisseur lu','N° facture','Date facture','Montant HT','Montant TTC','N° affaire','CF','Rapprochement','Écart HT','Saisie Axonaut','Statut paiement'],
+   statut:'Statut paiement',date:'Échéance',num:'N° facture',cacheStatuts:['Payée'],libOuverts:'À payer / litige',ordreStatuts:['À payer','Litige','Payée'],
+   ordreForm:['N° facture','Fournisseur','Fournisseur lu','Date facture','Échéance','Échéance calculée','Montant HT','TVA','Montant TTC','Devise','N° affaire','Affaire','CF','Montant CF HT','Écart HT','Rapprochement','Écart accepté','Commentaire','Statut paiement','Saisie Axonaut','ID Axonaut','Source','Boîte mail','Chemin fichier','PDF','Détail lignes','Reçue le','Clé']},
  consult:{t:1274941,nom:'Consultations SST',un:'consultation',fem:true,ico:'ddp',grp:'Achats',cols:['Réf','Devis','Fournisseur','Envoyée le','Réponse','Réponse le','Montant','Délai','Archivage','Dossier réponses'],statut:'Réponse',cacheStatuts:['Annulée']},
  fournisseurs:{t:1260241,nom:'Fournisseurs',un:'fournisseur',ico:'fournisseurs',grp:'Achats',cols:['Nom','Type','Pays','Contact','E-mail','Devise','Conditions de paiement'],
-   liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'},{nom:'Non-conformités',mod:'nc',lien:'Fournisseur'}]},
+   liees:[{nom:'Commandes fournisseurs',mod:'cf',lien:'Fournisseur'},{nom:'Factures',mod:'ffact',lien:'Fournisseur'},{nom:'Consultations SST',mod:'consult',lien:'Fournisseur'},{nom:'Synthèse pièces',mod:'synthese',lien:'Intervenant'},{nom:'Non-conformités',mod:'nc',lien:'Fournisseur'}]},
  referents:{t:1260243,nom:'Référents',un:'référent',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Téléphone',"Référent d'affaire"],
    liees:[{nom:'Tâches',mod:'taches',lien:'Référent'},{nom:'Commandes',mod:'commandes',lien:'Référent KTE'}]},
  catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']},
@@ -613,6 +616,7 @@ function majCompteurs(){
   const eD=$('nb_ddp'),RD=S.rows[MODS.devis.t],RC=S.rows[MODS.consult.t];
   if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
   const eA=$('nb_amelio'),RA=S.rows[MODS.amelio.t];if(eA&&RA){const n=RA.filter(amelioAuJour).length;eA.textContent=n||'';const it=eA.parentElement,s=amelioEtatMenu();it.classList.remove('alerteO','alerteR');if(s.c)it.classList.add(s.c);it.title=[s.t,n+' amélioration(s) à l’ordre du jour'].filter(Boolean).join(' · ')}
+  const eF=$('nb_ffact'),RF=S.rows[MODS.ffact.t];if(eF&&RF){const a=auj(),ech=RF.filter(r=>ffactAPayer(r)&&r['Échéance']&&r['Échéance']<a).length,ctl=RF.filter(ffactAControler).length;eF.textContent=(ech+ctl)||'';eF.title=ech+' facture(s) échue(s) non payée(s), '+ctl+' écart(s) à contrôler'}
   const eP=$('nb_depot'),RP=MODS.depot&&S.rows[MODS.depot.t];if(eP&&RP){const n=RP.filter(r=>txt(r.Statut)==='À traiter').length;eP.textContent=n||'';eP.title=n+' mail(s) à traiter'}
   const eM=$('nb_charges');if(eM&&S.rows[T_PLAN]&&S.rows[T_MACH]&&S.rows[MODS.commandes.t]){const n=[...chmCalcul().out.values()].filter(x=>x.retard).length;eM.textContent=n||'';eM.title=n+' affaire(s) dont la fin prévue dépasse le délai'}
   const eN=$('nb_nc'),RN=S.rows[MODS.nc.t];if(eN&&RN){const n=RN.filter(ncOuverte).length;eN.textContent=n||'';eN.title=n+' non-conformité(s) à traiter'}
@@ -620,6 +624,9 @@ function majCompteurs(){
 }
 const devisEnCours=r=>!/accept|refus|perdu|annul|sans suite|class/i.test(txt(r.Statut));
 const tacheOuverte=r=>!/^(fait|annul)/i.test(txt(r.Statut));
+/* Factures fournisseurs (13/11/2026) : à payer = Statut paiement ≠ Payée ; à contrôler = écart / CF introuvable / à vérifier non accepté. */
+const ffactAPayer=r=>txt(r['Statut paiement'])!=='Payée';
+const ffactAControler=r=>/^(écart|cf introuvable|à vérifier)/i.test(txt(r.Rapprochement))&&!r['Écart accepté'];
 const ncOuverte=r=>!/^(sold|annul)/i.test(txt(r.Statut));
 const faitRe=m=>m.faitRe||/^fait/i;
 function actif(k){document.querySelectorAll('#side a.it').forEach(a=>a.classList.toggle('on',a.dataset.m===k));document.body.classList.remove('menu')}
@@ -1952,7 +1959,7 @@ function dessinerListe(k){
     h+=`<div class="tw"><table class="l"><thead><tr>${cols.map(c=>{const f=sc.par[c],num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));return`<th data-c="${esc(c)}" class="${num?'n':''}">${esc(c)} <span class="fl">${E.tri?.f===c?(E.tri.d>0?'▲':'▼'):''}</span></th>`}).join('')}</tr>${ligneFiltres(k,cols)}</thead><tbody>`;
     const a=auj();
     h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
-      const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
+      const ret=c===m.date&&m.statut&&v&&v<a&&(k==='ffact'?ffactAPayer(r):tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese'));
       const prim=m.sansPrim?c===cols[0]:c===sc.prim;
       return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${k==='depot'&&c==='Action'?boutonsDepot(r):k==='bl'&&c==='PDF'?boutonPdfBL(r):c===m.statut&&k==='taches'&&peutEcrire(k)?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
     h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
@@ -3980,7 +3987,7 @@ function lancer(){
   document.body.classList.remove('deconnecte');GMODS=GMODS0.filter(peutVoir);
   if(SESSION?.referent&&!MOI){MOI=SESSION.referent;ls.set('moi',MOI)}
   dessinerMenu();route();charger(MODS.referents.t).then(R=>{if(!MOI&&SESSION?.login&&Array.isArray(R)){const r=R.find(x=>String(x['E-mail']||'').toLowerCase().trim()===SESSION.login);if(r){MOI=r.id;ls.set('moi',MOI);majMoi()}}}).catch(()=>{});
-  setTimeout(()=>{if(MODS.depot&&peutVoir('depot'))charger(MODS.depot.t).then(majCompteurs).catch(()=>{});['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{}));if(peutVoir('amelio'))charger(T_REUNIONS).catch(()=>{}).then(()=>charger(MODS.amelio.t)).catch(()=>{})},300)}
+  setTimeout(()=>{if(MODS.depot&&peutVoir('depot'))charger(MODS.depot.t).then(majCompteurs).catch(()=>{});['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{}));if(peutVoir('ffact'))charger(MODS.ffact.t).then(majCompteurs).catch(()=>{});if(peutVoir('amelio'))charger(T_REUNIONS).catch(()=>{}).then(()=>charger(MODS.amelio.t)).catch(()=>{})},300)}
 (async()=>{
   if(PASSERELLE){try{await ouvrirSession()}catch(e){ecranConnexionMS(e.message==='CONNEXION'?'':'Accès refusé : '+e.message)}return}
   ACCES=await lireAcces();
