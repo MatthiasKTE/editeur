@@ -324,7 +324,7 @@ const DEPOT_ACTIF=true;
 const MODS={
  depot:{t:1317249,nom:'À traiter',un:'mail',ico:'ddp',grp:'Boîte de réception',cols:['Reçu le','Type','À traiter par','Objet','Action','Expéditeur','Client / fournisseur','Devis cité','Statut'],libOuverts:'Ouverts',
    virt:'depot',statut:'Statut',date:'Reçu le',cacheStatuts:['Traité','Ignoré'],solde:['Traité','Ignoré'],soldeVerbe:'classer',faitLe:'Traité le',faitRe:/^(trait|ignor)/i,
-   ordreStatuts:['À traiter','À lancer','En cours','Traité','Ignoré'],ordreForm:['Objet','Type','À traiter par','Statut','Reçu le','Expéditeur','Boîte','Client / fournisseur','Devis cité','Proposition','Indices','Lien Outlook','Message-ID','Traité le','Commentaire']},
+   ordreStatuts:['À traiter','À lancer','En cours','Traité','Ignoré'],ordreForm:['Objet','Type','À traiter par','Statut','Reçu le','Fichier déposé','Expéditeur','Boîte','Client / fournisseur','Devis cité','Proposition','Indices','Lien Outlook','Message-ID','Traité le','Commentaire']},
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
@@ -1372,7 +1372,7 @@ function dessinerListe(k){
   const neuf=!peutEcrire(k)?'':k==='bl'?`<button class="btn p" onclick="nouveauBL()">${ico('plus')}Nouveau BL</button>`:m.editeur||k==='commandes'?`<a class="btn p" href="${EDITEUR}" target="_blank" title="${k==='commandes'?'Une commande se crée depuis le devis (bouton « Commande reçue » de l’éditeur)':'Numérotation et mise en page dans l’éditeur'}">${ico('plus')}${k==='commandes'?'Commande reçue (éditeur)':nouv(m)}</a>`:`<a class="btn p" href="#/${k}/nouveau">${ico('plus')}${nouv(m)}</a>`;
   const refs=S.rows[MODS.referents.t]||[];
   let h=`<div class="entete"><h1>${m.nom}</h1><span class="sous">${L.length} sur ${R.length}</span><div class="act">
-    ${k==='utilisateurs'&&peutVoir('droits')?`<a class="btn" href="#/droits">${ico('cle')}Droits d’accès par onglet</a>`:''}<button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>${k==='amelio'?amelioBandeau(R):''}
+    ${k==='utilisateurs'&&peutVoir('droits')?`<a class="btn" href="#/droits">${ico('cle')}Droits d’accès par onglet</a>`:''}<button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>${k==='amelio'?amelioBandeau(R):''}${k==='depot'?depotZone():''}
   <div class="card"><div class="outils">
     <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
     ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
@@ -1411,6 +1411,7 @@ function dessinerListe(k){
   if(E.vue==='kanban'&&!peutEcrire(k))document.querySelectorAll('.kcard').forEach(c=>{c.draggable=false;c.onclick=()=>location.hash=`#/${k}/${c.dataset.id}`});
   brancherStatuts($('main'),()=>dessinerListe(k));
   if(k==='amelio')brancherAmelio();
+  if(k==='depot')brancherDepot();
 }
 
 /* ---------- Améliorations Akteev (Paramètres) ----------
@@ -2224,6 +2225,66 @@ async function pdfBL(id,b){
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-blpdf]');if(!b)return;
   e.preventDefault();e.stopPropagation();if(!b.disabled)pdfBL(+b.dataset.blpdf,b)},true);
+/* ---------- Boîte « À traiter » : zone « Déposer un mail » (13/11/2026) ----------
+   Le mail (.msg / .eml) et ses pièces jointes sont rangés sur SharePoint « Devis et commandes »
+   dans _Dépôts Akteev/<année>/<date heure> <objet>/ ; une ligne « À traiter » est créée avec le type deviné ici
+   (mots-clés), puis complétée par Claude (tâche horaire ou « traite les dépôts » dans Cowork). */
+const DEPOT_DRIVE='b!Zl7BsNogKEWzzC91UUOkZjB1_AsfAoFNljBf6o0ZoGehuE4fGG3oRYHBr6mXXoEP',DEPOT_DOSSIER='_Dépôts Akteev';
+function depotZone(){if(!peutEcrire('depot'))return'';
+  return`<div id="depZone" style="margin:0 0 14px;border:2px dashed #9DB4E8;border-radius:12px;background:#fff;padding:18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+    <div style="flex:1;min-width:260px"><div style="font-weight:600">Déposer un mail</div><div class="mut" style="font-size:13px">Glissez ici un mail Outlook (.msg, .eml) et/ou ses pièces jointes : Akteev le range sur SharePoint, reconnaît la DDP, la commande ou l’offre fournisseur, et l’ajoute à la liste.</div></div>
+    <label class="btn p" style="cursor:pointer">${ico('dl')}Choisir des fichiers<input id="depFic" type="file" multiple style="display:none"></label>
+    <div id="depEtat" class="mut" style="font-size:13px;width:100%;display:none"></div></div>`}
+function brancherDepot(){const z=$('depZone');if(!z)return;
+  const on=v=>{z.style.borderColor=v?'#2F64D8':'#9DB4E8';z.style.background=v?'#EEF3FD':'#fff'};
+  z.ondragover=e=>{e.preventDefault();on(true)};z.ondragleave=()=>on(false);
+  z.ondrop=e=>{e.preventDefault();on(false);const F=[...(e.dataTransfer?.files||[])];if(F.length)deposerFichiers(F)};
+  $('depFic').onchange=e=>{const F=[...e.target.files];e.target.value='';if(F.length)deposerFichiers(F)}}
+const sansAcc=t=>String(t||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+function decodeEntete(v){return String(v||'').replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g,(m,cs,enc,txt)=>{try{
+  const b=/b/i.test(enc)?Uint8Array.from(atob(txt),c=>c.charCodeAt(0)):Uint8Array.from(txt.replace(/_/g,' ').replace(/=([0-9A-F]{2})/gi,(x,h)=>String.fromCharCode(parseInt(h,16))),c=>c.charCodeAt(0));
+  return new TextDecoder(cs).decode(b)}catch(e){return txt}}).replace(/\s+/g,' ').trim()}
+async function lireDebut(f){try{const b=new Uint8Array(await f.slice(0,400000).arrayBuffer());
+  return new TextDecoder('utf-8').decode(b)+' '+new TextDecoder('utf-16le').decode(b.subarray(0,b.length-(b.length%2)))}catch(e){return''}}
+function devinerDepot(nom,texte){
+  const t=sansAcc(nom+' '+texte);const m=t.match(/\b(?:d|offre|devis|quote)?\s?n?[o°]?\s?(2[67]\d{4})(?:\s?v\d+)?\b/);const devis=m?'D'+m[1]:'';
+  const tr=re=>{const r=t.match(re);return r?r[0].trim():''};let k,type;
+  if((k=tr(/bon de commande|purchase order|\bp\.?o\.?\s?n|\bcde\b|\bcommande n|notre commande|order confirmation|\border\b/)))type='Commande client';
+  else if((k=tr(/demande de prix|demande de devis|demande d.offre|chiffrage|chiffrer|\brfq\b|request for quot|appel d.offre|merci de nous faire une offre|consultation/)))type='DDP client';
+  else if((k=tr(/\boffre\b|\bdevis\b|quotation|\bquote\b|proforma|pro forma|cotation/)))type='Offre fournisseur';
+  else if((k=tr(/commande/)))type='Commande client';else{type='DDP client';k=''}
+  return{type,devis,indice:k?'Type deviné par Akteev d’après « '+k+' »'+(devis?', devis cité '+devis:''):'Aucun indice clair : DDP proposée par défaut'}}
+async function envoyerSP(j,dossier,f){const ch=dossier.split('/').map(encodeURIComponent).join('/')+'/'+encodeURIComponent(f.name);
+  if(f.size<=4e6)return graph(j,`/drives/${DEPOT_DRIVE}/root:/${ch}:/content?@microsoft.graph.conflictBehavior=rename`,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:f});
+  const ses=await graph(j,`/drives/${DEPOT_DRIVE}/root:/${ch}:/createUploadSession`,{method:'POST',body:JSON.stringify({item:{'@microsoft.graph.conflictBehavior':'rename'}})});
+  const T=5*1048576;let r=null;for(let i=0;i<f.size;i+=T){const fin=Math.min(i+T,f.size);
+    const x=await fetch(ses.uploadUrl,{method:'PUT',headers:{'Content-Range':`bytes ${i}-${fin-1}/${f.size}`},body:f.slice(i,fin)});
+    if(!x.ok&&x.status!==202)throw new Error('envoi de '+f.name+' : '+x.status);if(x.status===200||x.status===201)r=await x.json()}
+  return r}
+let DEPOT_EN_COURS=false;
+async function deposerFichiers(F){if(DEPOT_EN_COURS){toast('Un dépôt est déjà en cours, patientez',true);return}DEPOT_EN_COURS=true;
+  const et=$('depEtat'),dire=t=>{if(et){et.style.display='block';et.textContent=t}};
+  try{
+    const princ=F.find(f=>/\.(msg|eml)$/i.test(f.name))||F[0];
+    const texte=await lireDebut(princ);
+    let objet='',exped='';
+    if(/\.eml$/i.test(princ.name)){const h=texte.split(/\r?\n\r?\n/)[0];objet=decodeEntete((h.match(/^Subject:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1]);exped=decodeEntete((h.match(/^From:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1])}
+    if(!objet)objet=princ.name.replace(/\.[^.]+$/,'');
+    const g=devinerDepot(F.map(f=>f.name).join(' ')+' '+objet,texte);
+    const d=new Date(),p=n=>String(n).padStart(2,'0'),horo=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}h${p(d.getMinutes())}`;
+    const dossier=`${DEPOT_DOSSIER}/${d.getFullYear()}/${horo} ${objet.replace(/[\\/:*?"<>|#%]/g,' ').replace(/\s+/g,' ').trim().slice(0,60)}`;
+    dire('Connexion à Microsoft…');const j=await jetonGraph(['Files.ReadWrite.All']);
+    for(let i=0;i<F.length;i++){dire(`Envoi sur SharePoint ${i+1}/${F.length} : ${F[i].name}…`);await envoyerSP(j,dossier,F[i])}
+    const dos=await graph(j,`/drives/${DEPOT_DRIVE}/root:/${dossier.split('/').map(encodeURIComponent).join('/')}?$select=webUrl`);
+    dire('Création de la ligne…');const m=MODS.depot,sc=sch(m.t),opt=(n,v)=>(sc.par[n]?.select_options||[]).find(o=>o.value===v)?.id??v;
+    const prop={'Commande client':'Passer le devis '+(g.devis||'cité')+' en commande','Offre fournisseur':'Rédiger la commande fournisseur','DDP client':'Ouvrir un devis et lancer le chiffrage'}[g.type];
+    const corps={'Objet':objet,'Type':opt('Type',g.type),'Statut':opt('Statut','À traiter'),'Reçu le':d.toISOString(),'Expéditeur':exped,'Boîte':'Dépôt Akteev',
+      'Devis cité':g.devis,'Proposition':prop,'Indices':g.indice+' — à compléter par Claude ('+F.length+' fichier'+(F.length>1?'s':'')+' : '+F.map(f=>f.name).join(', ').slice(0,300)+')','Fichier déposé':dos.webUrl};
+    const r=await api(`/rows/table/${m.t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
+    majRow(m.t,r);majCompteurs();dire('');if(et)et.style.display='none';
+    toast(`${g.type} déposée : ${objet}`);route()}
+  catch(e){dire('Échec : '+e.message);toast('Dépôt impossible : '+e.message,true)}
+  finally{DEPOT_EN_COURS=false}}
 /* ---------- Boîte « À traiter » : actions proposées ---------- */
 function boutonsDepot(r,grand){if(!MODS.depot)return'';
   const ty=txt(r.Type),st=txt(r.Statut),fini=/^(trait|ignor)/i.test(st),dv=String(txt(r['Devis cité'])||'').trim(),pad=grand?'':'style="padding:3px 9px"';
@@ -2234,6 +2295,7 @@ function boutonsDepot(r,grand){if(!MODS.depot)return'';
     else if(ty==='Offre fournisseur')h+=b('cf','Rédiger la CF',true,'Ouvre une nouvelle commande fournisseur');
     else if(ty==='DDP client'&&st!=='À lancer')h+=b('ddp','Lancer le chiffrage',true,'Marque la DDP « À lancer » : Claude la traite quand vous lui dites « lance les DDP à traiter » dans Cowork');
     if(grand)h+=b('ok','Traité',false,'Classer ce mail comme traité');h+=b('ign','Ignorer',false,'Ce mail ne demande rien')}
+  const fd=txt(r['Fichier déposé']);if(/^https?:/i.test(fd))h+=`<a class="btn" ${pad} href="${esc(fd)}" target="_blank" data-dep="${r.id}" data-a="out">Fichiers ↗</a>`;
   const l=txt(r['Lien Outlook']);if(/^https?:/i.test(l))h+=`<a class="btn" ${pad} href="${esc(l)}" target="_blank" data-dep="${r.id}" data-a="out">Outlook ↗</a>`;
   return grand?h:`<span style="display:inline-flex;gap:4px;white-space:nowrap">${h}</span>`}
 async function actionDepot(id,a){const m=MODS.depot;if(!m)return;const row=(S.rows[m.t]||[]).find(x=>x.id==id);if(!row)return;
