@@ -251,6 +251,80 @@ body.deconnecte #side,body.deconnecte #top{display:none}
   .grille{grid-template-columns:1fr}
   .outils .rech input{width:170px}
 }
+/* ---------- Charges machines ---------- */
+.chWrap{overflow:auto;max-height:70vh;border-top:1px solid var(--trait)}
+.chGrid{position:relative}
+.chLig{display:flex;border-bottom:1px solid #EEF0F4;min-height:46px}
+.chTete{position:sticky;top:0;z-index:4;background:#fff;border-bottom:1px solid var(--trait)}
+.chNom{position:sticky;left:0;z-index:3;width:190px;flex:none;background:#fff;padding:6px 10px;border-right:1px solid var(--trait);font-size:12px;line-height:1.35}
+.chNom a.prim{font-weight:600;font-size:13px;color:var(--txt)}
+.chSect{position:sticky;left:0;padding:5px 10px;background:#F6F8FB;font-size:11.5px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #EEF0F4;width:max-content}
+.chPiste{position:relative;flex:none;min-height:46px}
+.chPiste.survol{background:#EEF4FF}
+.chWe{position:absolute;top:0;bottom:0;background:#F3F4F6}
+.chAuj{position:absolute;top:0;bottom:0;width:2px;background:#DC2626;opacity:.55;z-index:1}
+.chMo{position:absolute;top:0;height:18px;font-size:11px;font-weight:600;color:var(--mut);padding-left:4px;border-left:1px solid var(--trait);text-transform:capitalize;white-space:nowrap;overflow:hidden}
+.chDj{position:absolute;top:18px;height:20px;font-size:10.5px;color:var(--mut);text-align:center;line-height:20px;border-left:1px solid #F0F2F6}
+.chDj.we{background:#F3F4F6}.chDj.auj{color:#fff;background:#DC2626;border-radius:4px;font-weight:600}
+.chBar{position:absolute;top:8px;height:26px;border-radius:6px;font-size:11.5px;line-height:24px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;z-index:2;border:1px solid;box-sizing:border-box}
+.chBar span{opacity:.75}
+.chBar.drag{opacity:.4}
+.e_ok{background:#DCFCE7;border-color:#86EFAC;color:#14532D}
+.e_lim{background:#FFEDD5;border-color:#FDBA74;color:#7C2D12}
+.e_ret{background:#FEE2E2;border-color:#F87171;color:#7F1D1D}
+.e_est{background:#F3F4F6;border-color:#9CA3AF;border-style:dashed;color:#374151}
+.chBar.encours{box-shadow:inset 3px 0 0 #2F6FED;font-weight:600}
+.chDl{position:absolute;bottom:0;font-size:10px;line-height:10px;z-index:2;background:none!important;border:0!important}
+.chDl.e_ret{color:#DC2626}.chDl.e_lim{color:#EA580C}.chDl.e_ok{color:#16A34A}.chDl.e_est{color:#6B7280}
+.chCalNav{display:flex;align-items:center;gap:8px;padding:10px 14px;border-top:1px solid var(--trait)}
+.chCal{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--trait);border-top:1px solid var(--trait)}
+.chCalT{background:#F6F8FB;padding:6px 8px;font-size:12px;font-weight:600;color:var(--mut)}
+.chJour{background:#fff;min-height:96px;padding:5px 6px;display:flex;flex-direction:column;gap:3px}
+.chJour.hors{background:#FAFBFC}.chJour.hors .chJn{color:#C0C6D0}
+.chJour.passe{background:#FAFBFC;min-height:34px}
+.chJour.auj{box-shadow:inset 0 0 0 2px #DC2626}
+.chJn{font-size:12px;font-weight:600}
+.chCm{position:relative;font-size:11px;line-height:17px;height:17px;border-radius:4px;background:#EEF2F7;overflow:hidden;display:flex;gap:5px;padding:0 4px;white-space:nowrap}
+.chCm.libre{background:#F7F8FA;color:#9CA3AF}
+.chCmB{position:absolute;left:0;top:0;bottom:0;background:#BFD3FB;z-index:0}
+.chCmB.r{background:#FCA5A5}
+.chCm .n,.chCm .a{position:relative;z-index:1}
+.chCm .n{font-weight:600;min-width:58px;max-width:78px;overflow:hidden;text-overflow:ellipsis}
+.chCm .a{overflow:hidden;text-overflow:ellipsis}
+.chCm .a i{font-style:normal;margin-right:3px;padding:0 3px;border-radius:3px;border:1px solid;cursor:pointer;line-height:13px;font-size:10.5px}
+.chCalDl{display:flex;flex-wrap:wrap;gap:3px;margin-top:auto}
+.chCalDl span{font-size:10.5px;border:1px solid;border-radius:4px;padding:0 4px;cursor:pointer}
+.faT td{vertical-align:middle;padding:7px 8px}.faT input{width:70px;border:1px solid var(--trait);border-radius:6px;padding:6px 7px;font-size:14px;text-align:right}
+.faT select{width:100%;border:1px solid var(--trait);border-radius:6px;padding:6px}.faT tr.faSe td{background:#F6F8FB;font-size:11.5px;font-weight:600;color:var(--mut);text-transform:uppercase;padding:4px 8px}
+/* Semaine (15/11/2026) */
+.swWrap{overflow:auto;max-height:78vh;border-top:1px solid var(--trait)}
+.swGrid{min-width:1250px}
+.swRow{display:flex;border-bottom:1px solid #E5E8EE}
+.swTete{position:sticky;top:0;z-index:6;background:#fff;border-bottom:1px solid var(--trait)}
+.swNom{position:sticky;left:0;z-index:5;width:150px;flex:none;background:#fff;padding:8px 10px;border-right:1px solid var(--trait);font-size:11.5px;line-height:1.4}
+.swNom a.prim{font-weight:600;font-size:13.5px;color:var(--txt)}
+.swJauge{height:4px;background:#EEF0F4;border-radius:2px;margin-top:4px;overflow:hidden}.swJauge div{height:100%;background:#5689F1}
+.swSect{position:sticky;left:0;padding:5px 10px;background:#F6F8FB;font-size:11.5px;font-weight:600;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid #EEF0F4}
+.swPiste{position:relative;flex:1;height:100px;overflow:hidden}
+.swPiste.survol{background:#EEF4FF}
+.swJt{position:absolute;top:0;bottom:0;padding:5px 0 0 6px;font-size:12.5px;border-left:1px solid #CBD2DC;text-transform:capitalize;white-space:nowrap;overflow:hidden;box-sizing:border-box}
+.swJt.we{background:#E9ECF1;padding:5px 0 0;text-align:center;color:var(--mut)}
+.swJt.auj b{color:#DC2626}.swJt span{font-size:11px;color:var(--mut);text-transform:none}
+.swH{position:absolute;left:0;right:0;bottom:2px;height:14px;text-transform:none}
+.swH i{position:absolute;font-style:normal;font-size:10.5px;color:var(--mut);padding-left:3px}
+.swF{position:absolute;top:0;bottom:0;border-left:1px solid #CBD2DC;box-sizing:border-box;
+  background:repeating-linear-gradient(90deg,transparent 0,transparent calc(var(--pas) - 1px),#E8EBF0 calc(var(--pas) - 1px),#E8EBF0 var(--pas))}
+.swF.we{background:#E9ECF1}
+.swF.auj{background-color:#FFFAFA}
+.swPasse{position:absolute;top:0;bottom:0;background:rgba(148,163,184,.18);z-index:0}
+.swMaint{position:absolute;top:0;bottom:0;width:2px;background:#DC2626;z-index:3}
+.swBloc{position:absolute;height:23px;border-radius:5px;border:1px solid;box-sizing:border-box;cursor:pointer;z-index:2;overflow:visible;min-width:3px}
+.swBloc.e_est{width:auto;min-width:26px;border-style:dashed}
+.swBloc .lab{position:absolute;left:5px;top:3px;font-size:11.5px;line-height:15px;white-space:nowrap;color:#111827;pointer-events:none;text-shadow:0 0 2px #fff,0 0 2px #fff}
+.swBloc.encours{box-shadow:inset 3px 0 0 #2F6FED}
+.swBloc.drag{opacity:.4}
+.swBloc:hover{z-index:4;outline:2px solid #2F6FED}
+.swDl{position:absolute;bottom:2px;transform:translateX(-100%);font-size:10px;line-height:13px;border:1px solid;border-radius:3px;padding:0 3px;cursor:pointer;z-index:3;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -321,6 +395,8 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
 /* Boîte « À traiter » (mails DDP / commandes / offres repérés par Claude) – 13/11/2026.
    Interrupteur de retour arrière : false = l'onglet disparaît, rien d'autre ne change. Réservé à la Direction. */
 const DEPOT_ACTIF=true;
+/* Charges machines (13/11/2026) : tables « Planning machines » et « Machines ». */
+const T_PLAN=1318141,T_MACH=1318139;
 const MODS={
  depot:{t:1317249,nom:'À traiter',un:'mail',ico:'ddp',grp:'Boîte de réception',cols:['Reçu le','Type','À traiter par','Objet','Action','Expéditeur','Client / fournisseur','Devis cité','Statut'],libOuverts:'Ouverts',
    virt:'depot',statut:'Statut',date:'Reçu le',cacheStatuts:['Traité','Ignoré'],solde:['Traité','Ignoré'],soldeVerbe:'classer',faitLe:'Traité le',faitRe:/^(trait|ignor)/i,
@@ -328,7 +404,7 @@ const MODS={
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
-   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
+   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Charges machines',mod:'plan',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
    liees:[{nom:'Lignes',t:1261373,lien:'ARC',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'}]},
  bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut','PDF'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
@@ -338,6 +414,9 @@ const MODS={
  taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Fiche','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Fait','Annulée'],solde:'Fait',faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
+ plan:{t:T_PLAN,nom:'Planning machines',un:'ligne de planning',fem:true,ico:'cal',grp:'Production',cols:['Libellé','Affaire','Machine','Machine de repli','Heures estimées','Ordre','Délai','Début au plus tôt','Statut'],statut:'Statut',date:'Délai',ordre:'Ordre',
+   cacheStatuts:['Terminée','Annulée'],faitLe:'Terminée le',faitRe:/^termin/i,menu:false,ordreStatuts:['Planifiée','En cours','Terminée','Annulée'],
+   ordreForm:['Libellé','Affaire','Machine','Machine de repli','Heures estimées','Temps masqué (h)','Délai','Début au plus tôt','Ordre','Statut','Terminée le','Repères','Notes']},
  nc:{t:1284881,nom:'Non-conformités',un:'non-conformité',fem:true,ico:'nc',grp:'Qualité',cols:['N° NC','Date de détection','Affaire','Client','Origine','Secteur','Fournisseur','Repère / pièce','Décision','Coût direct','Responsable','Statut'],
    statut:'Statut',date:'Date de détection',ref:'Responsable',num:'N° NC',virt:'nc',requis:['Affaire','Origine','Secteur','Description'],cacheStatuts:['Annulée'],faitLe:'Soldée le',faitRe:/^sold/i,
    ordreForm:['N° NC','Affaire','Date de détection','Origine','Secteur','Fournisseur','Repère / pièce','Quantité','Description','Décision','Plan d\'action','Responsable','Échéance','Coût direct','Statut','Soldée le']},
@@ -349,6 +428,7 @@ const MODS={
  referents:{t:1260243,nom:'Référents',un:'référent',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Téléphone',"Référent d'affaire"],
    liees:[{nom:'Tâches',mod:'taches',lien:'Référent'},{nom:'Commandes',mod:'commandes',lien:'Référent KTE'}]},
  catalogue:{t:1261119,nom:'Catalogue de tâches',un:'type de tâche',ico:'catalogue',grp:'Paramètres',cols:['Nom','Référent par défaut','Ordre']},
+ machines:{t:T_MACH,nom:'Machines',un:'machine',fem:true,ico:'catalogue',grp:'Paramètres',cols:['Nom','Secteur','Heures par jour','Taux opérateur (€/h)','Taux masqué (€/h)','Ordre','Hors service'],ordreForm:['Nom','Secteur','Heures par jour','Taux opérateur (€/h)','Taux masqué (€/h)','Ordre','Hors service','Notes']},
  amelio:{t:1315880,nom:'Améliorations Akteev',un:'amélioration',fem:true,ico:'ampoule',grp:'Paramètres',cols:['Titre',"Partie d'Akteev",'Priorité','Proposée par','Proposée le','Statut','Décision','Décidée le'],
    statut:'Statut',date:'Proposée le',ref:'Proposée par',requis:['Titre'],cacheStatuts:['Faite','Refusée'],faitLe:'Décidée le',faitRe:/^(retenue|refus|report)/i,faitMaj:true,
    libOuverts:'Ouvertes',ordreStatuts:['Nouvelle','À discuter','Reportée','Retenue','En cours','Faite','Refusée'],ordreForm:['Titre','Description',"Partie d'Akteev",'Priorité','Proposée par','Proposée le','Statut','Décision','Décidée le','Lue par']},
@@ -360,7 +440,7 @@ const MOD_DE_TABLE={};for(const k in MODS)MOD_DE_TABLE[MODS[k].t]=k;
 /* Cibles des liens si l'API des champs n'est pas lisible avec le jeton (secours). */
 const LIENS_SECOURS={'Client':1260239,'Référent KTE':1260243,'Référent':1260243,'Demandeur':1260243,'Référent par défaut':1260243,'Commande':1260240,'Affaire':1260240,
  'Fournisseur':1260241,'Intervenant':1260241,'Type de tâche':1261119,'Devis':1261170,'ARC':1261374,'BL':1261382,'Commande fournisseur':1263348,'Tâche':1261600,
- 'Lignes de devis':1261171,'Consultations SST':1274941,'Non-conformités':1284881,'Responsable':1260243,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349,'Proposée par':1260243,'Lue par':1260243};
+ 'Lignes de devis':1261171,'Consultations SST':1274941,'Non-conformités':1284881,'Responsable':1260243,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349,'Proposée par':1260243,'Lue par':1260243,'Machine':T_MACH,'Machine de repli':T_MACH};
 const RO_TYPES=new Set(['formula','lookup','rollup','count','created_on','last_modified','created_by','last_modified_by','autonumber','uuid','file','multiple_collaborators','ai','password']);
 
 /* ---------- Utilitaires ---------- */
@@ -496,8 +576,16 @@ if(PASSERELLE)SESSION=null; // le profil est relu auprès de la passerelle à ch
 const PR=()=>PROFILS[SESSION?.profil]||(SESSION||PASSERELLE?PROFILS.atelier:PROFILS.admin);
 /* Droits par onglet renvoyés par la passerelle (/moi/) : E = écriture, L = lecture, N = aucun (réglables dans « Droits d'accès »). */
 const DRS=()=>SESSION?.droits||null;
-const peutVoir=k=>k==='utilisateurs'||k==='droits'?(!!PASSERELLE&&!!PR().admin):DRS()&&k in DRS()?DRS()[k]!=='N':(PR().voir==='*'||PR().voir.includes(k));
-const peutEcrire=k=>k==='utilisateurs'?(!!PASSERELLE&&!!PR().admin):DRS()&&k in DRS()?DRS()[k]==='E':(PR().ecrire==='*'||PR().ecrire.includes(k));
+const peutVoir0=k=>(k==='utilisateurs'||k==='droits'?(!!PASSERELLE&&!!PR().admin):DRS()&&k in DRS()?DRS()[k]!=='N':(PR().voir==='*'||PR().voir.includes(k)));
+const peutEcrire0=k=>(k==='utilisateurs'?(!!PASSERELLE&&!!PR().admin):DRS()&&k in DRS()?DRS()[k]==='E':(PR().ecrire==='*'||PR().ecrire.includes(k)));
+/* Charges machines : fraisage et tournage séparés (clés de droits chfraisage / chtournage, réglables par personne dans
+   « Droits d'accès »). CHM_TEST : phase de validation, onglet visible par la Direction seulement (13/11/2026). */
+const CHM_TEST=true,CHM_CLES={'Fraisage':'chfraisage','Fraisage fil':'chfraisage','Tournage':'chtournage'},CHM_K=new Set(['plan','machines','charges']);
+const chmSecteursVus=ecr=>CHM_TEST&&!PR().admin?[]:CHM_SECTEURS.filter(s=>(ecr?peutEcrire0:peutVoir0)(CHM_CLES[s]));
+const peutVoir=k=>CHM_K.has(k)?chmSecteursVus().length>0:peutVoir0(k);
+const peutEcrire=k=>CHM_K.has(k)?chmSecteursVus(true).length>0:peutEcrire0(k);
+const chmToutVoir=()=>chmSecteursVus().length===CHM_SECTEURS.length;
+const chmRentab=()=>montants()&&chmToutVoir();
 const montants=()=>PR().montants!==false;
 const estAdmin=()=>!!PR().admin;
 const masque=n=>!montants()&&estMonnaie(n);
@@ -509,7 +597,7 @@ function dessinerMenu(){
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
   if(STATS_ACTIF&&peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   let g='';
-  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`;if(k==='nc')h+=`<a class="it" data-m="ncsynth" href="#/ncsynth">${ico('stats')}Synthèse NC</a>`;if(k==='utilisateurs')h+=`<a class="it" data-m="droits" href="#/droits">${ico('cle')}Droits d’accès</a>`}
+  for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}if(k==='plan'){h+=`<a class="it" data-m="charges" href="#/charges">${ico('cal')}Charges machines<span class="nb" id="nb_charges"></span></a>`;continue}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`;if(k==='nc')h+=`<a class="it" data-m="ncsynth" href="#/ncsynth">${ico('stats')}Synthèse NC</a>`;if(k==='utilisateurs')h+=`<a class="it" data-m="droits" href="#/droits">${ico('cle')}Droits d’accès</a>`}
   if(estAdmin()&&!PASSERELLE){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
   h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
   $('side').innerHTML=h;
@@ -526,6 +614,7 @@ function majCompteurs(){
   if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
   const eA=$('nb_amelio'),RA=S.rows[MODS.amelio.t];if(eA&&RA){const n=RA.filter(amelioAuJour).length;eA.textContent=n||'';const it=eA.parentElement,s=amelioEtatMenu();it.classList.remove('alerteO','alerteR');if(s.c)it.classList.add(s.c);it.title=[s.t,n+' amélioration(s) à l’ordre du jour'].filter(Boolean).join(' · ')}
   const eP=$('nb_depot'),RP=MODS.depot&&S.rows[MODS.depot.t];if(eP&&RP){const n=RP.filter(r=>txt(r.Statut)==='À traiter').length;eP.textContent=n||'';eP.title=n+' mail(s) à traiter'}
+  const eM=$('nb_charges');if(eM&&S.rows[T_PLAN]&&S.rows[T_MACH]&&S.rows[MODS.commandes.t]){const n=[...chmCalcul().out.values()].filter(x=>x.retard).length;eM.textContent=n||'';eM.title=n+' affaire(s) dont la fin prévue dépasse le délai'}
   const eN=$('nb_nc'),RN=S.rows[MODS.nc.t];if(eN&&RN){const n=RN.filter(ncOuverte).length;eN.textContent=n||'';eN.title=n+' non-conformité(s) à traiter'}
   majMoi();
 }
@@ -550,6 +639,7 @@ async function route(){
     if(k==='droits'&&peutVoir('droits'))return await vueDroits();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
     if(k==='ncsynth'&&peutVoir('nc'))return await vueNCSynth();
+    if(k==='charges'&&peutVoir('plan'))return await vueCharges();
     if(k==='affecter'&&id&&peutVoir('cf')){actif('cf');return await vueAffecter(id)}
     if(k==='stats'&&STATS_ACTIF&&peutVoir('stats')&&montants())return await vueStats();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
@@ -693,6 +783,482 @@ function dessinerDDP(){
   document.querySelectorAll('.puce[data-e]').forEach(b=>b.onclick=()=>{DDPF=b.dataset.e;ls.set('ddpf',DDPF);dessinerDDP()});
   document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/devis/${tr.dataset.id}`);
   $('dMaj').onclick=async()=>{$('dMaj').disabled=true;try{await Promise.all([charger(MODS.devis.t,true),charger(MODS.consult.t,true)]);dessinerDDP();toast('DDP actualisées')}catch(e){toast('Échec : '+e.message,true);$('dMaj').disabled=false}};
+}
+
+/* ---------- Charges machines (13/11/2026) ----------
+   Planning de charge par machine, tenu par Arnaud (tournage) et Christophe (fraisage).
+   Table « Machines » T_MACH : Nom, Secteur (Fraisage / Tournage / Fraisage fil), Heures par jour, Ordre, Hors service, Notes.
+   Table « Planning machines » T_PLAN : une ligne par affaire × machine — Libellé, Affaire (→ Commandes), Machine,
+   Machine de repli (facultative), Heures estimées, Ordre (ordre de passage), Délai (défaut : Date Livraison de la
+   commande), Début au plus tôt (attente matière…), Statut Planifiée / En cours / Terminée / Annulée, Terminée le,
+   Repères, Notes.
+   Ordonnancement : chaque machine enchaîne ses lignes (En cours d'abord, puis par Ordre) à partir d'aujourd'hui,
+   à raison de « Heures par jour » (7 h par défaut) les jours ouvrés (lundi – vendredi, jours fériés exclus).
+   Fin prévue > délai → alerte rouge (retard en jours ouvrés) ; marge ≤ 1 jour → orange.
+   Vues : #/charges — Chronologie (une ligne horizontale par machine, glisser-déposer pour changer l'ordre ou la
+   machine) et Calendrier par secteur (charge de chaque machine jour par jour). */
+const CHM_SECTEURS=['Fraisage','Tournage','Fraisage fil'];
+let CHM=Object.assign({vue:'sem',sect:'',mois:'',sem:'',zoom:28},ls.get('chm',{}));if(!['sem','chrono','cal'].includes(CHM.vue))CHM.vue='sem';
+const chmSauve=()=>ls.set('chm',{vue:CHM.vue,sect:CHM.sect,mois:CHM.mois,zoom:CHM.zoom});
+function feriesFR(an){
+  const a=an%19,b=Math.floor(an/100),c=an%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),
+    h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),
+    mo=Math.floor((h+l-7*m+114)/31),j=((h+l-7*m+114)%31)+1,p=`${an}-${String(mo).padStart(2,'0')}-${String(j).padStart(2,'0')}`;
+  return new Set([`${an}-01-01`,isoAdd(p,1),`${an}-05-01`,`${an}-05-08`,isoAdd(p,39),isoAdd(p,50),`${an}-07-14`,`${an}-08-15`,`${an}-11-01`,`${an}-11-11`,`${an}-12-25`]);
+}
+const FERIES={};
+const isoAdd=(iso,n)=>{const d=new Date(iso+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)};
+const jourSem=iso=>new Date(iso+'T12:00:00Z').getUTCDay();
+const estFerie=iso=>{const a=+iso.slice(0,4);return(FERIES[a]||(FERIES[a]=feriesFR(a))).has(iso)};
+const jourOuvre=iso=>{const w=jourSem(iso);return w!==0&&w!==6&&!estFerie(iso)};
+const prochainOuvre=iso=>{let n=0;while(!jourOuvre(iso)&&n++<30)iso=isoAdd(iso,1);return iso};
+const ecartJours=(a,b)=>Math.round((Date.parse(b+'T12:00:00Z')-Date.parse(a+'T12:00:00Z'))/864e5);
+/* jours ouvrés de a (exclu) à b (inclus), négatif si b < a */
+function ouvresEntre(a,b){if(!a||!b||a===b)return 0;let s=1;if(b<a){[a,b]=[b,a];s=-1}let n=0,d=a;while(d<b){d=isoAdd(d,1);if(jourOuvre(d))n++}return n*s}
+const jourCourt=iso=>new Date(iso+'T12:00:00Z').toLocaleDateString('fr-FR',{weekday:'short',day:'2-digit',month:'2-digit',timeZone:'UTC'});
+const hFr=x=>(Math.round((+x||0)*10)/10).toLocaleString('fr-FR')+' h';
+
+const chmMachines=()=>(S.rows[T_MACH]||[]).filter(r=>!r['Hors service']&&(chmToutVoir()||chmSecteursVus().includes(txt(r.Secteur)))).sort((a,b)=>CHM_SECTEURS.indexOf(txt(a.Secteur))-CHM_SECTEURS.indexOf(txt(b.Secteur))||(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id);
+const capM=m=>Math.min(+m?.['Heures par jour']||chmFenetre(),chmFenetre());
+const chmActive=l=>!/^(termin|annul)/i.test(txt(l.Statut));
+const chmEnCours=l=>/^en cours/i.test(txt(l.Statut));
+const chmH=l=>+l['Heures estimées']||0;
+const chmTri=(a,b)=>(chmEnCours(b)-chmEnCours(a))||(+a.Ordre||0)-(+b.Ordre||0)||a.id-b.id;
+const chmCde=l=>(S.rows[MODS.commandes.t]||[]).find(c=>c.id===ids(l.Affaire)[0]);
+/* Fin d'usinage visée (règle de Matthias, 14/11/2026) : « Délai » saisi sur la ligne, sinon délai atelier de la fiche
+   atelier du secteur (tâche de la commande portant « Fiche atelier » + métier), sinon 1 jour ouvré avant la
+   livraison client (Date Livraison de la commande). */
+const jourOuvreAvant=iso=>{let d=isoAdd(iso,-1),n=0;while(!jourOuvre(d)&&n++<30)d=isoAdd(d,-1);return d};
+const CHM_METIER={'Fraisage':/fraisage(?![ _-]?fil)/i,'Fraisage fil':/fraisage[ _-]?fil/i,'Tournage':/tournage/i};
+function chmFicheAtelier(l){const cid=ids(l.Affaire)[0],m=chmMach(ids(l.Machine)[0]),re=CHM_METIER[txt(m?.Secteur)];if(!cid||!re)return null;
+  const T=(S.rows[MODS.taches.t]||[]).filter(t=>ids(t.Commande).includes(cid)&&t['Échéance']&&!/^annul/i.test(txt(t.Statut))&&/fiche atelier/i.test(String(t.Notes||''))
+    &&re.test([t['Libellé'],txt(t['Type de tâche']),...String(t.Notes||'').split('\n').filter(x=>/fiche atelier/i.test(x))].join(' ')));
+  return T.map(t=>String(t['Échéance']).slice(0,10)).sort()[0]||null}
+function chmDelaiSrc(l){if(l['Délai'])return{d:String(l['Délai']).slice(0,10),src:'délai saisi'};
+  const fa=chmFicheAtelier(l);if(fa)return{d:fa,src:'fiche atelier'};
+  const liv=String(chmCde(l)?.['Date Livraison']||'').slice(0,10);return liv?{d:jourOuvreAvant(liv),src:'livraison client '+dfr(liv)+' − 1 jour'}:{d:'',src:'aucune date'}}
+const chmDelai=l=>chmDelaiSrc(l).d;
+/* Dégradé vert → orange → rouge selon la marge (jours ouvrés entre la fin prévue et la fin visée) */
+/* Dégradé dans l'affaire (14/11/2026) : le début est vert (sauf s'il commence déjà après la fin visée), la fin prend
+   la couleur de la marge restante à la fin prévue : ≥ 3 jours ouvrés vert, 0 orange, −3 et au-delà rouge. */
+const chmTeinteMarge=m=>m>=3?125:m>=0?30+m/3*95:Math.max(0,30+m*10);
+function chmTeinte(s){if(s.aEstimer)return null;if(!s.delai)return 210;return chmTeinteMarge(s.marge)}
+function chmTeintes(s){const h1=chmTeinte(s);if(h1==null||h1===210)return null;const m0=s.delai?ouvresEntre(s.deb,s.delai):9;return[m0<0?chmTeinteMarge(m0):125,h1]}
+/* fond dégradé entre les fractions f0 et f1 (0 = début de l'affaire, 1 = fin) */
+function chmGrad(s,f0=0,f1=1){const T=chmTeintes(s);if(!T)return chmCss(s);const hu=f=>T[0]+(T[1]-T[0])*Math.max(0,Math.min(1,f));
+  return`background:linear-gradient(90deg,hsl(${hu(f0)},78%,84%),hsl(${hu(f1)},78%,84%));border-color:hsl(${hu(f1)},60%,48%);color:#1F2937;`}
+function chmCss(s,txtSeul){const h=chmTeinte(s);if(h==null)return'';return txtSeul?`color:hsl(${h},75%,38%);border-color:hsl(${h},70%,50%);`:h===210?'background:#EEF2F7;border-color:#B6C2D4;color:#334155;':`background:hsl(${h},80%,88%);border-color:hsl(${h},65%,50%);color:hsl(${h},70%,20%);`}
+const chmNum=l=>{const c=chmCde(l);return c?String(txt(c['N° affaire'])).trim().split(/\s+/)[0]:txt(l.Affaire)||'(sans affaire)'};
+const chmMach=id=>(S.rows[T_MACH]||[]).find(m=>m.id===id);
+
+/* Ordonnancement. lignes = lignes de planning (par défaut celles de Baserow). */
+function chmCalcul(lignes){
+  const M=chmMachines(),L=(lignes||S.rows[T_PLAN]||[]).filter(chmActive),out=new Map(),parM=new Map(),a0=prochainOuvre(auj());
+  for(const m of M){
+    const cap=capM(m),Lm=L.filter(l=>ids(l.Machine)[0]===m.id).sort(chmTri),seg=[];let d=a0,u=a0===auj()?Math.min(cap,chmEcoule()):0;
+    for(const l of Lm){
+      const tot=chmH(l),tot0=l['Début au plus tôt'];
+      if(tot0&&tot0>d){d=prochainOuvre(String(tot0).slice(0,10));u=0}
+      if(u>=cap-1e-9){d=prochainOuvre(isoAdd(d,1));u=0}
+      const deb=d,debU=u,jours=[];let h=tot;
+      while(h>1e-9){const pr=Math.min(cap-u,h);jours.push({j:d,h:pr,u0:u,cum:tot-h});u+=pr;h-=pr;if(h>1e-9){d=prochainOuvre(isoAdd(d,1));u=0}}
+      const fin=jours.length?jours[jours.length-1].j:deb,finU=jours.length?u:debU,delai=chmDelai(l);
+      const marge=delai?ouvresEntre(fin,delai):null;
+      seg.push({l,m,cap,deb,debU,fin,finU,jours,delai,marge,retard:marge!=null&&marge<0,aEstimer:!tot})}
+    seg.forEach(s=>out.set(s.l.id,s));
+    parM.set(m.id,{m,cap,seg,fin:d,finU:u,heures:Lm.reduce((s,l)=>s+chmH(l),0)});
+  }
+  return{M,out,parM,orph:chmToutVoir()?L.filter(l=>!parM.has(ids(l.Machine)[0])):[],a0};
+}
+/* Fin prévue si la ligne passait en fin de file sur une autre machine */
+function chmSimuler(C,mid,h){const P=C.parM.get(mid);if(!P)return null;let d=P.fin,u=P.finU;if(u>=P.cap-1e-9){d=prochainOuvre(isoAdd(d,1));u=0}
+  while(h>1e-9){const pr=Math.min(P.cap-u,h);u+=pr;h-=pr;if(h>1e-9){d=prochainOuvre(isoAdd(d,1));u=0}}return d}
+const chmEtat=s=>s.aEstimer?'est':s.retard?'ret':s.marge!=null&&s.marge<=1?'lim':'ok';
+function chmTexteDelai(s){if(!s.delai)return'<span class="mut">pas de délai</span>';
+  return s.retard?`<b style="color:var(--err)">retard ${-s.marge} j ouvré${s.marge<-1?'s':''}</b>`:`<span style="color:${s.marge<=1?'#C2410C':'#15803D'}">marge ${s.marge} j</span>`}
+
+async function vueCharges(){
+  document.title='Akteev – Charges machines';actif('charges');
+  if(!S.rows[T_PLAN]||!S.rows[T_MACH]||!S.rows[MODS.commandes.t])chargement();
+  await Promise.all([charger(T_PLAN),charger(T_MACH),charger(MODS.commandes.t),peutVoir('taches')?charger(MODS.taches.t).catch(()=>[]):null,peutVoir('clients')?charger(MODS.clients.t).catch(()=>[]):null]);
+  charger(MODS.referents.t).catch(()=>{});
+  dessinerCharges();
+}
+function dessinerCharges(){
+  const C=chmCalcul(),ecr=peutEcrire('plan'),Mt=C.M,secteurs=CHM_SECTEURS.filter(s=>Mt.some(m=>txt(m.Secteur)===s));
+  if(CHM.sect&&!secteurs.includes(CHM.sect))CHM.sect='';if(secteurs.length===1)CHM.sect=secteurs[0];
+  const Ms=Mt.filter(m=>!CHM.sect||txt(m.Secteur)===CHM.sect),segs=Ms.flatMap(m=>C.parM.get(m.id).seg);
+  const nRet=segs.filter(s=>s.retard).length,nEst=segs.filter(s=>s.aEstimer).length,hTot=segs.reduce((s,x)=>s+chmH(x.l),0);
+  let h=`<div class="entete"><h1>Charges machines</h1><span class="sous">${segs.length} affaire(s) planifiée(s) · ${hFr(hTot)}${nRet?` · <span style="color:var(--err);font-weight:600">${nRet} en retard</span>`:''}${nEst?` · <span style="color:#C2410C">${nEst} à estimer</span>`:''}</span><div class="act">
+    ${ecr?`<button class="btn p" id="chNv">${ico('plus')}Planifier une affaire</button>`:''}<button class="btn" id="chMaj">${ico('cal')}Actualiser</button>
+    <a class="btn" href="#/machines">${ico('catalogue')}Machines</a></div></div>
+  <div class="card"><div class="outils">
+    <div class="puces">${secteurs.length>1?`<button class="puce ${!CHM.sect?'on':''}" data-s="">Tous les secteurs<b>${Mt.length}</b></button>`:''}${secteurs.map(s=>`<button class="puce ${CHM.sect===s?'on':''}" data-s="${esc(s)}">${esc(s)}<b>${Mt.filter(m=>txt(m.Secteur)===s).length}</b></button>`).join('')}</div>
+    ${CHM.vue==='chrono'?`<select id="chZoom" title="Largeur d’une journée"><option value="16">Compact</option><option value="28">Normal</option><option value="48">Large</option></select>`:''}
+    <div class="bascule"><button data-v="sem" class="${CHM.vue==='sem'?'on':''}">${ico('cal')}Semaine</button><button data-v="chrono" class="${CHM.vue==='chrono'?'on':''}">${ico('liste')}Chronologie</button><button data-v="cal" class="${CHM.vue==='cal'?'on':''}">${ico('cal')}Mois</button></div>
+  </div><div id="chCorps"></div></div><div id="chAPlan"></div>`;
+  $('main').innerHTML=h;
+  if(!Mt.length){$('chCorps').innerHTML=`<div class="vide">Aucune machine enregistrée. ${peutEcrire('machines')?'<a href="#/machines/nouveau">Ajouter une machine</a>':''}</div>`}
+  else if(CHM.vue==='cal')dessinerChmCal(C,Ms);else if(CHM.vue==='chrono')dessinerChmChrono(C,Ms);else dessinerChmSemaine(C,Ms);
+  if(ecr)dessinerAPlanifier(C);
+  document.querySelectorAll('.puce[data-s]').forEach(b=>b.onclick=()=>{CHM.sect=b.dataset.s;chmSauve();dessinerCharges()});
+  document.querySelectorAll('.bascule button[data-v]').forEach(b=>b.onclick=()=>{CHM.vue=b.dataset.v;chmSauve();dessinerCharges()});
+  if($('chZoom')){$('chZoom').value=String(CHM.zoom);$('chZoom').onchange=e=>{CHM.zoom=+e.target.value;chmSauve();dessinerCharges()}}
+  if($('chNv'))$('chNv').onclick=()=>chmFormAffaire(null);
+  $('chMaj').onclick=async()=>{$('chMaj').disabled=true;try{await Promise.all([charger(T_PLAN,true),charger(T_MACH,true),charger(MODS.commandes.t,true)]);dessinerCharges();toast('Planning actualisé')}catch(e){toast('Échec : '+e.message,true);$('chMaj').disabled=false}};
+  majCompteurs();
+}
+function chmInfobulle(s){const l=s.l,c=chmCde(l),rep=ids(l['Machine de repli'])[0];
+  return[`${chmNum(l)}${c?' – '+txt(c.Client):''}`,c&&txt(c.Objet)?txt(c.Objet):'',`${s.m?txt(s.m.Nom):''} · ${s.aEstimer?'heures à estimer':hFr(chmH(l))}${chmEnCours(l)?' · en cours':''}`,
+    `Début ${dfr(s.deb)} → fin prévue ${dfr(s.fin)}`,s.delai?`Fin visée ${dfr(s.delai)} (${chmDelaiSrc(l).src}) : ${s.retard?'RETARD de '+(-s.marge)+' j ouvré(s)':'marge '+s.marge+' j ouvré(s)'}`:'Pas de délai',
+    rep?'Repli : '+txt(chmMach(rep)?.Nom):'',txt(l['Repères'])?'Repères : '+txt(l['Repères']):'',txt(l.Notes)].filter(Boolean).join('\n')}
+
+function dessinerChmChrono(C,Ms){
+  const W=CHM.zoom,a0=auj(),dLun=isoAdd(a0,-((jourSem(a0)+6)%7));
+  let fin=isoAdd(dLun,41);for(const m of Ms)for(const s of C.parM.get(m.id).seg){if(s.fin>fin)fin=s.fin;if(s.delai&&s.delai>fin)fin=s.delai}
+  fin=isoAdd(fin,4);if(ecartJours(dLun,fin)>370)fin=isoAdd(dLun,370);
+  const N=ecartJours(dLun,fin)+1,X=(iso,u,cap)=>(ecartJours(dLun,iso)+(cap?u/cap:0))*W,jours=[...Array(N)].map((_,i)=>isoAdd(dLun,i));
+  const fond=jours.map((j,i)=>!jourOuvre(j)?`<div class="chWe" style="left:${i*W}px;width:${W}px"></div>`:'').join('')+`<div class="chAuj" style="left:${X(a0,0)}px"></div>`;
+  let mois='',dj='';let i0=0;
+  jours.forEach((j,i)=>{if(i===N-1||j.slice(0,7)!==isoAdd(j,1).slice(0,7)){const lib=new Date(j+'T12:00:00Z').toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'});mois+=`<div class="chMo" style="left:${i0*W}px;width:${(i-i0+1)*W}px">${(i-i0+1)*W>60?esc(lib):''}</div>`;i0=i+1}
+    dj+=`<div class="chDj ${jourOuvre(j)?'':'we'} ${j===a0?'auj':''}" style="left:${i*W}px;width:${W}px" title="${esc(jourCourt(j))}${estFerie(j)?' (férié)':''}">${W>=20||jourSem(j)===1?+j.slice(8):''}</div>`});
+  let h=`<div class="chWrap"><div class="chGrid" style="width:${190+N*W}px">
+    <div class="chLig chTete"><div class="chNom"></div><div class="chPiste" style="width:${N*W}px;height:38px">${mois}${dj}</div></div>`;
+  let sect='';
+  for(const m of Ms){const P=C.parM.get(m.id),nr=P.seg.filter(s=>s.retard).length,se=txt(m.Secteur);
+    if(!CHM.sect&&se!==sect){sect=se;h+=`<div class="chSect">${esc(se||'Sans secteur')}</div>`}
+    const libre=P.seg.length?P.fin:null;
+    h+=`<div class="chLig" data-m="${m.id}"><div class="chNom"><a href="#/machines/${m.id}" class="prim">${esc(txt(m.Nom))}</a>
+      <div class="mut">${hFr(P.cap)}/j · ${hFr(P.heures)}${libre?` · libre ${dfr(libre).slice(0,5)}`:' · libre'}</div>${nr?`<div style="color:var(--err);font-weight:600;font-size:11.5px">${nr} en retard</div>`:''}</div>
+      <div class="chPiste" data-m="${m.id}" style="width:${N*W}px">${fond}`;
+    for(const s of P.seg){const x=X(s.deb,s.debU,s.cap),w=Math.max(s.aEstimer?26:4,X(s.fin,s.finU,s.cap)-x-2),e=chmEtat(s);
+      h+=`<div class="chBar e_${e}${chmEnCours(s.l)?' encours':''}" draggable="${peutEcrire('plan')}" data-l="${s.l.id}" style="left:${x+1}px;width:${w}px;${chmGrad(s)}" title="${esc(chmInfobulle(s))}"><b>${esc(chmNum(s.l))}</b> ${esc(String(txt(chmCde(s.l)?.Client)).slice(0,22))} <span>${s.aEstimer?'? h':hFr(chmH(s.l))}</span></div>`;
+      if(s.delai&&s.delai>=dLun&&s.delai<=fin)h+=`<div class="chDl e_${e}" style="${chmCss(s,1)}left:${(ecartJours(dLun,s.delai)+1)*W-5}px" title="Délai ${esc(chmNum(s.l))} : ${dfr(s.delai)}">▼</div>`}
+    h+=`</div></div>`}
+  h+=`</div></div>`;
+  const orph=C.orph.filter(l=>!CHM.sect);
+  if(orph.length)h+=`<div style="padding:10px 16px" class="mut">Sans machine active : ${orph.map(l=>`<a href="#" data-ed="${l.id}">${esc(chmNum(l))}</a>`).join(', ')}</div>`;
+  h+=`<div class="plus mut" style="font-size:12.5px;text-align:left">Chaque machine enchaîne ses affaires dans l’ordre de passage, à partir d’aujourd’hui, selon ses heures par jour (lundi – vendredi, jours fériés exclus). Couleur = avance sur la fin d’usinage visée (délai de la fiche atelier, sinon livraison client − 1 jour) : <span style="display:inline-block;width:90px;height:9px;border-radius:5px;vertical-align:middle;background:linear-gradient(90deg,hsl(125,60%,45%),hsl(30,85%,55%),hsl(0,75%,55%))"></span> chaque affaire part du vert et tend vers l’orange ou le rouge à sa fin si elle termine près de la fin visée ou après (vert : 3 jours ouvrés d’avance ou plus · orange : fin le jour même · rouge : dépassée) · gris pointillé : heures à estimer. ▼ = délai de l’affaire. ${peutEcrire('plan')?'Glissez une affaire pour changer son ordre de passage ou sa machine ; cliquez dessus pour la modifier.':''}</div>`;
+  $('chCorps').innerHTML=h;
+    document.querySelectorAll('.chBar[data-l]').forEach(b=>{b.onclick=()=>chmEditer(+b.dataset.l);
+    b.ondragstart=e=>{e.dataTransfer.setData('text/plain',b.dataset.l);e.dataTransfer.effectAllowed='move';b.classList.add('drag')};b.ondragend=()=>b.classList.remove('drag')});
+  document.querySelectorAll('[data-ed]').forEach(a=>a.onclick=e=>{e.preventDefault();chmEditer(+a.dataset.ed)});
+  if(peutEcrire('plan'))document.querySelectorAll('.chPiste[data-m]').forEach(p=>{
+    p.ondragover=e=>{e.preventDefault();p.classList.add('survol')};p.ondragleave=()=>p.classList.remove('survol');
+    p.ondrop=e=>{e.preventDefault();p.classList.remove('survol');const lid=+e.dataTransfer.getData('text/plain');if(!lid)return;
+      const cible=e.target.closest('.chBar');let avant=null;
+      if(cible&&+cible.dataset.l!==lid){const r=cible.getBoundingClientRect();avant=e.clientX<r.left+r.width/2?+cible.dataset.l:'apres:'+cible.dataset.l}
+      chmDeplacer(lid,+p.dataset.m,avant)}});
+}
+
+function dessinerChmCal(C,Ms){
+  const a0=auj();if(!/^\d{4}-\d{2}$/.test(CHM.mois||''))CHM.mois=a0.slice(0,7);
+  const p1=CHM.mois+'-01',lun=isoAdd(p1,-((jourSem(p1)+6)%7)),dern=isoAdd(isoAdd(p1,32).slice(0,7)+'-01',-1);
+  const charge=new Map(),delais=new Map();
+  for(const m of Ms)for(const s of C.parM.get(m.id).seg){for(const x of s.jours){const k=m.id+'|'+x.j;if(!charge.has(k))charge.set(k,[]);charge.get(k).push({s,h:x.h})}
+    if(s.delai){if(!delais.has(s.delai))delais.set(s.delai,[]);delais.get(s.delai).push(s)}}
+  const nomMois=new Date(p1+'T12:00:00Z').toLocaleDateString('fr-FR',{month:'long',year:'numeric',timeZone:'UTC'});
+  let h=`<div class="chCalNav"><button class="btn" data-mo="-1">‹</button><b style="min-width:150px;text-align:center;text-transform:capitalize">${esc(nomMois)}</b><button class="btn" data-mo="1">›</button><button class="btn" data-mo="0">Aujourd’hui</button>
+    <span class="mut" style="margin-left:auto;font-size:12.5px">${CHM.sect?esc(CHM.sect)+' · ':''}${Ms.length} machine(s) · barre = charge du jour / capacité</span></div>
+    <div class="chCal"><div class="chCalT">Lundi</div><div class="chCalT">Mardi</div><div class="chCalT">Mercredi</div><div class="chCalT">Jeudi</div><div class="chCalT">Vendredi</div>`;
+  for(let d=lun;d<=dern||jourSem(d)!==1;d=isoAdd(d,1)){const w=jourSem(d);if(w===0||w===6)continue;
+    const hors=d.slice(0,7)!==CHM.mois,fer=estFerie(d),passe=d<a0,dl=(delais.get(d)||[]);
+    h+=`<div class="chJour ${hors?'hors':''} ${d===a0?'auj':''} ${passe?'passe':''}"><div class="chJn">${+d.slice(8)}${fer?' <span class="mut">férié</span>':''}</div>`;
+    if(!fer&&!passe)for(const m of Ms){const L=charge.get(m.id+'|'+d)||[],cap=capM(m),hj=L.reduce((s,x)=>s+x.h,0),pc=Math.min(100,Math.round(hj/cap*100)),ret=L.some(x=>x.s.retard);
+      h+=`<div class="chCm ${hj?'':'libre'}" title="${esc(txt(m.Nom))} : ${hFr(hj)} / ${hFr(cap)}${L.length?'\n'+L.map(x=>`${chmNum(x.s.l)} ${txt(chmCde(x.s.l)?.Client)} – ${hFr(x.h)}${x.s.retard?' (retard)':''}`).join('\n'):'\nlibre'}">
+        <div class="chCmB ${ret?'r':''}" style="width:${pc}%"></div><span class="n">${esc(txt(m.Nom))}</span><span class="a">${L.length?L.map(x=>`<i class="e_${chmEtat(x.s)}" style="${chmCss(x.s)}" data-l="${x.s.l.id}">${esc(chmNum(x.s.l).replace(/^D2\d/,''))}</i>`).join(''):'libre'}</span></div>`}
+    if(dl.length)h+=`<div class="chCalDl">${dl.map(s=>`<span class="e_${chmEtat(s)}" style="${chmCss(s)}" data-l="${s.l.id}" title="Délai ${esc(chmNum(s.l))} sur ${esc(txt(s.m.Nom))} : fin prévue ${dfr(s.fin)}">⚑ ${esc(chmNum(s.l))}</span>`).join('')}</div>`;
+    h+=`</div>`}
+  h+=`</div><div class="plus mut" style="font-size:12.5px;text-align:left">Pour chaque jour : une ligne par machine, la barre bleue donne la charge du jour par rapport à sa capacité (rouge si une affaire de la journée finira en retard), puis les affaires usinées ce jour-là. ⚑ = délai d’une affaire ce jour-là (rouge si la fin prévue le dépasse). Cliquez sur une affaire pour la modifier.</div>`;
+  $('chCorps').innerHTML=h;
+  document.querySelectorAll('[data-mo]').forEach(b=>b.onclick=()=>{const n=+b.dataset.mo;if(!n)CHM.mois=a0.slice(0,7);else{const d=new Date(CHM.mois+'-15T12:00:00Z');d.setUTCMonth(d.getUTCMonth()+n);CHM.mois=d.toISOString().slice(0,7)}chmSauve();dessinerCharges()});
+  document.querySelectorAll('.chCal [data-l]').forEach(x=>x.onclick=e=>{e.stopPropagation();chmEditer(+x.dataset.l)});
+}
+
+/* Affaires à planifier : commandes en cours, avec une date de livraison récente ou future, sans ligne de planning
+   sur une machine du secteur choisi (ou sur aucune machine en « Tous les secteurs »). « Pas dans ce secteur » = mémorisé. */
+function dessinerAPlanifier(C){
+  const ign=ls.get('chm_ign',{}),cle=CHM.sect||'*',ig=new Set(ign[cle]||[]),lim=isoAdd(auj(),-30);
+  const mSect=new Set(chmMachines().filter(m=>!CHM.sect||txt(m.Secteur)===CHM.sect).map(m=>m.id));
+  const deja=new Set((S.rows[T_PLAN]||[]).filter(l=>!/^annul/i.test(txt(l.Statut))&&(CHM.sect?mSect.has(ids(l.Machine)[0]):true)).flatMap(l=>ids(l.Affaire)));
+  const L=(S.rows[MODS.commandes.t]||[]).filter(c=>!AFF_FIN.test(txt(c.Statut))&&String(c['Date Livraison']||'')>=lim&&!deja.has(c.id)&&!ig.has(c.id))
+    .sort((a,b)=>String(a['Date Livraison']).localeCompare(String(b['Date Livraison'])));
+  const box=$('chAPlan');if(!box)return;
+  box.innerHTML=`<div class="card" style="margin-top:16px"><div class="outils"><b>Affaires à planifier${CHM.sect?' – '+esc(CHM.sect):''}</b><span class="mut" style="font-size:12.5px">${L.length} commande(s) en cours sans planning${CHM.sect?' dans ce secteur':''}</span></div>
+    ${L.length?`<div class="tw"><table class="l"><thead><tr><th style="cursor:default">Affaire</th><th style="cursor:default">Client</th><th style="cursor:default">Objet</th><th style="cursor:default">Livraison</th><th style="cursor:default"></th></tr></thead><tbody>
+    ${L.map(c=>{const d=String(c['Date Livraison']).slice(0,10),j=ouvresEntre(auj(),d);return`<tr data-c="${c.id}"><td class="prim"><a href="#/commandes/${c.id}">${esc(txt(c['N° affaire']))}</a></td><td>${esc(txt(c.Client))}</td><td>${esc(String(txt(c.Objet)).slice(0,70))}</td>
+      <td>${dfr(d)} <span class="${j<0?'retard':'mut'}" style="font-size:11.5px">${j<0?'dépassée':'J-'+j}</span></td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn mini p" data-pl="${c.id}">Planifier</button> <button class="btn mini" data-ig="${c.id}" title="Ne plus proposer cette affaire ${CHM.sect?'en '+esc(CHM.sect):''}">${CHM.sect?'Pas en '+esc(CHM.sect.toLowerCase()):'Ignorer'}</button></td></tr>`}).join('')}</tbody></table></div>`:'<div class="vide">Toutes les commandes en cours sont planifiées.</div>'}</div>`;
+  box.querySelectorAll('[data-pl]').forEach(b=>b.onclick=()=>chmFormAffaire(+b.dataset.pl));
+  box.querySelectorAll('[data-ig]').forEach(b=>b.onclick=()=>{const o=ls.get('chm_ign',{});o[cle]=[...new Set([...(o[cle]||[]),+b.dataset.ig])];ls.set('chm_ign',o);dessinerAPlanifier(C);toast('Affaire retirée de la liste')});
+}
+
+/* Corps Baserow : seulement les champs qui existent dans la table (schéma lu) */
+function chmCorps(o){const sc=sch(T_PLAN);if(sc.deduit||!sc.fields.length)return o;const r={};for(const k in o)if(sc.par[k]&&!RO_TYPES.has(sc.par[k].type))r[k]=o[k];return r}
+const chmOpt=(champ,nom)=>(sch(T_PLAN).par[champ]?.select_options||[]).find(o=>norm(o.value)===norm(nom))?.id;
+async function chmEcrire(id,o){const c=chmCorps(o);
+  const r=id?await api(`/rows/table/${T_PLAN}/${id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(c)}):await api(`/rows/table/${T_PLAN}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});
+  majRow(T_PLAN,r);return r}
+async function chmReordonner(maj){ // maj : [{id,Ordre,...}]
+  if(!maj.length)return;const items=maj.map(chmCorps).map((x,i)=>({id:maj[i].id,...x}));
+  for(let i=0;i<items.length;i+=100){const r=await api(`/rows/table/${T_PLAN}/batch/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({items:items.slice(i,i+100)})});(r.items||[]).forEach(x=>majRow(T_PLAN,x))}}
+function chmFile(mid,sauf){return(S.rows[T_PLAN]||[]).filter(l=>chmActive(l)&&ids(l.Machine)[0]===mid&&l.id!==sauf).sort(chmTri)}
+const chmLib=(cid,mid)=>{const c=(S.rows[MODS.commandes.t]||[]).find(x=>x.id===cid),n=c?String(txt(c['N° affaire'])).trim().split(/\s+/)[0]:'';return[n,txt(chmMach(mid)?.Nom)].filter(Boolean).join(' – ')};
+
+/* Glisser-déposer : avant = id de la ligne devant laquelle placer, 'apres:<id>', ou null (fin de file) */
+async function chmDeplacer(lid,mid,avant){
+  const l=(S.rows[T_PLAN]||[]).find(x=>x.id===lid);if(!l)return;const ancien=ids(l.Machine)[0],rep=ids(l['Machine de repli'])[0];
+  const extra={};
+  if(ancien!==mid){const m=chmMach(mid),a=chmMach(ancien);if(!chmSecteursVus(true).includes(txt(m?.Secteur))){toast('Machine d’un autre secteur',true);return}
+    if(!confirm(`Passer ${chmNum(l)} de ${txt(a?.Nom)||'?'} sur ${txt(m?.Nom)} ?${rep===mid?`\n${txt(a?.Nom)} devient la machine de repli.`:''}`))return;
+    extra.Machine=[mid];extra['Libellé']=chmLib(ids(l.Affaire)[0],mid);if(rep===mid)extra['Machine de repli']=ancien?[ancien]:[]}
+  const F=chmFile(mid,lid);let pos=F.length;
+  if(avant!=null){const s=String(avant),apres=s.startsWith('apres:'),id=+s.replace('apres:',''),i=F.findIndex(x=>x.id===id);if(i>=0)pos=apres?i+1:i}
+  F.splice(pos,0,l);
+  const maj=F.map((x,i)=>({id:x.id,Ordre:(i+1)*10,...(x.id===lid?extra:{})})).filter(x=>x.id===lid||+((S.rows[T_PLAN]||[]).find(y=>y.id===x.id)?.Ordre)!==x.Ordre);
+  try{await chmReordonner(maj);toast(ancien!==mid?'Affaire déplacée sur '+txt(chmMach(mid)?.Nom):'Ordre de passage enregistré');dessinerCharges()}catch(e){toast('Échec : '+e.message,true)}
+}
+
+/* Fenêtre « Planifier / modifier » une ligne de planning. o.affaire : id de commande pré-choisi. */
+function chmEditer(id,o={}){
+  const l=id?(S.rows[T_PLAN]||[]).find(x=>x.id===id):null;if(id&&!l)return;
+  const ecr=peutEcrire('plan'),M=chmMachines(),Cmd=(S.rows[MODS.commandes.t]||[]);
+  const cid=l?ids(l.Affaire)[0]:o.affaire||null,mid=l?ids(l.Machine)[0]:(M.find(m=>!CHM.sect||txt(m.Secteur)===CHM.sect)||{}).id,rid=l?ids(l['Machine de repli'])[0]:null;
+  const enc=Cmd.filter(c=>c.id===cid||!AFF_FIN.test(txt(c.Statut))).sort((a,b)=>String(txt(b['N° affaire'])).localeCompare(String(txt(a['N° affaire']))));
+  const optM=(sel,vide)=>(vide?`<option value="">${vide}</option>`:'')+CHM_SECTEURS.concat(['']).map(s=>{const L=M.filter(m=>(txt(m.Secteur)||'')===s);return L.length?`<optgroup label="${esc(s||'Autre')}">${L.map(m=>`<option value="${m.id}" ${m.id===sel?'selected':''}>${esc(txt(m.Nom))} (${hFr(capM(m))}/j)</option>`).join('')}</optgroup>`:''}).join('');
+  const dis=ecr?'':'disabled',st=txt(l?.Statut)||'Planifiée';
+  ouvrirModal(l?'Planning – '+chmNum(l):'Planifier une affaire',`<div class="formU" style="padding:0">
+    <label style="grid-column:1/-1">Affaire <span style="color:var(--err)">*</span>${l||o.affaire?`<div style="padding:7px 0;font-weight:600">${esc(chmLib(cid))} – ${esc(txt(Cmd.find(c=>c.id===cid)?.Client))}<input type="hidden" id="cpA" value="${cid||''}"></div>`
+      :`<input id="cpQ" placeholder="Filtrer (n°, client)…" style="margin-bottom:4px"><select id="cpA" size="6">${enc.map(c=>`<option value="${c.id}">${esc(txt(c['N° affaire']))} – ${esc(txt(c.Client))} – ${esc(String(txt(c.Objet)).slice(0,50))}</option>`).join('')}</select>`}</label>
+    <label>Machine <span style="color:var(--err)">*</span><select id="cpM" ${dis}>${optM(mid)}</select></label>
+    <label>Machine de repli<select id="cpR" ${dis}>${optM(rid,'— aucune —')}</select></label>
+    <label>Heures estimées <span style="color:var(--err)">*</span><input id="cpH" type="number" min="0" step="0.5" value="${l?esc(l['Heures estimées']??''):''}" ${dis}></label>
+    <label>dont temps masqué (h)<input id="cpHm" type="number" min="0" step="0.5" value="${l?esc(l['Temps masqué (h)']??''):''}" ${dis}><span class="mut" style="font-size:11.5px">machine seule, sans opérateur</span></label>
+    <label>Fin d’usinage visée (facultatif)<input id="cpD" type="date" value="${esc(String(l?.['Délai']||'').slice(0,10))}" ${dis}><span class="mut" id="cpDh" style="font-size:11.5px"></span></label>
+    <label>Début au plus tôt<input id="cpT" type="date" value="${esc(String(l?.['Début au plus tôt']||'').slice(0,10))}" ${dis}><span class="mut" style="font-size:11.5px">attente matière, sous-traitance…</span></label>
+    ${l?`<label>Statut<select id="cpS" ${dis}>${['Planifiée','En cours','Terminée','Annulée'].map(x=>`<option ${x===st?'selected':''}>${x}</option>`).join('')}</select></label>`
+      :`<label>Ordre de passage<select id="cpP"><option value="fin">En fin de file</option><option value="tete">En tête de file</option></select></label>`}
+    <label style="grid-column:1/-1">Repères / pièces<input id="cpRep" value="${esc(txt(l?.['Repères']))}" placeholder="ex. rep 4, 5, 14" ${dis}></label>
+    <label style="grid-column:1/-1">Notes<textarea id="cpN" rows="2" style="width:100%;border:1px solid var(--trait);border-radius:7px;padding:7px 9px;margin-top:3px" ${dis}>${esc(txt(l?.Notes))}</textarea></label>
+    <div id="cpPrev" style="grid-column:1/-1;background:#F6F8FB;border-radius:8px;padding:10px 12px;font-size:13px"></div></div>`,
+    `${l&&ecr?`<button class="btn" id="cpAv" title="Passer avant l’affaire précédente">↑ Avancer</button><button class="btn" id="cpRe" title="Passer après l’affaire suivante">↓ Reculer</button>`:''}
+     ${l?`<a class="btn" href="#/commandes/${cid}" style="margin-right:auto">Ouvrir l’affaire</a>`:''}<button class="btn" onclick="fermerModal()">${ecr?'Annuler':'Fermer'}</button>${ecr?'<button class="btn p" id="cpOk">Enregistrer</button>':''}`);
+  const v=k=>$(k)?.value||'',cur=()=>id?(S.rows[T_PLAN]||[]).find(x=>x.id===id):null;
+  const prev=()=>{const c=Cmd.find(x=>x.id===+v('cpA')),dl=String(c?.['Date Livraison']||'').slice(0,10);
+    {const ds=c?chmDelaiSrc({Affaire:[{id:c.id}],Machine:[{id:+v('cpM')}]}):null;$('cpDh').textContent=v('cpD')?'remplace la date par défaut'+(ds?.d?' ('+dfr(ds.d)+', '+ds.src+')':''):ds?.d?'vide = '+dfr(ds.d)+' ('+ds.src+')':'pas de date de livraison';}
+    const m=+v('cpM'),h=+v('cpH')||0;if(!m||!c){$('cpPrev').innerHTML='<span class="mut">Choisissez l’affaire et la machine.</span>';return}
+    const L=(S.rows[T_PLAN]||[]).filter(x=>x.id!==id).slice(),F=chmFile(m,id);
+    const ordre=l&&ids(cur().Machine)[0]===m?cur().Ordre:v('cpP')==='tete'?(F.length?Math.min(...F.map(x=>+x.Ordre||0))-10:10):(F.length?Math.max(...F.map(x=>+x.Ordre||0))+10:10);
+    const st=v('cpS')||'Planifiée',fic={id:id||-1,Affaire:[{id:c.id}],Machine:[{id:m}],'Heures estimées':h,'Délai':v('cpD')||null,'Début au plus tôt':v('cpT')||null,Ordre:ordre,Statut:{value:st}};
+    L.push(fic);const Cc=chmCalcul(L),s=Cc.out.get(id||-1);
+    if(!s){$('cpPrev').innerHTML=/^(termin|annul)/i.test(st)?'<span class="mut">Ligne retirée du planning.</span>':'<span class="mut">—</span>';return}
+    const hm=Math.min(h,+v('cpHm')||0);
+    let t=`${h?`<div class="mut" style="font-size:12px;margin-bottom:3px">${hFr(h-hm)} opérateur · ${hFr(hm)} masqué</div>`:''}${s.aEstimer?'<b style="color:#C2410C">Heures à estimer</b>':`Sur <b>${esc(txt(chmMach(m)?.Nom))}</b> : début ${esc(jourCourt(s.deb))} → <b>fin prévue ${esc(jourCourt(s.fin))}</b>`} · délai ${s.delai?dfr(s.delai):'—'} · ${chmTexteDelai(s)}`;
+    const r=+v('cpR');if(r&&r!==m&&h){const fr=chmSimuler(Cc,r,h);if(fr){const mg=s.delai?ouvresEntre(fr,s.delai):null;t+=`<div style="margin-top:4px">Sur la machine de repli <b>${esc(txt(chmMach(r)?.Nom))}</b> (en fin de file) : fin ${esc(jourCourt(fr))}${mg!=null?` · ${mg<0?`<b style="color:var(--err)">retard ${-mg} j</b>`:`<span style="color:#15803D">marge ${mg} j</span>`}`:''}${ecr&&s.retard&&(mg==null||mg>=0)?` <button class="btn mini" id="cpBasc">Basculer sur ${esc(txt(chmMach(r)?.Nom))}</button>`:''}</div>`}}
+    $('cpPrev').innerHTML=t;
+    if($('cpBasc'))$('cpBasc').onclick=()=>{$('cpR').value=String(m);$('cpM').value=String(r);if($('cpP'))$('cpP').value='fin';prev()}};
+  ['cpM','cpR','cpH','cpHm','cpD','cpT','cpS','cpP','cpA'].forEach(k=>{if($(k)){$(k).oninput=prev;$(k).onchange=prev}});
+  if($('cpQ'))$('cpQ').oninput=()=>{const q=norm($('cpQ').value).split(/\s+/).filter(Boolean);[...$('cpA').options].forEach(op=>op.hidden=!q.every(w=>norm(op.textContent).includes(w)))};
+  prev();
+  const ordreDe=m=>{const F=chmFile(m,id);if(l&&ids(cur().Machine)[0]===m)return cur().Ordre;return v('cpP')==='tete'?(F.length?Math.min(...F.map(x=>+x.Ordre||0))-10:10):(F.length?Math.max(...F.map(x=>+x.Ordre||0))+10:10)};
+  if($('cpOk'))$('cpOk').onclick=async()=>{
+    const a=+v('cpA'),m=+v('cpM'),r=+v('cpR'),h=v('cpH');
+    if(!a){toast('Choisissez l’affaire',true);return}if(!m){toast('Choisissez la machine',true);return}if(h===''||+h<0){toast('Indiquez les heures estimées',true);return}
+    if(r===m){toast('La machine de repli doit être différente de la machine',true);return}
+    if((+v('cpHm')||0)>+h){toast('Le temps masqué ne peut pas dépasser les heures estimées',true);return}
+    const st=v('cpS')||'Planifiée',corps={'Libellé':chmLib(a,m),Affaire:[a],Machine:[m],'Machine de repli':r?[r]:[],'Heures estimées':+h,'Temps masqué (h)':+v('cpHm')||0,'Délai':v('cpD')||null,'Début au plus tôt':v('cpT')||null,
+      'Repères':v('cpRep'),Notes:v('cpN'),Ordre:ordreDe(m)};
+    const so=chmOpt('Statut',st);if(so)corps.Statut=so;
+    if(/^termin/i.test(st)&&!/^termin/i.test(txt(cur()?.Statut)))corps['Terminée le']=auj();
+    $('cpOk').disabled=true;
+    try{await chmEcrire(id,corps);fermerModal(true);toast(l?'Planning enregistré':'Affaire planifiée');if(location.hash.startsWith('#/charges'))dessinerCharges();else route()}
+    catch(e){toast('Échec : '+e.message,true);$('cpOk').disabled=false}};
+  const bouger=async d=>{const m=ids(cur().Machine)[0],F=chmFile(m);const i=F.findIndex(x=>x.id===id),j=i+d;if(i<0||j<0||j>=F.length){toast(d<0?'Déjà en tête de file':'Déjà en fin de file');return}
+    [F[i],F[j]]=[F[j],F[i]];const maj=F.map((x,k)=>({id:x.id,Ordre:(k+1)*10})).filter(x=>+((S.rows[T_PLAN]||[]).find(y=>y.id===x.id)?.Ordre)!==x.Ordre);
+    try{await chmReordonner(maj);toast('Ordre de passage enregistré');dessinerCharges();prev()}catch(e){toast('Échec : '+e.message,true)}};
+  if($('cpAv'))$('cpAv').onclick=()=>bouger(-1);if($('cpRe'))$('cpRe').onclick=()=>bouger(1);
+}
+
+/* Formulaire simple « Planifier une affaire » (15/11/2026) pour Arnaud et Christophe : pour chaque machine de leur
+   secteur, les heures prévues et, si besoin, la machine de repli. Une ligne de planning par machine renseignée, ajoutée
+   en fin de file. Les lignes déjà planifiées pour l'affaire sont pré-remplies (heures vidées → ligne Annulée). */
+function chmFormAffaire(cid){
+  const ecr=peutEcrire('plan');if(!ecr)return;
+  const Cmd=S.rows[MODS.commandes.t]||[],M=chmMachines().filter(m=>chmSecteursVus(true).includes(txt(m.Secteur))&&(!CHM.sect||txt(m.Secteur)===CHM.sect));
+  const enc=Cmd.filter(c=>!AFF_FIN.test(txt(c.Statut))).sort((a,b)=>String(txt(b['N° affaire'])).localeCompare(String(txt(a['N° affaire']))));
+  const secteurs=[...new Set(M.map(m=>txt(m.Secteur)))];
+  const choix=cid?'':`<div style="margin-bottom:12px"><input id="faQ" placeholder="Rechercher l’affaire (n°, client)…" style="width:100%;border:1px solid var(--trait);border-radius:7px;padding:8px 10px;font-size:14px">
+    <select id="faA" size="5" style="width:100%;margin-top:4px;border:1px solid var(--trait);border-radius:7px;padding:4px">${enc.map(c=>`<option value="${c.id}">${esc(txt(c['N° affaire']))} – ${esc(txt(c.Client))} – ${esc(String(txt(c.Objet)).slice(0,60))}</option>`).join('')}</select></div>`;
+  ouvrirModal('Planifier une affaire',`${choix}<div id="faEnt"></div>
+    <table class="l faT"><thead><tr><th style="cursor:default">Machine</th><th style="cursor:default;width:110px">Heures prévues</th><th style="cursor:default;width:170px">Machine de repli</th><th style="cursor:default">Fin prévue</th></tr></thead><tbody>
+    ${secteurs.map(se=>`${secteurs.length>1?`<tr class="faSe"><td colspan="4">${esc(se)}</td></tr>`:''}${M.filter(m=>txt(m.Secteur)===se).map(m=>`<tr data-m="${m.id}">
+      <td><b>${esc(txt(m.Nom))}</b></td>
+      <td><input type="number" min="0" step="0.5" class="faH" data-m="${m.id}" placeholder="—"> h</td>
+      <td><select class="faR" data-m="${m.id}"><option value="">—</option>${M.filter(x=>txt(x.Secteur)===se&&x.id!==m.id).map(x=>`<option value="${x.id}">${esc(txt(x.Nom))}</option>`).join('')}</select></td>
+      <td class="faF" data-m="${m.id}"></td></tr>`).join('')}`).join('')}</tbody></table>
+    <p class="mut" style="font-size:12px;margin:10px 0 0">Ne remplissez que les machines qui travaillent sur l’affaire. Elle est ajoutée en fin de file sur chaque machine ; l’ordre se change ensuite en glissant les cadres.</p>`,
+    `<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="faOk">Enregistrer</button>`);
+  const bx=$('modal').querySelector('.box');bx.style.width='min(720px,96vw)';
+  let A=cid||null;
+  const existantes=()=>(S.rows[T_PLAN]||[]).filter(l=>ids(l.Affaire)[0]===A&&chmActive(l));
+  const remplir=()=>{const c=Cmd.find(x=>x.id===A);
+    $('faEnt').innerHTML=c?`<div style="background:#F6F8FB;border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:13px"><b>${esc(txt(c['N° affaire']))}</b> – ${esc(txt(c.Client))} – ${esc(txt(c.Objet))}<div class="mut" style="font-size:12px">Livraison client ${c['Date Livraison']?dfr(String(c['Date Livraison']).slice(0,10)):'—'}</div></div>`:'<div class="mut" style="margin-bottom:10px">Choisissez l’affaire.</div>';
+    document.querySelectorAll('.faH').forEach(i=>{const l=existantes().find(x=>ids(x.Machine)[0]===+i.dataset.m);i.value=l?(l['Heures estimées']??''):'';
+      const r=document.querySelector(`.faR[data-m="${i.dataset.m}"]`);r.value=l?String(ids(l['Machine de repli'])[0]||''):''});
+    apercu()};
+  const apercu=()=>{if(!A){document.querySelectorAll('.faF').forEach(t=>t.innerHTML='');return}
+    const L=(S.rows[T_PLAN]||[]).filter(l=>!(ids(l.Affaire)[0]===A&&M.some(m=>m.id===ids(l.Machine)[0]))).slice();let k=-1;
+    document.querySelectorAll('.faH').forEach(i=>{const h=+i.value||0,m=+i.dataset.m;if(!h)return;const old=existantes().find(x=>ids(x.Machine)[0]===m);
+      const F=chmFile(m,old?.id);L.push({id:k--,Affaire:[{id:A}],Machine:[{id:m}],'Heures estimées':h,Ordre:old?old.Ordre:(F.length?Math.max(...F.map(x=>+x.Ordre||0))+10:10),Statut:old?.Statut||{value:'Planifiée'},'Délai':old?.['Délai']||null,'Début au plus tôt':old?.['Début au plus tôt']||null})});
+    const Cc=chmCalcul(L);
+    document.querySelectorAll('.faF').forEach(td=>{const m=+td.dataset.m,s=[...Cc.out.values()].find(x=>x.l.id<0&&ids(x.l.Machine)[0]===m);
+      if(!s){td.innerHTML='';return}
+      let t=`<span style="display:inline-block;padding:1px 7px;border-radius:5px;border:1px solid;${chmGrad(s,1,1)}">${esc(jourCourt(s.fin))}</span> <span style="font-size:11.5px">${s.delai?chmTexteDelai(s):''}</span>`;
+      const r=+document.querySelector(`.faR[data-m="${m}"]`).value;
+      if(r&&s.retard){const fr=chmSimuler(Cc,r,chmH(s.l));if(fr){const mg=ouvresEntre(fr,s.delai);t+=`<div style="font-size:11.5px" class="mut">sur ${esc(txt(chmMach(r)?.Nom))} : ${esc(jourCourt(fr))} ${mg<0?`<b style="color:var(--err)">retard ${-mg} j</b>`:`<span style="color:#15803D">à l’heure</span>`}</div>`}}
+      td.innerHTML=t});
+    const s0=[...Cc.out.values()].find(x=>x.l.id<0);if(s0&&$('faEnt').firstChild)$('faEnt').querySelector('.mut').innerHTML=`Livraison client ${dfr(String(Cmd.find(x=>x.id===A)?.['Date Livraison']||'').slice(0,10))||'—'} · fin d’usinage visée <b>${dfr(s0.delai)||'—'}</b> (${esc(chmDelaiSrc(s0.l).src)})`};
+  document.querySelectorAll('.faH,.faR').forEach(i=>{i.oninput=apercu;i.onchange=apercu});
+  if($('faA')){$('faA').onchange=()=>{A=+$('faA').value||null;remplir()};
+    $('faQ').oninput=()=>{const q=norm($('faQ').value).split(/\s+/).filter(Boolean);[...$('faA').options].forEach(o=>o.hidden=!q.every(w=>norm(o.textContent).includes(w)))};setTimeout(()=>$('faQ').focus(),50)}
+  else setTimeout(()=>document.querySelector('.faH')?.focus(),50);
+  remplir();
+  $('faOk').onclick=async()=>{if(!A){toast('Choisissez l’affaire',true);return}
+    const lignes=[...document.querySelectorAll('.faH')].map(i=>({m:+i.dataset.m,h:i.value===''?0:+i.value,r:+document.querySelector(`.faR[data-m="${i.dataset.m}"]`).value||null,old:existantes().find(x=>ids(x.Machine)[0]===+i.dataset.m)}));
+    if(lignes.some(x=>x.h<0||isNaN(x.h))){toast('Heures invalides',true);return}
+    const aFaire=lignes.filter(x=>x.h>0||x.old);if(!aFaire.length){toast('Indiquez les heures prévues sur au moins une machine',true);return}
+    const so=chmOpt('Statut','Planifiée'),sa=chmOpt('Statut','Annulée');$('faOk').disabled=true;
+    try{for(const x of aFaire){
+        if(x.old&&!x.h){await chmEcrire(x.old.id,sa?{Statut:sa}:{'Heures estimées':0});continue}
+        const corps={'Libellé':chmLib(A,x.m),Affaire:[A],Machine:[x.m],'Machine de repli':x.r?[x.r]:[],'Heures estimées':x.h};
+        if(!x.old){const F=chmFile(x.m);corps.Ordre=F.length?Math.max(...F.map(y=>+y.Ordre||0))+10:10;if(so)corps.Statut=so}
+        await chmEcrire(x.old?.id||null,corps)}
+      fermerModal(true);toast('Affaire planifiée');if(location.hash.startsWith('#/charges'))dessinerCharges();else route()}
+    catch(e){toast('Échec : '+e.message,true);$('faOk').disabled=false}};
+}
+
+/* Vue « Semaine » (14–15/11/2026) : les 7 jours à venir, samedi / dimanche étroits et vides, 7 h – 17 h en créneaux de 2 h.
+   Une ligne par machine ; dans chaque jour, les affaires placées à l'heure près (n°, client, repères / objet, horaire). */
+const CHM_JOUR={debut:7,fin:17,pause:null}; // 5 créneaux de 2 h (Matthias, 15/11/2026) ; pause possible : [12,13]
+const chmFenetre=()=>CHM_JOUR.fin-CHM_JOUR.debut-(CHM_JOUR.pause?CHM_JOUR.pause[1]-CHM_JOUR.pause[0]:0);
+/* heure d'horloge d'une position u (heures de travail depuis le début de journée) ; debut=true : après la pause */
+function chmHorloge(u,debut){let t=CHM_JOUR.debut+u;const p=CHM_JOUR.pause;if(p&&(t>p[0]+1e-9||(debut&&t>=p[0]-1e-9)))t+=p[1]-p[0];return t}
+const hHeure=t=>{const h=Math.floor(t+1e-9),m=Math.round((t-h)*60);return m?`${h}h${String(m).padStart(2,'0')}`:`${h}h`};
+/* heures de travail déjà écoulées aujourd'hui (pour démarrer le planning à l'heure actuelle) */
+function chmEcoule(){const n=new Date(),t=n.getHours()+n.getMinutes()/60,p=CHM_JOUR.pause;let u=Math.max(0,Math.min(t,CHM_JOUR.fin)-CHM_JOUR.debut);
+  if(p&&t>p[0])u-=Math.min(t,p[1])-p[0];return Math.max(0,u)}
+function dessinerChmSemaine(C,Ms){
+  /* 15/11/2026 (Matthias) : 7 jours glissants ; samedi et dimanche gris et étroits, rien n'y est planifié ; jours ouvrés
+     larges en 5 créneaux de 2 h (7 h – 17 h) ; un seul cadre par affaire, du début à la fin prévue, même sur plusieurs
+     jours (le texte n° d'affaire + code client peut dépasser) ; 3 lignes par machine (les affaires se suivent en
+     alternant les lignes pour que les textes ne se chevauchent pas). */
+  const a0=auj();if(!CHM.sem||!/^\d{4}-\d{2}-\d{2}$/.test(CHM.sem))CHM.sem=a0;
+  const jours=[...Array(7)].map((_,i)=>isoAdd(CHM.sem,i)),D=CHM_JOUR.fin-CHM_JOUR.debut,PAS=2,LIGNES=3;
+  const lg=j=>jourOuvre(j)?D:1.4,tot=jours.reduce((s,j)=>s+lg(j),0),off={};let acc=0;for(const j of jours){off[j]=acc;acc+=lg(j)}
+  const X=(j,t)=>off[j]!=null?(off[j]+(jourOuvre(j)?Math.max(0,Math.min(D,t-CHM_JOUR.debut)):0))/tot*100:null;
+  const W=j=>lg(j)/tot*100,fin=jours[6];
+  const fond=jours.map(j=>`<div class="swF ${jourOuvre(j)?'':'we'} ${j===a0?'auj':''}" style="left:${X(j,CHM_JOUR.debut)}%;width:${W(j)}%;--pas:${PAS/D*100}%"></div>`).join('');
+  let maint='';if(jourOuvre(a0)&&off[a0]!=null){const n=new Date(),t=Math.min(CHM_JOUR.fin,n.getHours()+n.getMinutes()/60);
+    if(t>CHM_JOUR.debut)maint=`<div class="swPasse" style="left:${X(a0,CHM_JOUR.debut)}%;width:${X(a0,t)-X(a0,CHM_JOUR.debut)}%"></div>`+(t<CHM_JOUR.fin?`<div class="swMaint" style="left:${X(a0,t)}%"></div>`:'')}
+  const tete=jours.map(j=>{const o=jourOuvre(j),dt=new Date(j+'T12:00:00Z');
+    return`<div class="swJt ${o?'':'we'} ${j===a0?'auj':''}" style="left:${X(j,CHM_JOUR.debut)}%;width:${W(j)}%">${o?`<b>${esc(dt.toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'short',timeZone:'UTC'}))}</b>${estFerie(j)?' <span>férié</span>':''}
+      <div class="swH">${[...Array(D/PAS)].map((_,i)=>`<i style="left:${i*PAS/D*100}%">${CHM_JOUR.debut+i*PAS} h</i>`).join('')}</div>`:`<b title="${esc(dt.toLocaleDateString('fr-FR',{weekday:'long',timeZone:'UTC'}))}">${esc(dt.toLocaleDateString('fr-FR',{weekday:'narrow',timeZone:'UTC'}))}</b>`}</div>`}).join('');
+  let h=`<div class="chCalNav"><button class="btn" data-sw="-7">‹</button><b style="min-width:230px;text-align:center">${esc(jourCourt(jours[0]))} → ${esc(jourCourt(fin))}</b><button class="btn" data-sw="7">›</button><button class="btn" data-sw="0">Aujourd’hui</button>
+    <span class="mut" style="margin-left:auto;font-size:12.5px">créneaux de 2 h, ${CHM_JOUR.debut} h – ${CHM_JOUR.fin} h · rien le samedi ni le dimanche</span></div>
+  <div class="swWrap"><div class="swGrid"><div class="swRow swTete"><div class="swNom"></div><div class="swPiste" style="height:40px">${tete}</div></div>`;
+  let sect='';
+  for(const m of Ms){const se=txt(m.Secteur),cap=capM(m),P=C.parM.get(m.id);
+    if(!CHM.sect&&se!==sect){sect=se;h+=`<div class="swSect">${esc(se||'Sans secteur')}</div>`}
+    const ouvres=jours.filter(jourOuvre),hSem=P.seg.reduce((s,x)=>s+x.jours.filter(y=>ouvres.includes(y.j)).reduce((a,y)=>a+y.h,0),0),capSem=ouvres.length*cap;
+    h+=`<div class="swRow"><div class="swNom"><a href="#/machines/${m.id}" class="prim">${esc(txt(m.Nom))}</a><div class="mut">${hFr(hSem)} / ${hFr(capSem)}</div><div class="swJauge"><div style="width:${capSem?Math.min(100,hSem/capSem*100):0}%"></div></div></div>
+      <div class="swPiste" data-m="${m.id}">${fond}${maint}`;
+    let n=0;
+    for(const s of P.seg){const J=s.jours.filter(y=>off[y.j]!=null),t=chmH(s.l);
+      let x0,x1,f0=0,f1=1;
+      if(J.length){const a=J[0],b=J[J.length-1];x0=X(a.j,chmHorloge(a.u0,true));x1=X(b.j,chmHorloge(b.u0+b.h,false));if(t){f0=a.cum/t;f1=(b.cum+b.h)/t}}
+      else if(!t&&off[s.deb]!=null){x0=X(s.deb,chmHorloge(s.debU,true));x1=x0}
+      else{n++;continue}
+      const lane=n++%LIGNES,c=chmCde(s.l),code=chmCodeCli(c),suite=J.length&&J[0].cum>0?'… ':'';
+      h+=`<div class="swBloc ${s.aEstimer?'e_est':''}${chmEnCours(s.l)?' encours':''}" draggable="${peutEcrire('plan')}" data-l="${s.l.id}" style="left:${x0}%;width:${s.aEstimer?'':`calc(${x1-x0}% - 1px)`};top:${5+lane*27}px;${chmGrad(s,f0,f1)}" title="${esc(chmInfobulle(s))}">
+        <span class="lab">${suite}<b>${esc(chmNum(s.l))}</b> ${esc(code)}${s.aEstimer?' · ? h':''}</span></div>`}
+    for(const s of P.seg)if(s.delai&&off[s.delai]!=null&&jourOuvre(s.delai))h+=`<div class="swDl" style="left:${X(s.delai,CHM_JOUR.fin)}%;${chmCss(s)}" data-l="${s.l.id}" title="Fin visée de ${esc(chmNum(s.l))} : ${dfr(s.delai)} (${esc(chmDelaiSrc(s.l).src)}) – fin prévue ${dfr(s.fin)}">⚑ ${esc(chmNum(s.l))}</div>`;
+    h+=`</div></div>`}
+  h+=`</div></div><div class="plus mut" style="font-size:12.5px;text-align:left">Un cadre par affaire, de son début à sa fin prévue. ${'Couleur = avance sur la fin d’usinage visée (délai de la fiche atelier, sinon livraison client − 1 jour) : <span style="display:inline-block;width:90px;height:9px;border-radius:5px;vertical-align:middle;background:linear-gradient(90deg,hsl(125,60%,45%),hsl(30,85%,55%),hsl(0,75%,55%))"></span> chaque affaire part du vert et tend vers l’orange ou le rouge à sa fin si elle termine près de la fin visée ou après'} · gris pointillé : heures à estimer · trait bleu à gauche : en cours · ⚑ : fin visée · trait rouge : maintenant. Survolez une affaire pour le détail, cliquez pour la modifier${peutEcrire('plan')?', glissez-la sur une autre pour changer l’ordre de passage ou la machine':''}.</div>`;
+  $('chCorps').innerHTML=h;
+  document.querySelectorAll('[data-sw]').forEach(b=>b.onclick=()=>{const n=+b.dataset.sw;CHM.sem=n?isoAdd(CHM.sem,n):a0;chmSauve();dessinerCharges()});
+  document.querySelectorAll('.swBloc[data-l],.swDl[data-l]').forEach(b=>{b.onclick=e=>{e.stopPropagation();chmEditer(+b.dataset.l)};
+    if(b.classList.contains('swBloc')){b.ondragstart=e=>{e.dataTransfer.setData('text/plain',b.dataset.l);b.classList.add('drag')};b.ondragend=()=>b.classList.remove('drag')}});
+  if(peutEcrire('plan'))document.querySelectorAll('.swPiste[data-m]').forEach(p=>{
+    p.ondragover=e=>{e.preventDefault();p.classList.add('survol')};p.ondragleave=()=>p.classList.remove('survol');
+    p.ondrop=e=>{e.preventDefault();p.classList.remove('survol');const lid=+e.dataTransfer.getData('text/plain');if(!lid)return;
+      const cible=e.target.closest('.swBloc');let avant=null;
+      if(cible&&+cible.dataset.l!==lid){const r=cible.getBoundingClientRect();avant=e.clientX<r.left+r.width/2?+cible.dataset.l:'apres:'+cible.dataset.l}
+      chmDeplacer(lid,+p.dataset.m,avant)}});
+}
+/* code client de la commande (« Client (code) », sinon fiche client), à défaut le nom */
+function chmCodeCli(c){if(!c)return'';const k=txt(c['Client (code)']);if(k)return k;const cl=(S.rows[MODS.clients.t]||[]).find(x=>x.id===ids(c.Client)[0]);return txt(cl?.['Code client'])||txt(c.Client)}
+
+/* ---------- Coût de revient prévisionnel d'une affaire (13/11/2026) ----------
+   Prix de vente HT (Commandes « Montant HT (€) ») − achats affectés à l'affaire (lignes de commandes fournisseurs
+   non annulées : matière, outillage spécifique, sous-traitance ; frais de port répartis au prorata) − heures prévues
+   au planning × taux horaires de la machine (« Taux opérateur (€/h) » pour le temps opérateur, « Taux masqué (€/h) »
+   pour le temps masqué). Tendance seulement : heures prévues, pas réalisées. Réservé à qui voit tous les secteurs
+   (Direction ; Sébastien plus tard). */
+const CF_LIGNES_T=1263349,CHM_SEUIL=0.15;
+const chmTaux=m=>({op:+m?.['Taux opérateur (€/h)']||0,masq:+m?.['Taux masqué (€/h)']||0});
+const chmHm=l=>Math.min(chmH(l),Math.max(0,+l['Temps masqué (h)']||0));
+async function chmChargerRevient(){await Promise.all([charger(T_PLAN),charger(T_MACH),charger(MODS.commandes.t),charger(MODS.cf.t),charger(CF_LIGNES_T),charger(MODS.fournisseurs.t)])}
+function chmRevient(cid){
+  const c=(S.rows[MODS.commandes.t]||[]).find(x=>x.id===cid)||{},pv=+c['Montant HT (€)']||0,scL=sch(CF_LIGNES_T),LL=S.rows[CF_LIGNES_T]||[],FO=S.rows[MODS.fournisseurs.t]||[];
+  const achats=[],autresDev=[],aRepartir=[];
+  for(const cf of S.rows[MODS.cf.t]||[]){if(/annul/i.test(txt(cf.Statut)))continue;
+    const L=LL.filter(l=>ids(l.Commande).includes(cf.id)),affs=ids(cf.Affaire);
+    const lig=L.map(l=>{const v=affLue(l,scL),fr=AFF_FRAIS.test(l.Description||'');return{l,fr,v:v||(fr?'prorata':''),mt:(+l['Quantité']||0)*(+l['Prix unitaire']||0)}});
+    const pieces=lig.filter(x=>!x.fr),frais=lig.filter(x=>x.fr),parLigne=pieces.some(x=>x.v&&x.v!=='prorata');
+    let part=null;
+    if(parLigne)part=pieces.filter(x=>String(x.v)===String(cid));
+    else if(affs.includes(cid)){if(affs.length===1&&!/stock|maint|invest/i.test(txt(cf.Affectation)))part=pieces;else{aRepartir.push(cf);continue}}
+    if(!part||(!part.length&&!frais.some(x=>String(x.v)===String(cid))))continue;
+    const totP=pieces.reduce((s,x)=>s+x.mt,0),mP=part.reduce((s,x)=>s+x.mt,0);
+    const mF=frais.reduce((s,x)=>s+(String(x.v)===String(cid)?x.mt:/^\d+$/.test(String(x.v))?0:totP?x.mt*mP/totP:0),0);
+    const four=FO.find(f=>f.id===ids(cf.Fournisseur)[0]),dev=txt(cf.Devise)||txt(four?.Devise)||'EUR';
+    const a={cf,num:txt(cf['N° CF'])||'#'+cf.id,four:txt(cf.Fournisseur),statut:txt(cf.Statut),mt:Math.round((mP+mF)*100)/100,frais:Math.round(mF*100)/100,dev,
+      desc:part.map(x=>String(x.l.Description||'').split('\n')[0]).filter(Boolean)};
+    (/^(eur|€)$/i.test(dev)?achats:autresDev).push(a)}
+  const heures=(S.rows[T_PLAN]||[]).filter(l=>ids(l.Affaire).includes(cid)&&!/^annul/i.test(txt(l.Statut))).map(l=>{
+    const m=(S.rows[T_MACH]||[]).find(x=>x.id===ids(l.Machine)[0]),t=chmTaux(m),h=chmH(l),hm=chmHm(l),hop=h-hm;
+    return{l,m,h,hm,hop,t,cout:hop*t.op+hm*t.masq,manque:(hop>0&&!t.op)||(hm>0&&!t.masq)}});
+  const tA=achats.reduce((s,x)=>s+x.mt,0),tH=heures.reduce((s,x)=>s+x.cout,0),total=tA+tH,marge=pv-total;
+  return{c,pv,achats,autresDev,aRepartir,heures,tA,tH,total,marge,pct:pv?marge/pv:null,hTot:heures.reduce((s,x)=>s+x.h,0),
+    manqueTaux:heures.some(x=>x.manque),aEstimer:!heures.length||heures.some(x=>!x.h)}}
+const chmCoulMarge=p=>p==null?'var(--mut)':p<0?'var(--err)':p<CHM_SEUIL?'#C2410C':'#15803D';
+const pctFr=p=>p==null?'—':(Math.round(p*1000)/10).toLocaleString('fr-FR')+' %';
+async function chmAfficherRevient(cid){
+  ouvrirModal('Coût de revient prévisionnel','<div class="charge">Chargement…</div>','<button class="btn" onclick="fermerModal()">Fermer</button>');
+  try{await chmChargerRevient()}catch(e){$('mCorps').innerHTML=`<div class="vide">Erreur : ${esc(e.message)}</div>`;return}
+  const R=chmRevient(cid),c=R.c,bx=$('modal').querySelector('.box');bx.style.width='min(860px,96vw)';bx.style.maxHeight='88vh';
+  $('mTitre').textContent='Coût de revient prévisionnel – '+txt(c['N° affaire']);
+  const ligne=(a,b,st='')=>`<tr><td style="${st}">${a}</td><td class="n" style="${st}">${b}</td></tr>`;
+  let h=`<div class="mut" style="margin-bottom:10px">${esc(txt(c.Client))} · ${esc(txt(c.Objet))}</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px">
+    <div class="card kpi" style="padding:10px"><div class="lab">Prix de vente HT</div><div class="val" style="font-size:20px">${eur(R.pv)}</div></div>
+    <div class="card kpi" style="padding:10px"><div class="lab">Achats</div><div class="val" style="font-size:20px">${eur(R.tA)}</div></div>
+    <div class="card kpi" style="padding:10px"><div class="lab">Heures (${hFr(R.hTot)})</div><div class="val" style="font-size:20px">${eur(R.tH)}</div></div>
+    <div class="card kpi" style="padding:10px"><div class="lab">Marge prévisionnelle</div><div class="val" style="font-size:20px;color:${chmCoulMarge(R.pct)}">${eur(R.marge)}</div><div class="det" style="color:${chmCoulMarge(R.pct)}">${pctFr(R.pct)}</div></div></div>`;
+  const al=[];if(!R.pv)al.push('Montant HT de la commande vide.');if(R.manqueTaux)al.push('Taux horaires à saisir sur une ou plusieurs machines (Paramètres › Machines).');
+  if(R.aEstimer)al.push(R.heures.length?'Heures à estimer sur une ligne de planning.':'Aucune heure planifiée pour cette affaire.');
+  if(R.autresDev.length)al.push('Achats en devise non comptés : '+R.autresDev.map(a=>`${esc(a.num)} ${nb(a.mt)} ${esc(a.dev)}`).join(', ')+'.');
+  if(R.aRepartir.length)al.push('Commandes fournisseurs multi-affaires sans affectation ligne par ligne, non comptées : '+R.aRepartir.map(cf=>`<a href="#/affecter/${cf.id}" onclick="fermerModal(true)">${esc(txt(cf['N° CF'])||'#'+cf.id)}</a>`).join(', ')+'.');
+  if(al.length)h+=`<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;color:#9A3412">${al.map(x=>'⚠ '+x).join('<br>')}</div>`;
+  h+=`<h4 style="margin:6px 0">Achats affectés</h4><table class="l"><tbody>${R.achats.length?R.achats.map(a=>ligne(`<a href="#/cf/${a.cf.id}" onclick="fermerModal(true)">${esc(a.num)}</a> · ${esc(a.four)} <span class="mut">${esc(a.statut)}</span><div class="mut" style="font-size:11.5px">${esc(a.desc.slice(0,4).join(' · '))}${a.desc.length>4?' …':''}${a.frais?` · dont frais ${eur(a.frais)}`:''}</div>`,eur(a.mt))).join(''):ligne('<span class="mut">Aucun achat affecté à cette affaire</span>','—')}
+    ${ligne('<b>Total achats</b>','<b>'+eur(R.tA)+'</b>')}</tbody></table>
+  <h4 style="margin:14px 0 6px">Heures prévues au planning</h4><table class="l"><thead><tr><th style="cursor:default">Machine</th><th class="n" style="cursor:default">Opérateur</th><th class="n" style="cursor:default">Masqué</th><th class="n" style="cursor:default">Taux op. / masqué</th><th class="n" style="cursor:default">Coût</th></tr></thead><tbody>
+    ${R.heures.map(x=>`<tr><td>${esc(txt(x.m?.Nom)||'?')} <span class="mut">${esc(txt(x.l.Statut))}</span></td><td class="n">${hFr(x.hop)}</td><td class="n">${hFr(x.hm)}</td><td class="n" style="${x.manque?'color:var(--err)':''}">${x.t.op?eur(x.t.op):'?'} / ${x.t.masq?eur(x.t.masq):'?'}</td><td class="n">${eur(x.cout)}</td></tr>`).join('')||'<tr><td colspan="5" class="mut">Aucune ligne de planning</td></tr>'}
+    <tr><td><b>Total heures</b></td><td class="n">${hFr(R.heures.reduce((s,x)=>s+x.hop,0))}</td><td class="n">${hFr(R.heures.reduce((s,x)=>s+x.hm,0))}</td><td></td><td class="n"><b>${eur(R.tH)}</b></td></tr></tbody></table>
+  <table class="l" style="margin-top:14px"><tbody>${ligne('Prix de vente HT',eur(R.pv))}${ligne('− Achats',eur(R.tA))}${ligne('− Heures',eur(R.tH))}${ligne('<b>= Coût de revient</b>','<b>'+eur(R.total)+'</b>')}${ligne(`<b>Marge prévisionnelle</b>`,`<b>${eur(R.marge)} · ${pctFr(R.pct)}</b>`,`color:${chmCoulMarge(R.pct)}`)}</tbody></table>
+  <p class="mut" style="font-size:12px;margin-top:10px">Tendance calculée sur les heures prévues (pas les heures réalisées) et les commandes fournisseurs enregistrées dans Akteev (hors annulées). Vert : marge ≥ ${Math.round(CHM_SEUIL*100)} % · orange : moins · rouge : perte.</p>`;
+  $('mCorps').innerHTML=h;
+  $('mPied').innerHTML=`<a class="btn" href="#/charges" onclick="fermerModal(true)">Charges machines</a><button class="btn" onclick="fermerModal()">Fermer</button>`;
 }
 
 /* ---------- Non-conformités ----------
@@ -1553,6 +2119,8 @@ function dessinerFiche(){
     <div class="act">${k==='depot'&&!nouveau?boutonsDepot(row,true):''}${k==='bl'&&!nouveau?boutonPdfBL(row,true):''}${lienEditeur&&k!=='devis'?`<a class="btn ${k==='bl'?'':'p'}" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>${/^FA_.+\.pdf$/i.test(x.fichier)&&peutEcrire('taches')&&ids(row.Commande).length?`<button class="btn vert" data-fat="${esc(x.fichier)}" title="Rouvrir et modifier ${esc(x.fichier)}">${ico('crayon')}Modifier</button>`:''}`).join(''):''}
     ${/* Devis : ordre de travail = comparatif SST → éditeur → réponse au client, dégradé de bleu clair → bleu Akteev */''}
+    ${k==='commandes'&&!nouveau&&peutEcrire('plan')?`<button class="btn" id="bPlan" title="Heures prévues par machine et machine de repli">${ico('cal')}Planifier l’usinage</button>`:''}
+    ${k==='commandes'&&!nouveau&&chmRentab()?`<button class="btn" id="bRev" title="Achats affectés + heures prévues au planning × taux horaires">${ico('euro')}Coût de revient</button>`:''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn dg1" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
     ${k==='devis'&&lienEditeur?`<a class="btn dg2" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn dg3" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
@@ -1573,6 +2141,8 @@ function dessinerFiche(){
   $('main').innerHTML=h;
   brancherChamps();
   if($('bRep')){$('bRep').onclick=()=>repondreClient(SALE.row);prechargerMSAL()}
+  if($('bPlan'))$('bPlan').onclick=async()=>{try{await Promise.all([charger(T_PLAN),charger(T_MACH),charger(MODS.commandes.t),peutVoir('taches')?charger(MODS.taches.t).catch(()=>[]):null]);chmFormAffaire(SALE.row.id)}catch(e){toast('Erreur : '+e.message,true)}};
+  if($('bRev'))$('bRev').onclick=()=>chmAfficherRevient(SALE.row.id);
   if($('bCmp'))$('bCmp').onclick=()=>comparerSST(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if(k==='devis'&&!nouveau&&peutVoir('consult')&&!S.rows[MODS.consult.t])charger(MODS.consult.t).then(()=>{if(SALE&&SALE.k==='devis'&&SALE.id===row.id&&!Object.keys(SALE.draft).length)dessinerFiche()}).catch(()=>{});
   if($('bCfPdf')){$('bCfPdf').onclick=()=>cfEditer(SALE.row);prechargerMSAL()}
@@ -1778,7 +2348,7 @@ async function editerLigne(t,x,r){
    regroupées par client. Les frais (transport, port, emballage, remise…) sont « répartis au prorata du montant ».
    Écrit : Lignes → champs « Affectation » + « Affaire » s'ils existent, sinon une ligne « Affectation : … » en fin de Précisions ;
    Commande → Affectation (Affaire / Stock / Multi-affaires si l'option existe), lien Affaire = toutes les affaires choisies. */
-const AFF_FIN=/^(livr|sold|annul|perdu)/i, AFF_FRAIS=/^(transport|frais|port|emballage|remise|livraison|delivery)/i, AFF_TAG=/^Affectation\s*:/i;
+const AFF_FIN=/^(livr|sold|annul|perdu)/i, AFF_FRAIS=/^(transport|frais|port|emballage|remise|livraison|delivery)\b/i, AFF_TAG=/^Affectation\s*:/i;
 let AFFX=null;
 function affOptions(sel,frais){
   const C=(S.rows[MODS.commandes.t]||[]).filter(c=>!AFF_FIN.test(txt(c.Statut))&&/^D\d/.test(txt(c['N° affaire'])));
@@ -3284,12 +3854,12 @@ const T_DROITS=1285300;
 const ONGLETS_ACCES=[
  ['devis','Devis','avec les lignes de devis'],['consult','Consultations SST / DDP','avec les prix SST'],['commandes','Commandes',''],
  ['arc','ARC','avec les lignes'],['bl','Bons de livraison','avec les lignes'],['clients','Clients',''],['taches','Tâches',''],
- ['synthese','Synthèse pièces',''],['nc','Non-conformités','et Synthèse NC'],['cf','Commandes fournisseurs','avec les lignes'],
+ ['synthese','Synthèse pièces',''],['chfraisage','Charges machines – fraisage','planning des machines de fraisage'],['chtournage','Charges machines – tournage','planning des machines de tournage'],['nc','Non-conformités','et Synthèse NC'],['cf','Commandes fournisseurs','avec les lignes'],
  ['fournisseurs','Fournisseurs',''],['referents','Référents','nécessaire aux tâches et à « Je suis »'],['catalogue','Catalogue de tâches',''],['amelio','Améliorations Akteev','idées à revoir en réunion'],['stats','Statistiques','onglet pas encore réactivé']];
 const PROFILS_ACCES=[['commercial','Commercial'],['atelier','Atelier']];
 /* Niveaux par défaut (= ceux codés dans la passerelle quand rien n'est réglé). */
-const DEF_ACCES={commercial:{devis:'E',consult:'E',commandes:'E',arc:'E',bl:'E',clients:'E',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'E',referents:'E',catalogue:'E',amelio:'E',stats:'N'},
- atelier:{devis:'N',consult:'E',commandes:'L',arc:'N',bl:'L',clients:'L',taches:'E',synthese:'E',nc:'E',cf:'E',fournisseurs:'L',referents:'L',catalogue:'E',amelio:'N',stats:'N'}};
+const DEF_ACCES={commercial:{devis:'E',consult:'E',commandes:'E',arc:'E',bl:'E',clients:'E',taches:'E',synthese:'E',chfraisage:'N',chtournage:'N',nc:'E',cf:'E',fournisseurs:'E',referents:'E',catalogue:'E',amelio:'E',stats:'N'},
+ atelier:{devis:'N',consult:'E',commandes:'L',arc:'N',bl:'L',clients:'L',taches:'E',synthese:'E',chfraisage:'N',chtournage:'N',nc:'E',cf:'E',fournisseurs:'L',referents:'L',catalogue:'E',amelio:'N',stats:'N'}};
 const NIV={E:'Écriture',L:'Lecture',N:'Aucun'};
 const lireNiv=s=>{const o={};for(const m of String(s||'').replace(/\\/g,'').matchAll(/([a-z]+)\s*[:=]\s*([ELN])/gi)){const k=m[1].toLowerCase();if(ONGLETS_ACCES.some(x=>x[0]===k))o[k]=m[2].toUpperCase()}return o};
 const ecrireNiv=o=>ONGLETS_ACCES.filter(([k])=>o[k]).map(([k])=>k+':'+o[k]).join(' ');
