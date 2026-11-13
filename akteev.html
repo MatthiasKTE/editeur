@@ -2257,24 +2257,33 @@ function corpsEml(raw){const dec=(h,c)=>{const cs=(h.match(/charset="?([\w-]+)/i
     if(/content-disposition:\s*attachment/i.test(h))return;
     if(/text\/plain/i.test(ct))txt.push(dec(h,c));else if(/text\/html/i.test(ct))html.push(dec(h,c).replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' '))});
   return(txt.join('\n')||html.join('\n')).replace(/\s+/g,' ').slice(0,5000)}
+/* Texte des 3 premières pages d'un PDF (pdf.js chargé à la demande). */
+const LIB_PDFJS='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/';
+async function textePdf(f){try{let L=window.pdfjsLib||window['pdfjs-dist/build/pdf'];
+  if(!L){await chargerScript(LIB_PDFJS+'pdf.min.js');L=window.pdfjsLib||window['pdfjs-dist/build/pdf'];if(!L)throw new Error('pdf.js absent');L.GlobalWorkerOptions.workerSrc=LIB_PDFJS+'pdf.worker.min.js'}
+  const doc=await L.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;let t='';
+  for(let i=1;i<=Math.min(3,doc.numPages);i++){const c=await (await doc.getPage(i)).getTextContent();t+=c.items.map(x=>x.str).join(' ')+'\n'}
+  return t.replace(/\s+/g,' ').slice(0,5000)}catch(e){console.warn('PDF illisible',f.name,e);return''}}
 /* Texte lisible d'un .msg (Outlook, binaire) : suites de caractères UTF-16 d'au moins 20 lettres. */
 function corpsMsg(raw){return(raw.match(/[\p{L}\p{N} .,;:'’()°€\-\/@]{20,}/gu)||[]).join(' ').replace(/\s+/g,' ').slice(0,5000)}
 const DEP_REGLES=[
-  ['Commande client',/bon de commande|purchase order|\bp\.?o\.?\s*(?:n[o°]|#|:)|\bcde\b|\bcommande n|notre commande|order confirmation|\border n[o°]/],
+  ['Commande client',/bon de commande|commande d.achat|ordre d.achat|bon d.achat|\bachat n|purchase order|\bp\.?o\.?\s*(?:n[o°]|#|:)|\bcde\b|\bcommande n|notre commande|order confirmation|\border n[o°]/],
   ['DDP client',/\bddp\b|demande de prix|demande de devis|demande d.offre|demande de cotation|chiffrage|chiffrer|\brfq\b|request for quot|appel d.offre|faire une offre|consultation/],
   ['Commande client',/\bcommande\b/],
   ['Offre fournisseur',/\boffre\b|\bdevis\b|quotation|\bquote\b|proforma|pro forma|cotation/]];
 function domaineDe(e){const m=String(e||'').toLowerCase().match(/@([a-z0-9.-]+)/);return m?m[1].replace(/^(mail|smtp)\./,''):''}
 function devinerDepot(objet,corps,exped){
   const o=sansAcc(objet),c=sansAcc(corps),tout=o+' '+c;
-  const m=tout.match(/\b(?:d|offre|devis|quote)?\s?n?[o°]?\s?(2[67]\d{4})(?:\s?v\d+)?\b/);const devis=m?'D'+m[1]:'';
+  const m=tout.match(/(?:^|[^0-9a-z])(?:d|offre|devis|quote)?[\s_-]?n?[o°]?\s?(2[67]\d{4})(?:\s?v\d+)?(?![0-9])/);const devis=m?'D'+m[1]:'';
   const dom=domaineDe(exped),deDom=(t,ch)=>dom&&(S.rows[t]||[]).find(r=>String(txt(r[ch])||'').toLowerCase().split(/[\s,;]+/).some(a=>domaineDe(a)===dom));
-  const four=deDom(MODS.fournisseurs.t,'E-mail'),cli=deDom(MODS.clients.t,'E-mail');
+  const four=deDom(MODS.fournisseurs.t,'E-mail'),cli=deDom(MODS.clients.t,'E-mail'),dv0=devis&&(S.rows[MODS.devis.t]||[]).some(r=>String(txt(r['N° devis'])).toUpperCase().startsWith(devis)),pasOffre=cli||(dv0&&!four);
   let type='',k='',ou='';
-  for(const [txtA,lieu] of [[o,'l’objet'],[c,'le corps du mail']]){for(const [ty,re] of DEP_REGLES){if(cli&&ty==='Offre fournisseur')continue;const r=txtA.match(re);if(r){type=ty;k=r[0].trim();ou=lieu;break}}if(type)break}
+  for(const [txtA,lieu] of [[o,'l’objet'],[c,'le corps du mail']]){for(const [ty,re] of DEP_REGLES){if(pasOffre&&ty==='Offre fournisseur')continue;const r=txtA.match(re);if(r){type=ty;k=r[0].trim();ou=lieu;break}}if(type)break}
   let indice=type?`Type deviné par Akteev d’après « ${k} » dans ${ou}`:'Aucun indice clair';
   if(four&&type!=='Commande client'){type='Offre fournisseur';indice+=` ; expéditeur = fournisseur connu (${titre(MODS.fournisseurs.t,four)})`}
   else if(cli)indice+=` ; expéditeur = client connu (${titre(MODS.clients.t,cli)})`;
+  const dv=devis&&(S.rows[MODS.devis.t]||[]).find(r=>String(txt(r['N° devis'])).toUpperCase().startsWith(devis));
+  if(!type&&devis){type='Commande client';indice=`Aucun mot-clé, mais n° de devis KTE cité (${devis}${dv?' : '+txt(dv.Client)+', '+txt(dv.Statut):''}) : probablement la commande de ce devis`}
   if(!type){type='DDP client';indice+=' : DDP proposée par défaut'}
   if(devis)indice+=', devis cité '+devis;
   return{type,devis,indice}}
@@ -2294,8 +2303,9 @@ async function deposerFichiers(F){if(DEPOT_EN_COURS){toast('Un dépôt est déj�
     let objet='',exped='',corpsM='';
     if(/\.eml$/i.test(princ.name)){const h=texte.split(/\r?\n\r?\n/)[0];objet=decodeEntete((h.match(/^Subject:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1]);exped=decodeEntete((h.match(/^From:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1]);corpsM=corpsEml(texte)}
     else if(/\.msg$/i.test(princ.name))corpsM=corpsMsg(texte);
+    for(const p of F.filter(f=>/\.pdf$/i.test(f.name)).slice(0,2)){dire('Lecture de '+p.name+'…');corpsM+=' '+(await textePdf(p))}
     if(!objet)objet=princ.name.replace(/\.[^.]+$/,'');
-    await Promise.all([MODS.fournisseurs.t,MODS.clients.t].map(t=>charger(t).catch(()=>{})));
+    await Promise.all([MODS.fournisseurs.t,MODS.clients.t,MODS.devis.t].map(t=>charger(t).catch(()=>{})));
     const g=devinerDepot(objet+' '+F.map(f=>f.name).join(' '),corpsM,exped);
     const d=new Date(),p=n=>String(n).padStart(2,'0'),horo=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}h${p(d.getMinutes())}`;
     const dossier=`${DEPOT_DOSSIER}/${d.getFullYear()}/${horo} ${objet.replace(/[\\/:*?"<>|#%]/g,' ').replace(/\s+/g,' ').trim().slice(0,60)}`;
