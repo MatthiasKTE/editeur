@@ -1321,7 +1321,7 @@ async function vueListe(k){
   if(p.f==='retard'){E.st=[];E.retard=true;E.tout=false}else if(p.f==='encours'){E.st=[];E.encours=true}
   if(!S.rows[m.t])chargement();
   await charger(m.t);
-  if(m.virt)await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));
+  if(m.virt&&k!=='depot')await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));
   if(m.ref)charger(MODS.referents.t).catch(()=>{});
   if(k==='amelio')await charger(T_REUNIONS).catch(()=>{});
   dessinerListe(k);
@@ -2232,7 +2232,7 @@ function boutonsDepot(r,grand){if(!MODS.depot)return'';
   if(!fini&&peutEcrire('depot')){
     if(ty==='Commande client')h+=b('cde',grand?(dv?'Passer '+esc(dv)+' en commande':'Trouver le devis'):'Passer en commande',true,dv?'Ouvre le devis '+dv+' pour le passer en commande':'Aucun devis cité : ouvre la liste des devis');
     else if(ty==='Offre fournisseur')h+=b('cf','Rédiger la CF',true,'Ouvre une nouvelle commande fournisseur');
-    else if(ty==='DDP client'&&st!=='À lancer')h+=b('ddp','Lancer le chiffrage',true,'Claude lancera la procédure DDP au prochain passage (ou dans Cowork)');
+    else if(ty==='DDP client'&&st!=='À lancer')h+=b('ddp','Lancer le chiffrage',true,'Marque la DDP « À lancer » : Claude la traite quand vous lui dites « lance les DDP à traiter » dans Cowork');
     if(grand)h+=b('ok','Traité',false,'Classer ce mail comme traité');h+=b('ign','Ignorer',false,'Ce mail ne demande rien')}
   const l=txt(r['Lien Outlook']);if(/^https?:/i.test(l))h+=`<a class="btn" ${pad} href="${esc(l)}" target="_blank" data-dep="${r.id}" data-a="out">Outlook ↗</a>`;
   return grand?h:`<span style="display:inline-flex;gap:4px;white-space:nowrap">${h}</span>`}
@@ -2245,7 +2245,7 @@ async function actionDepot(id,a){const m=MODS.depot;if(!m)return;const row=(S.ro
       await passer('En cours');
       if(d)location.hash='#/devis/'+d.id;else{toast(dv?'Devis '+dv+' introuvable : cherchez-le dans la liste':'Aucun devis cité : cherchez-le dans la liste',true);location.hash='#/devis'}}
     else if(a==='cf'){await passer('En cours');location.hash='#/cf/nouveau'}
-    else if(a==='ddp'){await passer('À lancer');toast('DDP à lancer : Claude la traitera au prochain passage, ou dites « lance les DDP à traiter » dans Cowork')}
+    else if(a==='ddp'){await passer('À lancer');toast('DDP marquée « À lancer » : dites « lance les DDP à traiter » à Claude dans Cowork')}
     else if(a==='ok')await passer('Traité');
     else if(a==='ign')await passer('Ignoré');
     if(location.hash.startsWith('#/depot'))route()}catch(er){toast('Échec : '+er.message,true)}}
