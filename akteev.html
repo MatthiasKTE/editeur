@@ -2246,14 +2246,38 @@ function decodeEntete(v){return String(v||'').replace(/=\?([^?]+)\?([BbQq])\?([^
   return new TextDecoder(cs).decode(b)}catch(e){return txt}}).replace(/\s+/g,' ').trim()}
 async function lireDebut(f){try{const b=new Uint8Array(await f.slice(0,400000).arrayBuffer());
   return new TextDecoder('utf-8').decode(b)+' '+new TextDecoder('utf-16le').decode(b.subarray(0,b.length-(b.length%2)))}catch(e){return''}}
-function devinerDepot(nom,texte){
-  const t=sansAcc(nom+' '+texte);const m=t.match(/\b(?:d|offre|devis|quote)?\s?n?[o°]?\s?(2[67]\d{4})(?:\s?v\d+)?\b/);const devis=m?'D'+m[1]:'';
-  const tr=re=>{const r=t.match(re);return r?r[0].trim():''};let k,type;
-  if((k=tr(/bon de commande|purchase order|\bp\.?o\.?\s?n|\bcde\b|\bcommande n|notre commande|order confirmation|\border\b/)))type='Commande client';
-  else if((k=tr(/demande de prix|demande de devis|demande d.offre|chiffrage|chiffrer|\brfq\b|request for quot|appel d.offre|merci de nous faire une offre|consultation/)))type='DDP client';
-  else if((k=tr(/\boffre\b|\bdevis\b|quotation|\bquote\b|proforma|pro forma|cotation/)))type='Offre fournisseur';
-  else if((k=tr(/commande/)))type='Commande client';else{type='DDP client';k=''}
-  return{type,devis,indice:k?'Type deviné par Akteev d’après « '+k+' »'+(devis?', devis cité '+devis:''):'Aucun indice clair : DDP proposée par défaut'}}
+/* Corps lisible d'un .eml (parties text/plain, sinon text/html sans balises ; base64 et quoted-printable décodés). */
+function corpsEml(raw){const dec=(h,c)=>{const cs=(h.match(/charset="?([\w-]+)/i)||[])[1]||'utf-8';let b;
+    if(/content-transfer-encoding:\s*base64/i.test(h)){try{b=Uint8Array.from(atob(c.replace(/[^A-Za-z0-9+/=]/g,'')),x=>x.charCodeAt(0))}catch(e){return''}}
+    else if(/content-transfer-encoding:\s*quoted-printable/i.test(h))b=Uint8Array.from(c.replace(/=\r?\n/g,'').replace(/=([0-9A-F]{2})/gi,(x,y)=>String.fromCharCode(parseInt(y,16))),x=>x.charCodeAt(0)&255);
+    else return c;try{return new TextDecoder(cs).decode(b)}catch(e){return new TextDecoder().decode(b)}};
+  const morceaux=raw.split(/\r?\n--[^\r\n]*\r?\n/),txt=[],html=[];
+  morceaux.forEach((m,i)=>{const k=m.search(/\r?\n\r?\n/);if(k<0)return;const h=m.slice(0,k),c=m.slice(k).trim();
+    const ct=(h.match(/content-type:\s*([^;\r\n]+)/i)||[])[1]||(i===0&&morceaux.length===1?'text/plain':'');
+    if(/content-disposition:\s*attachment/i.test(h))return;
+    if(/text\/plain/i.test(ct))txt.push(dec(h,c));else if(/text\/html/i.test(ct))html.push(dec(h,c).replace(/<style[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/g,' '))});
+  return(txt.join('\n')||html.join('\n')).replace(/\s+/g,' ').slice(0,5000)}
+/* Texte lisible d'un .msg (Outlook, binaire) : suites de caractères UTF-16 d'au moins 20 lettres. */
+function corpsMsg(raw){return(raw.match(/[\p{L}\p{N} .,;:'’()°€\-\/@]{20,}/gu)||[]).join(' ').replace(/\s+/g,' ').slice(0,5000)}
+const DEP_REGLES=[
+  ['Commande client',/bon de commande|purchase order|\bp\.?o\.?\s*(?:n[o°]|#|:)|\bcde\b|\bcommande n|notre commande|order confirmation|\border n[o°]/],
+  ['DDP client',/\bddp\b|demande de prix|demande de devis|demande d.offre|demande de cotation|chiffrage|chiffrer|\brfq\b|request for quot|appel d.offre|faire une offre|consultation/],
+  ['Commande client',/\bcommande\b/],
+  ['Offre fournisseur',/\boffre\b|\bdevis\b|quotation|\bquote\b|proforma|pro forma|cotation/]];
+function domaineDe(e){const m=String(e||'').toLowerCase().match(/@([a-z0-9.-]+)/);return m?m[1].replace(/^(mail|smtp)\./,''):''}
+function devinerDepot(objet,corps,exped){
+  const o=sansAcc(objet),c=sansAcc(corps),tout=o+' '+c;
+  const m=tout.match(/\b(?:d|offre|devis|quote)?\s?n?[o°]?\s?(2[67]\d{4})(?:\s?v\d+)?\b/);const devis=m?'D'+m[1]:'';
+  const dom=domaineDe(exped),deDom=(t,ch)=>dom&&(S.rows[t]||[]).find(r=>String(txt(r[ch])||'').toLowerCase().split(/[\s,;]+/).some(a=>domaineDe(a)===dom));
+  const four=deDom(MODS.fournisseurs.t,'E-mail'),cli=deDom(MODS.clients.t,'E-mail');
+  let type='',k='',ou='';
+  for(const [txtA,lieu] of [[o,'l’objet'],[c,'le corps du mail']]){for(const [ty,re] of DEP_REGLES){if(cli&&ty==='Offre fournisseur')continue;const r=txtA.match(re);if(r){type=ty;k=r[0].trim();ou=lieu;break}}if(type)break}
+  let indice=type?`Type deviné par Akteev d’après « ${k} » dans ${ou}`:'Aucun indice clair';
+  if(four&&type!=='Commande client'){type='Offre fournisseur';indice+=` ; expéditeur = fournisseur connu (${titre(MODS.fournisseurs.t,four)})`}
+  else if(cli)indice+=` ; expéditeur = client connu (${titre(MODS.clients.t,cli)})`;
+  if(!type){type='DDP client';indice+=' : DDP proposée par défaut'}
+  if(devis)indice+=', devis cité '+devis;
+  return{type,devis,indice}}
 async function envoyerSP(j,dossier,f){const ch=dossier.split('/').map(encodeURIComponent).join('/')+'/'+encodeURIComponent(f.name);
   if(f.size<=4e6)return graph(j,`/drives/${DEPOT_DRIVE}/root:/${ch}:/content?@microsoft.graph.conflictBehavior=rename`,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:f});
   const ses=await graph(j,`/drives/${DEPOT_DRIVE}/root:/${ch}:/createUploadSession`,{method:'POST',body:JSON.stringify({item:{'@microsoft.graph.conflictBehavior':'rename'}})});
@@ -2267,10 +2291,12 @@ async function deposerFichiers(F){if(DEPOT_EN_COURS){toast('Un dépôt est déj�
   try{
     const princ=F.find(f=>/\.(msg|eml)$/i.test(f.name))||F[0];
     const texte=await lireDebut(princ);
-    let objet='',exped='';
-    if(/\.eml$/i.test(princ.name)){const h=texte.split(/\r?\n\r?\n/)[0];objet=decodeEntete((h.match(/^Subject:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1]);exped=decodeEntete((h.match(/^From:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1])}
+    let objet='',exped='',corpsM='';
+    if(/\.eml$/i.test(princ.name)){const h=texte.split(/\r?\n\r?\n/)[0];objet=decodeEntete((h.match(/^Subject:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1]);exped=decodeEntete((h.match(/^From:\s*(.*(?:\r?\n[ \t].*)*)/mi)||[])[1]);corpsM=corpsEml(texte)}
+    else if(/\.msg$/i.test(princ.name))corpsM=corpsMsg(texte);
     if(!objet)objet=princ.name.replace(/\.[^.]+$/,'');
-    const g=devinerDepot(F.map(f=>f.name).join(' ')+' '+objet,texte);
+    await Promise.all([MODS.fournisseurs.t,MODS.clients.t].map(t=>charger(t).catch(()=>{})));
+    const g=devinerDepot(objet+' '+F.map(f=>f.name).join(' '),corpsM,exped);
     const d=new Date(),p=n=>String(n).padStart(2,'0'),horo=`${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())} ${p(d.getHours())}h${p(d.getMinutes())}`;
     const dossier=`${DEPOT_DOSSIER}/${d.getFullYear()}/${horo} ${objet.replace(/[\\/:*?"<>|#%]/g,' ').replace(/\s+/g,' ').trim().slice(0,60)}`;
     dire('Connexion à Microsoft…');const j=await jetonGraph(['Files.ReadWrite.All']);
