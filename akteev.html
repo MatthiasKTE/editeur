@@ -322,9 +322,9 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
    Interrupteur de retour arrière : false = l'onglet disparaît, rien d'autre ne change. Réservé à la Direction. */
 const DEPOT_ACTIF=true;
 const MODS={
- depot:{t:1317249,nom:'À traiter',un:'mail',ico:'ddp',grp:'Boîte de réception',cols:['Reçu le','Type','Objet','Action','Expéditeur','Client / fournisseur','Devis cité','Statut'],libOuverts:'Ouverts',
+ depot:{t:1317249,nom:'À traiter',un:'mail',ico:'ddp',grp:'Boîte de réception',cols:['Reçu le','Type','À traiter par','Objet','Action','Expéditeur','Client / fournisseur','Devis cité','Statut'],libOuverts:'Ouverts',
    virt:'depot',statut:'Statut',date:'Reçu le',cacheStatuts:['Traité','Ignoré'],solde:['Traité','Ignoré'],soldeVerbe:'classer',faitLe:'Traité le',faitRe:/^(trait|ignor)/i,
-   ordreStatuts:['À traiter','À lancer','En cours','Traité','Ignoré'],ordreForm:['Objet','Type','Statut','Reçu le','Expéditeur','Boîte','Client / fournisseur','Devis cité','Proposition','Indices','Lien Outlook','Message-ID','Traité le','Commentaire']},
+   ordreStatuts:['À traiter','À lancer','En cours','Traité','Ignoré'],ordreForm:['Objet','Type','À traiter par','Statut','Reçu le','Expéditeur','Boîte','Client / fournisseur','Devis cité','Proposition','Indices','Lien Outlook','Message-ID','Traité le','Commentaire']},
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
