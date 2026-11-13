@@ -318,7 +318,13 @@ const ico=(n,s='')=>`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" 
    t : id de table Baserow ; cols : colonnes de la liste (ignorées si absentes) ;
    statut : champ de statut (puces + kanban) ; editeur : type de document de l'éditeur ;
    liees : listes affichées en onglets dans la fiche (table + champ lien vers la fiche). */
+/* Boîte « À traiter » (mails DDP / commandes / offres repérés par Claude) – 13/11/2026.
+   Interrupteur de retour arrière : false = l'onglet disparaît, rien d'autre ne change. Réservé à la Direction. */
+const DEPOT_ACTIF=true;
 const MODS={
+ depot:{t:1317249,nom:'À traiter',un:'mail',ico:'ddp',grp:'Boîte de réception',cols:['Reçu le','Type','Objet','Action','Expéditeur','Client / fournisseur','Devis cité','Statut'],libOuverts:'Ouverts',
+   virt:'depot',statut:'Statut',date:'Reçu le',cacheStatuts:['Traité','Ignoré'],solde:['Traité','Ignoré'],soldeVerbe:'classer',faitLe:'Traité le',faitRe:/^(trait|ignor)/i,
+   ordreStatuts:['À traiter','À lancer','En cours','Traité','Ignoré'],ordreForm:['Objet','Type','Statut','Reçu le','Expéditeur','Boîte','Client / fournisseur','Devis cité','Proposition','Indices','Lien Outlook','Message-ID','Traité le','Commentaire']},
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
@@ -348,6 +354,7 @@ const MODS={
    libOuverts:'Ouvertes',ordreStatuts:['Nouvelle','À discuter','Reportée','Retenue','En cours','Faite','Refusée'],ordreForm:['Titre','Description',"Partie d'Akteev",'Priorité','Proposée par','Proposée le','Statut','Décision','Décidée le','Lue par']},
  utilisateurs:{t:1281481,nom:'Utilisateurs',un:'utilisateur',ico:'referents',grp:'Paramètres',cols:['Nom','E-mail','Profil','Actif','Dernière connexion','Commentaire']}
 };
+if(!DEPOT_ACTIF)delete MODS.depot;
 for(const k in MODS)MODS[k].k=k;
 const MOD_DE_TABLE={};for(const k in MODS)MOD_DE_TABLE[MODS[k].t]=k;
 /* Cibles des liens si l'API des champs n'est pas lisible avec le jeton (secours). */
@@ -518,6 +525,7 @@ function majCompteurs(){
   const eD=$('nb_ddp'),RD=S.rows[MODS.devis.t],RC=S.rows[MODS.consult.t];
   if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
   const eA=$('nb_amelio'),RA=S.rows[MODS.amelio.t];if(eA&&RA){const n=RA.filter(amelioAuJour).length;eA.textContent=n||'';const it=eA.parentElement,s=amelioEtatMenu();it.classList.remove('alerteO','alerteR');if(s.c)it.classList.add(s.c);it.title=[s.t,n+' amélioration(s) à l’ordre du jour'].filter(Boolean).join(' · ')}
+  const eP=$('nb_depot'),RP=MODS.depot&&S.rows[MODS.depot.t];if(eP&&RP){const n=RP.filter(r=>txt(r.Statut)==='À traiter').length;eP.textContent=n||'';eP.title=n+' mail(s) à traiter'}
   const eN=$('nb_nc'),RN=S.rows[MODS.nc.t];if(eN&&RN){const n=RN.filter(ncOuverte).length;eN.textContent=n||'';eN.title=n+' non-conformité(s) à traiter'}
   majMoi();
 }
@@ -1246,7 +1254,10 @@ function etat(k){const E=ETAT[k]||(ETAT[k]={q:'',st:[],tri:null,vue:MODS[k].vue|
   if(typeof E.q!=='string')E.q='';if(!E.lim)E.lim=100;if(!Array.isArray(E.st))E.st=[];if(!E.cf)E.cf={};
   if(k==='taches'&&!E.v2){E.vue='liste';E.tri=null;E.cf={};E.v2=true}return E}
 /* Colonnes calculées (affichage seulement, jamais envoyées à Baserow). */
-const VIRT={taches(rows,sc){
+const VIRT={depot(rows,sc){
+  if(!sc.par['Action']){const x={id:'v_Action',name:'Action',virt:true,read_only:true,type:'text'};sc.fields.push(x);sc.par['Action']=x}
+  for(const r of rows)r['Action']=''},
+taches(rows,sc){
   const C=S.rows[MODS.commandes.t]||[],parId=new Map(C.map(c=>[c.id,c]));
   const aj=(name,f)=>{if(!sc.par[name]){const x={id:'v_'+name,name,virt:true,read_only:true,...f};sc.fields.push(x);sc.par[name]=x}};
   aj('Affaire',{type:'link_row',link_row_table_id:MODS.commandes.t});aj('Client',{type:'link_row',link_row_table_id:MODS.clients.t});
@@ -1377,7 +1388,7 @@ function dessinerListe(k){
     h+=L.slice(0,E.lim).map(r=>`<tr data-id="${r.id}">${cols.map(c=>{const f=sc.par[c],v=r[c];const num=f&&(f.type==='number'||f.type==='count'||((f.type==='formula'||f.type==='rollup')&&estMonnaie(c)));
       const ret=c===m.date&&m.statut&&v&&v<a&&tacheOuverte(r)&&(k==='taches'||k==='commandes'||k==='synthese');
       const prim=m.sansPrim?c===cols[0]:c===sc.prim;
-      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${k==='bl'&&c==='PDF'?boutonPdfBL(r):c===m.statut&&k==='taches'&&peutEcrire(k)?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
+      return`<td class="${prim?'prim':''} ${num?'n':''} ${ret?'retard':''}">${k==='depot'&&c==='Action'?boutonsDepot(r):k==='bl'&&c==='PDF'?boutonPdfBL(r):c===m.statut&&k==='taches'&&peutEcrire(k)?celluleStatut(k,r):f?.relatif?delaiRel(r,v):f?.infobulle?`<span title="${esc(txt(r[f.infobulle]))}">${rendu(f,v,true)}</span>`:rendu(f,v,true)}</td>`}).join('')}</tr>`).join('');
     h+=`</tbody>${Object.keys(tot).length?`<tfoot><tr>${cols.map((c,i)=>`<td class="${c in tot?'n':''}">${c in tot?eur(tot[c]):i===0?'Total':''}</td>`).join('')}</tr></tfoot>`:''}</table></div>`;
     if(!L.length)h+='<div class="vide">Aucun résultat</div>';
     if(L.length>E.lim)h+=`<div class="plus"><button class="btn" id="bPlus">Afficher plus (${L.length-E.lim} restants)</button></div>`;
@@ -1538,7 +1549,7 @@ function dessinerFiche(){
   let h=`<div class="entete"><a class="btn" href="#/${k}" title="Retour à la liste">${ico('retour')}</a><h1>${esc(nom)}</h1>
     ${stF&&!nouveau&&!ecr?badge(val(m.statut)):''}${stF&&!nouveau&&ecr?`<span class="selStatut" title="Changer le statut">${badge(val(m.statut))||'<span class="badge">—</span>'} <span class="mut" style="font-size:11px">▾</span><select id="selSt">${(stF.select_options||[]).map(o=>`<option value="${o.id}" ${val(m.statut)?.id===o.id?'selected':''}>${esc(o.value)}</option>`).join('')}</select></span>`:''}
     <span class="sous">${!nouveau&&row['Client']?.length&&k!=='clients'?esc(txt(row.Client)):''}</span>
-    <div class="act">${k==='bl'&&!nouveau?boutonPdfBL(row,true):''}${lienEditeur&&k!=='devis'?`<a class="btn ${k==='bl'?'':'p'}" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
+    <div class="act">${k==='depot'&&!nouveau?boutonsDepot(row,true):''}${k==='bl'&&!nouveau?boutonPdfBL(row,true):''}${lienEditeur&&k!=='devis'?`<a class="btn ${k==='bl'?'':'p'}" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='taches'&&!nouveau?fichesNotes(row.Notes).map(x=>`<a class="btn p" href="${esc(x.url)}" target="_blank" title="${esc(x.fichier)}">${ico('pdf')}${x.value==='RC'||x.value==='Plan contrôle'?esc(x.value):'Fiche '+esc(x.value)}</a>${/^FA_.+\.pdf$/i.test(x.fichier)&&peutEcrire('taches')&&ids(row.Commande).length?`<button class="btn vert" data-fat="${esc(x.fichier)}" title="Rouvrir et modifier ${esc(x.fichier)}">${ico('crayon')}Modifier</button>`:''}`).join(''):''}
     ${/* Devis : ordre de travail = comparatif SST → éditeur → réponse au client, dégradé de bleu clair → bleu Akteev */''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn dg1" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
@@ -2213,6 +2224,33 @@ async function pdfBL(id,b){
 }
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-blpdf]');if(!b)return;
   e.preventDefault();e.stopPropagation();if(!b.disabled)pdfBL(+b.dataset.blpdf,b)},true);
+/* ---------- Boîte « À traiter » : actions proposées ---------- */
+function boutonsDepot(r,grand){if(!MODS.depot)return'';
+  const ty=txt(r.Type),st=txt(r.Statut),fini=/^(trait|ignor)/i.test(st),dv=String(txt(r['Devis cité'])||'').trim(),pad=grand?'':'style="padding:3px 9px"';
+  const b=(a,lib,p,titre)=>`<button class="btn${p?' p':''}" ${pad} data-dep="${r.id}" data-a="${a}" title="${esc(titre||lib)}">${lib}</button>`;
+  let h='';
+  if(!fini&&peutEcrire('depot')){
+    if(ty==='Commande client')h+=b('cde',grand?(dv?'Passer '+esc(dv)+' en commande':'Trouver le devis'):'Passer en commande',true,dv?'Ouvre le devis '+dv+' pour le passer en commande':'Aucun devis cité : ouvre la liste des devis');
+    else if(ty==='Offre fournisseur')h+=b('cf','Rédiger la CF',true,'Ouvre une nouvelle commande fournisseur');
+    else if(ty==='DDP client'&&st!=='À lancer')h+=b('ddp','Lancer le chiffrage',true,'Claude lancera la procédure DDP au prochain passage (ou dans Cowork)');
+    if(grand)h+=b('ok','Traité',false,'Classer ce mail comme traité');h+=b('ign','Ignorer',false,'Ce mail ne demande rien')}
+  const l=txt(r['Lien Outlook']);if(/^https?:/i.test(l))h+=`<a class="btn" ${pad} href="${esc(l)}" target="_blank" data-dep="${r.id}" data-a="out">Outlook ↗</a>`;
+  return grand?h:`<span style="display:inline-flex;gap:4px;white-space:nowrap">${h}</span>`}
+async function actionDepot(id,a){const m=MODS.depot;if(!m)return;const row=(S.rows[m.t]||[]).find(x=>x.id==id);if(!row)return;
+  const opt=v=>(sch(m.t).par.Statut?.select_options||[]).find(o=>o.value===v);
+  const passer=async v=>{const o=opt(v);if(o&&txt(row.Statut)!==v)await changerStatut('depot',row,o.id,o.value)};
+  try{
+    if(a==='cde'){const dv=String(txt(row['Devis cité'])||'').trim().toUpperCase();await charger(MODS.devis.t);
+      const d=dv&&(S.rows[MODS.devis.t]||[]).find(x=>String(txt(x['N° devis'])).toUpperCase().startsWith(dv));
+      await passer('En cours');
+      if(d)location.hash='#/devis/'+d.id;else{toast(dv?'Devis '+dv+' introuvable : cherchez-le dans la liste':'Aucun devis cité : cherchez-le dans la liste',true);location.hash='#/devis'}}
+    else if(a==='cf'){await passer('En cours');location.hash='#/cf/nouveau'}
+    else if(a==='ddp'){await passer('À lancer');toast('DDP à lancer : Claude la traitera au prochain passage, ou dites « lance les DDP à traiter » dans Cowork')}
+    else if(a==='ok')await passer('Traité');
+    else if(a==='ign')await passer('Ignoré');
+    if(location.hash.startsWith('#/depot'))route()}catch(er){toast('Échec : '+er.message,true)}}
+document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-dep]');if(!b)return;
+  e.stopPropagation();if(b.dataset.a==='out')return;e.preventDefault();if(!b.disabled)actionDepot(+b.dataset.dep,b.dataset.a)},true);
 async function toutTelecharger(L){
   const b=$('dlTout');if(b)b.disabled=true;let ok=0;
   for(const [i,d] of L.entries()){if(b)b.innerHTML=`${ico('dl')}Téléchargement ${i+1} / ${L.length}…`;
@@ -3274,7 +3312,7 @@ function lancer(){
   document.body.classList.remove('deconnecte');GMODS=GMODS0.filter(peutVoir);
   if(SESSION?.referent&&!MOI){MOI=SESSION.referent;ls.set('moi',MOI)}
   dessinerMenu();route();charger(MODS.referents.t).then(R=>{if(!MOI&&SESSION?.login&&Array.isArray(R)){const r=R.find(x=>String(x['E-mail']||'').toLowerCase().trim()===SESSION.login);if(r){MOI=r.id;ls.set('moi',MOI);majMoi()}}}).catch(()=>{});
-  setTimeout(()=>{['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{}));if(peutVoir('amelio'))charger(T_REUNIONS).catch(()=>{}).then(()=>charger(MODS.amelio.t)).catch(()=>{})},300)}
+  setTimeout(()=>{if(MODS.depot&&peutVoir('depot'))charger(MODS.depot.t).then(majCompteurs).catch(()=>{});['devis','commandes','taches'].filter(peutVoir).forEach(k=>charger(MODS[k].t).catch(()=>{}));if(peutVoir('amelio'))charger(T_REUNIONS).catch(()=>{}).then(()=>charger(MODS.amelio.t)).catch(()=>{})},300)}
 (async()=>{
   if(PASSERELLE){try{await ouvrirSession()}catch(e){ecranConnexionMS(e.message==='CONNEXION'?'':'Accès refusé : '+e.message)}return}
   ACCES=await lireAcces();
