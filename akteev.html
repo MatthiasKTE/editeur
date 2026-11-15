@@ -89,6 +89,23 @@ a.chip:hover{background:var(--accentL);color:var(--accent)}
 .puce b{font-weight:600;color:var(--txt);margin-left:3px}
 .puce.on{background:var(--accentL);border-color:#B8CDF8;color:var(--accent)}
 .puce.on b{color:var(--accent)}
+/* Mail kte@ (15/11/2026) */
+.mailg{display:grid;grid-template-columns:minmax(360px,1fr) minmax(0,1.35fr);gap:14px;align-items:start}
+@media(max-width:1100px){.mailg{grid-template-columns:1fr}}
+.mliste #mLignes{max-height:calc(100vh - 230px);overflow:auto}
+.mrow{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--trait);cursor:pointer;border-left:3px solid transparent}
+.mrow:hover{background:var(--hover)}.mrow.on{background:var(--accentL)}
+.mrow.mnl{border-left-color:var(--accent)}.mrow.mnl .mde,.mrow.mnl .mobj{font-weight:700;color:var(--txt)}
+.mtxt{flex:1;min-width:0}.mh{display:flex;gap:8px}.mde{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mdt{color:var(--mut);font-size:12px;white-space:nowrap}.mobj{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mpre{color:var(--mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mlie:empty{display:none}.mlie{margin-top:3px}
+.mpers{flex:none;display:grid;place-items:center;width:30px;height:22px;border-radius:6px;color:#fff;font-size:11px;font-weight:700;margin-top:2px}
+.mpers.vide0{background:#EEF1F6;color:var(--mut)}
+.mlect{position:sticky;top:0;display:flex;flex-direction:column;min-height:300px}
+.mtete{padding:14px 16px;border-bottom:1px solid var(--trait)}.mtete h2{margin:0 0 6px;font-size:17px}
+.mact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}.mact .mattr{padding:5px 10px;font-weight:700}
+.mpj{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mpj .chip{cursor:pointer;border:1px solid var(--trait);background:#fff}
+.mcorps{border:0;width:100%;height:calc(100vh - 330px);min-height:320px;border-radius:0 0 var(--r) var(--r)}
 .bascule{display:inline-flex;border:1px solid var(--trait);border-radius:7px;overflow:hidden;margin-left:auto}
 .bascule button{border:0;background:#fff;padding:6px 10px;color:var(--mut);display:flex;align-items:center;gap:5px}
 .bascule button.on{background:var(--accentL);color:var(--accent)}
@@ -600,6 +617,7 @@ function dessinerMenu(){
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
   if(STATS_ACTIF&&peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   let g='';
+  if(mailVisible()){g='Boîte de réception';h+=`<div class="grp">${g}</div><a class="it" data-m="mail" href="#/mail">${ico('mail')}Mail kte@<span class="nb" id="nb_mail"></span></a>`}
   for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}if(k==='plan'){h+=`<a class="it" data-m="charges" href="#/charges">${ico('cal')}Charges machines<span class="nb" id="nb_charges"></span></a>`;continue}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`;if(k==='nc')h+=`<a class="it" data-m="ncsynth" href="#/ncsynth">${ico('stats')}Synthèse NC</a>`;if(k==='utilisateurs')h+=`<a class="it" data-m="droits" href="#/droits">${ico('cle')}Droits d’accès</a>`}
   if(estAdmin()&&!PASSERELLE){if(g!=='Paramètres')h+=`<div class="grp">Paramètres</div>`;h+=`<a class="it" data-m="utilisateurs" href="#/utilisateurs">${ico('referents')}Utilisateurs</a>`}
   h+=`<div class="bas">${SESSION?`<div style="color:#fff;font-weight:600">${esc(SESSION.nom)}</div><div style="margin-bottom:8px">${esc(PR().nom)}</div>`:''}Je suis :<select id="moi"><option value="">— choisir —</option></select>${peutVoir('devis')?`<a href="${EDITEUR}" target="_blank">Éditeur devis / ARC / BL ↗</a>`:''}${estAdmin()?`<a href="https://baserow.io/database/592007" target="_blank">Ouvrir Baserow ↗</a>`:''}${SESSION?'':'<a href="#" id="bJeton">Changer de jeton</a>'}<a href="#" id="bSortir">Se déconnecter</a></div>`;
@@ -645,6 +663,7 @@ async function route(){
     if(k==='utilisateurs'&&estAdmin()&&!PASSERELLE)return await vueUtilisateurs();
     if(k==='droits'&&peutVoir('droits'))return await vueDroits();
     if(k==='ddp'&&peutVoir('consult'))return await vueDDP();
+    if(k==='mail'&&mailVisible())return await vueMail(id);
     if(k==='ncsynth'&&peutVoir('nc'))return await vueNCSynth();
     if(k==='charges'&&peutVoir('plan'))return await vueCharges();
     if(k==='affecter'&&id&&peutVoir('cf')){actif('cf');return await vueAffecter(id)}
@@ -791,6 +810,152 @@ function dessinerDDP(){
   document.querySelectorAll('table.l tbody tr').forEach(tr=>tr.onclick=()=>location.hash=`#/devis/${tr.dataset.id}`);
   $('dMaj').onclick=async()=>{$('dMaj').disabled=true;try{await Promise.all([charger(MODS.devis.t,true),charger(MODS.consult.t,true)]);dessinerDDP();toast('DDP actualisées')}catch(e){toast('Échec : '+e.message,true);$('dMaj').disabled=false}};
 }
+
+/* ---------- Mail kte@ (15/11/2026) ----------
+   La boîte kte@ lue et triée dans Akteev, sans copie : Akteev et Outlook montrent la même boîte (Microsoft Graph,
+   jeton délégué de l'utilisateur, scope Mail.ReadWrite.Shared : il faut avoir accès à kte@ dans Exchange).
+   - Lire un mail ne le passe PAS en lu (un GET Graph ne touche pas isRead) ; bouton « Marquer lu / non lu ».
+   - Attribution = catégorie Outlook MK / SD / WB (les annotations déjà utilisées dans kte@, mêmes couleurs) ;
+     la fonction Scaleway « tri-kte » pose la même catégorie automatiquement toutes les 5 min.
+   - N° d'affaire (D26xxxx) et expéditeur reconnus → liens vers le devis, la commande, le client ou le fournisseur.
+   - Contenu affiché dans un cadre isolé (pas de script, images distantes bloquées tant qu'on ne les demande pas).
+   Interrupteur de retour arrière : MAIL_ACTIF=false → l'onglet disparaît. Visibilité : mailVisible(). */
+const MAIL_ACTIF=true;
+/* Phase 1 (15/11/2026, demande de Matthias) : onglet visible seulement par lui (profil Direction / Admin). */
+const mailVisible=()=>MAIL_ACTIF&&estAdmin();
+const MAIL_BOITE='kte@kte-fr.com',MAIL_SCOPES=['Mail.ReadWrite.Shared'];
+const MAIL_PERS=[{c:'MK',n:'Matthias',coul:'#2E7D32',re:/^matt/},{c:'SD',n:'Sébastien',coul:'#0E9C9C',re:/^s[eé]b/},{c:'WB',n:'William',coul:'#C2185B',re:/^will/}];
+const MAIL_CODES=new Set(MAIL_PERS.map(p=>p.c));
+const mailCodeDe=m=>(m.categories||[]).find(c=>MAIL_CODES.has(c))||((m.categories||[]).map(c=>(c.match(/^a traiter par (MK|SD|WB)$/i)||[])[1]).find(Boolean)||'').toUpperCase()||'';
+const MAIL={L:[],next:null,sel:null,charge:false,err:'',q:'',img:false,recherche:null};
+let MAILF=ls.get('mailf','');
+const mailBase=()=>`/users/${encodeURIComponent(MAIL_BOITE)}`;
+const MAIL_SEL='id,subject,from,receivedDateTime,isRead,categories,bodyPreview,hasAttachments,conversationId,importance';
+async function mailJeton(){return jetonGraph(MAIL_SCOPES)}
+function mailMoiCode(){if(!MOI)return'';const r=(S.rows[MODS.referents.t]||[]).find(x=>x.id===MOI);const n=norm(r?titre(MODS.referents.t,r):'');return(MAIL_PERS.find(p=>p.re.test(n))||{}).c||''}
+const mailNums=(...t)=>[...new Set(t.join(' ').match(/(?<![A-Z0-9])D\s?2[6-9]\d{4}(?!\d)/gi)||[])].map(x=>x.replace(/\s/g,'').toUpperCase());
+function mailDate(s){if(!s)return'';const d=new Date(s),a=new Date();if(d.toDateString()===a.toDateString())return d.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'});
+  const h=new Date(a-864e5);if(d.toDateString()===h.toDateString())return'hier';return d.toLocaleDateString('fr-FR',{day:'2-digit',month:'2-digit',year:d.getFullYear()===a.getFullYear()?undefined:'2-digit'})}
+const mailPastille=c=>{const p=MAIL_PERS.find(x=>x.c===c);return p?`<span class="mpers" style="background:${p.coul}" title="À traiter par ${esc(p.n)}">${c}</span>`:'<span class="mpers vide0" title="Non attribué">—</span>'};
+/* Liens Akteev : n° d'affaire → devis / commande ; domaine de l'expéditeur → client / fournisseur */
+function mailLiens(m){const out=[];
+  for(const n of mailNums(m.subject||'',m.bodyPreview||'',m._corps||'').slice(0,4)){
+    const c=(S.rows[MODS.commandes.t]||[]).find(r=>txt(r['N° affaire']).toUpperCase()===n);
+    const d=(S.rows[MODS.devis.t]||[]).find(r=>txt(r['N° devis']).toUpperCase()===n);
+    if(c&&peutVoir('commandes'))out.push(`<a class="chip" href="#/commandes/${c.id}" title="Commande ${esc(n)}">${ico('commandes')}${esc(n)}</a>`);
+    else if(d&&peutVoir('devis'))out.push(`<a class="chip" href="#/devis/${d.id}" title="Devis ${esc(n)} · ${esc(txt(d.Statut))}">${ico('devis')}${esc(n)}</a>`);
+    else out.push(`<span class="chip" title="N° cité, introuvable dans Akteev">${esc(n)}</span>`)}
+  const adr=String(m.from?.emailAddress?.address||'').toLowerCase(),dom=adr.split('@')[1]||'';
+  if(dom&&!/^(gmail|hotmail|outlook|yahoo|live|orange|free|wanadoo|icloud|kte-fr)\./.test(dom)){
+    const tr=(k,champs)=>(S.rows[MODS[k]?.t]||[]).find(r=>champs.some(f=>String(txt(r[f])).toLowerCase().split(/[;,\s]+/).some(e=>e===adr||e.endsWith('@'+dom))));
+    const cl=peutVoir('clients')&&tr('clients',['E-mail']),fo=!cl&&peutVoir('fournisseurs')&&tr('fournisseurs',['E-mail']);
+    if(cl)out.push(`<a class="chip" href="#/clients/${cl.id}">${ico('clients')}${esc(titre(MODS.clients.t,cl))}</a>`);
+    if(fo)out.push(`<a class="chip" href="#/fournisseurs/${fo.id}">${ico('fournisseurs')}${esc(titre(MODS.fournisseurs.t,fo))}</a>`)}
+  return out.join(' ')}
+async function mailCharger(plus){
+  if(MAIL.charge)return;MAIL.charge=true;MAIL.err='';
+  try{const j=await mailJeton();
+    const url=plus&&MAIL.next?MAIL.next:MAIL.recherche
+      ?`${mailBase()}/messages?$search=${encodeURIComponent('"'+MAIL.recherche.replace(/"/g,'')+'"')}&$top=40&$select=${MAIL_SEL}`
+      :`${mailBase()}/mailFolders/inbox/messages?$top=40&$orderby=receivedDateTime desc&$select=${MAIL_SEL}`;
+    const r=await graph(j,url);const v=r.value||[];
+    MAIL.L=plus?MAIL.L.concat(v.filter(x=>!MAIL.L.some(y=>y.id===x.id))):v;MAIL.next=r['@odata.nextLink']||null;
+    if(MAIL.recherche)MAIL.L.sort((a,b)=>String(b.receivedDateTime).localeCompare(String(a.receivedDateTime)));
+  }catch(e){MAIL.err=e.status===403||e.status===404?`Accès refusé à ${MAIL_BOITE} (${e.status}). Il faut avoir accès à cette boîte dans Outlook.`:e.message;console.error(e)}
+  finally{MAIL.charge=false}}
+async function vueMail(id){
+  document.title='Akteev – Mail kte@';
+  if(id)MAIL.sel=decodeURIComponent(id);
+  ['devis','commandes','clients','fournisseurs','referents'].forEach(k=>peutVoir(k)&&MODS[k]&&charger(MODS[k].t).then(()=>{if(location.hash.startsWith('#/mail'))mailDessinerListe()}).catch(()=>{}));
+  if(!MAIL.L.length){$('main').innerHTML='<div class="charge">Connexion à Microsoft et lecture de kte@…</div>';await mailCharger()}
+  mailDessiner();if(MAIL.sel)mailOuvrir(MAIL.sel,true);
+}
+function mailFiltres(){const moi=mailMoiCode();
+  return[['','Tous',()=>true],['nonlu','Non lus',m=>!m.isRead],...(moi?[['moi','Mes mails ('+moi+')',m=>mailCodeDe(m)===moi]]:[]),['sans','Non attribués',m=>!mailCodeDe(m)],
+    ...MAIL_PERS.map(p=>[p.c,p.n,m=>mailCodeDe(m)===p.c])]}
+function mailDessiner(){
+  const nl=MAIL.L.filter(m=>!m.isRead).length;
+  $('main').innerHTML=`<div class="entete"><h1>Mail kte@</h1><span class="sous">${MAIL.recherche?`Recherche « ${esc(MAIL.recherche)} » dans toute la boîte · `:'Boîte de réception · '}${MAIL.L.length} mail(s) chargé(s)${nl?` · <b style="color:var(--accent)">${nl} non lu(s)</b>`:''}</span>
+    <div class="act"><button class="btn" id="mMaj">${ico('cal')}Actualiser</button><a class="btn" href="https://outlook.office.com/mail/${MAIL_BOITE}/" target="_blank">${ico('ext')}kte@ dans Outlook</a></div></div>
+  ${MAIL.err?`<div class="card" style="padding:14px;margin-bottom:12px;color:var(--err)">${esc(MAIL.err)}</div>`:''}
+  <div class="mailg"><div class="card mliste"><div class="outils">
+    <div class="rech">${ico('loupe')}<input id="mq" placeholder="Filtrer (objet, expéditeur, n°…) · Entrée = toute la boîte" value="${esc(MAIL.q)}"></div>
+    ${MAIL.recherche?'<button class="btn" id="mRaz">× Fin de la recherche</button>':''}
+    <div class="puces" id="mPuces"></div></div><div id="mLignes"></div></div>
+  <div class="card mlect" id="mLect"><div class="vide">Choisissez un mail à gauche.<br><span style="font-size:12.5px">Le lire ici ne le marque pas comme lu.</span></div></div></div>`;
+  $('mMaj').onclick=async()=>{$('mMaj').disabled=true;MAIL.next=null;await mailCharger();mailDessiner();if(MAIL.sel)mailOuvrir(MAIL.sel,true);toast('Mails actualisés')};
+  const q=$('mq');q.oninput=()=>{MAIL.q=q.value;mailDessinerListe()};
+  q.onkeydown=async e=>{if(e.key==='Enter'&&q.value.trim().length>1){MAIL.recherche=q.value.trim();MAIL.q='';MAIL.next=null;$('mLignes').innerHTML='<div class="charge">Recherche dans toute la boîte…</div>';await mailCharger();mailDessiner()}};
+  if($('mRaz'))$('mRaz').onclick=async()=>{MAIL.recherche=null;MAIL.next=null;MAIL.q='';await mailCharger();mailDessiner()};
+  mailDessinerListe();mailMajCompteur();
+}
+function mailDessinerListe(){
+  if(!$('mLignes'))return;const F=mailFiltres();if(!F.some(f=>f[0]===MAILF))MAILF='';
+  const w=norm(MAIL.q).split(/\s+/).filter(Boolean),f=F.find(x=>x[0]===MAILF)[2];
+  const L=MAIL.L.filter(m=>f(m)&&(!w.length||w.every(x=>norm([m.subject,m.from?.emailAddress?.name,m.from?.emailAddress?.address,m.bodyPreview,...(m.categories||[])].join(' ')).includes(x))));
+  $('mPuces').innerHTML=F.map(([k,n,fn])=>`<button class="puce ${MAILF===k?'on':''}" data-f="${k}">${esc(n)}<b>${MAIL.L.filter(fn).length}</b></button>`).join('');
+  document.querySelectorAll('#mPuces .puce').forEach(b=>b.onclick=()=>{MAILF=b.dataset.f;ls.set('mailf',MAILF);mailDessinerListe()});
+  $('mLignes').innerHTML=(L.map(m=>`<div class="mrow ${m.isRead?'':'mnl'} ${MAIL.sel===m.id?'on':''}" data-id="${esc(m.id)}">
+      ${mailPastille(mailCodeDe(m))}<div class="mtxt"><div class="mh"><span class="mde">${esc(m.from?.emailAddress?.name||m.from?.emailAddress?.address||'(sans expéditeur)')}</span><span class="mdt">${m.hasAttachments?'📎 ':''}${esc(mailDate(m.receivedDateTime))}</span></div>
+      <div class="mobj">${m.importance==='high'?'<span style="color:var(--err)">! </span>':''}${esc(m.subject||'(sans objet)')}</div><div class="mpre">${esc(String(m.bodyPreview||'').slice(0,140))}</div>
+      <div class="mlie">${mailLiens(m)}</div></div></div>`).join('')||`<div class="vide">${MAIL.charge?'Chargement…':'Aucun mail dans ce filtre'}</div>`)
+    +(MAIL.next?'<div class="plus"><button class="btn" id="mPlus">Charger les suivants</button></div>':'');
+  document.querySelectorAll('#mLignes .mrow').forEach(d=>d.onclick=e=>{if(e.target.closest('a'))return;mailOuvrir(d.dataset.id)});
+  if($('mPlus'))$('mPlus').onclick=async()=>{$('mPlus').disabled=true;await mailCharger(true);mailDessinerListe()};
+}
+function mailMajCompteur(){const e=$('nb_mail');if(!e)return;const n=MAIL.recherche?null:MAIL.L.filter(m=>!m.isRead).length;if(n==null)return;e.textContent=n||'';e.title=n+' mail(s) non lu(s) dans kte@ (parmi les derniers chargés)'}
+/* Contenu HTML isolé : pas de script ; images distantes seulement à la demande ; liens ouverts dans un nouvel onglet */
+function mailCadre(m,att){
+  let h=m.body?.contentType==='html'?String(m.body.content||''):`<pre style="white-space:pre-wrap;font:13px/1.5 system-ui">${esc(m.body?.content||'')}</pre>`;
+  for(const a of att||[])if(a.contentId&&a.contentBytes)h=h.split('cid:'+a.contentId).join(`data:${a.contentType||'image/png'};base64,${a.contentBytes}`);
+  const csp=`default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:${MAIL.img?' https: http:':''}`;
+  return`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><style>body{font:13.5px/1.5 -apple-system,Segoe UI,system-ui,sans-serif;color:#1F2937;margin:14px;word-wrap:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>${h}</body></html>`}
+async function mailOuvrir(id,silencieux){
+  MAIL.sel=id;if(location.hash!=='#/mail/'+encodeURIComponent(id))history.replaceState(null,'','#/mail/'+encodeURIComponent(id));
+  document.querySelectorAll('#mLignes .mrow').forEach(d=>d.classList.toggle('on',d.dataset.id===id));
+  const box=$('mLect');if(!box)return;box.innerHTML='<div class="charge">Lecture du mail…</div>';
+  try{const j=await mailJeton(),B=mailBase()+'/messages/'+encodeURIComponent(id);
+    const m=await graph(j,B+'?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,categories,isRead,importance,internetMessageId',{headers:{Prefer:'outlook.body-content-type="html"'}});
+    let att=[];if(m.hasAttachments||/cid:/i.test(m.body?.content||'')){try{att=(await graph(j,B+'/attachments?$select=id,name,size,contentType,isInline')).value||[]}catch(e){console.warn(e)}
+      for(const a of att.filter(a=>a.isInline&&a.size<400e3).slice(0,12)){try{const x=await graph(j,B+'/attachments/'+encodeURIComponent(a.id));a.contentId=x.contentId;a.contentBytes=x.contentBytes}catch(e){}}}
+    const i=MAIL.L.findIndex(x=>x.id===id);if(i>=0)Object.assign(MAIL.L[i],{categories:m.categories,isRead:m.isRead});
+    m._corps=String(m.body?.content||'').replace(/<[^>]+>/g,' ').slice(0,20000);
+    if(MAIL.sel!==id)return;mailDessinerLecture(m,att);
+  }catch(e){box.innerHTML=`<div class="vide" style="color:var(--err)">Lecture impossible : ${esc(e.message)}</div>`;if(!silencieux)toast('Lecture impossible : '+e.message,true)}
+}
+function mailDessinerLecture(m,att){
+  const box=$('mLect');if(!box)return;const code=mailCodeDe(m),adr=m.from?.emailAddress||{};
+  const dest=l=>(l||[]).map(x=>esc(x.emailAddress?.name||x.emailAddress?.address)).join(', ');
+  const pj=(att||[]).filter(a=>!a.isInline);
+  box.innerHTML=`<div class="mtete"><h2>${esc(m.subject||'(sans objet)')}</h2>
+    <div class="mut" style="font-size:12.5px"><b style="color:var(--txt)">${esc(adr.name||'')}</b> &lt;${esc(adr.address||'')}&gt; · ${new Date(m.receivedDateTime).toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})}<br>À : ${dest(m.toRecipients)}${m.ccRecipients?.length?` · Cc : ${dest(m.ccRecipients)}`:''}</div>
+    <div class="mlie" style="margin-top:6px">${mailLiens(m)}</div>
+    <div class="mact"><span class="mut" style="font-size:12.5px">À traiter par</span>${MAIL_PERS.map(p=>`<button class="btn mattr ${code===p.c?'on':''}" data-c="${p.c}" style="${code===p.c?`background:${p.coul};border-color:${p.coul};color:#fff`:''}" title="${esc(p.n)}">${p.c}</button>`).join('')}<button class="btn mattr ${code?'':'on'}" data-c="" title="Retirer l'attribution">—</button>
+      <span style="flex:1"></span><button class="btn" id="mLu">${m.isRead?'Marquer non lu':'Marquer lu'}</button>
+      <a class="btn p" href="https://outlook.office.com/mail/${MAIL_BOITE}/inbox/id/${encodeURIComponent(m.id)}" target="_blank">${ico('ext')}Répondre dans Outlook</a></div>
+    ${pj.length?`<div class="mpj">${pj.map(a=>`<button class="chip" data-a="${esc(a.id)}" data-n="${esc(a.name)}">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span></button>`).join('')}</div>`:''}
+    ${!MAIL.img&&/<img[^>]+src=["']?https?:/i.test(m.body?.content||'')?'<div class="mut" style="font-size:12px;margin-top:6px">Images distantes masquées. <a href="#" id="mImg">Les afficher</a></div>':''}
+    <div class="mut" style="font-size:11.5px;margin-top:4px">${m.isRead?'Lu':'<b style="color:var(--accent)">Non lu</b> — reste non lu tant que vous ne cliquez pas « Marquer lu »'}</div></div>
+  <iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
+  box.querySelector('iframe').srcdoc=mailCadre(m,att);
+  box.querySelectorAll('.mattr').forEach(b=>b.onclick=()=>mailAttribuer(m,b.dataset.c,att));
+  $('mLu').onclick=()=>mailMarquer(m,!m.isRead,att);
+  if($('mImg'))$('mImg').onclick=e=>{e.preventDefault();MAIL.img=true;mailDessinerLecture(m,att)};
+  box.querySelectorAll('.mpj .chip').forEach(b=>b.onclick=()=>mailPJ(m.id,b.dataset.a,b.dataset.n));
+}
+async function mailPatch(m,corps){const j=await mailJeton();return graph(j,mailBase()+'/messages/'+encodeURIComponent(m.id),{method:'PATCH',body:JSON.stringify(corps)})}
+async function mailAttribuer(m,code,att){
+  const cats=(m.categories||[]).filter(c=>!MAIL_CODES.has(c)&&!/^a traiter par /i.test(c));if(code)cats.push(code);
+  try{const r=await mailPatch(m,{categories:cats});m.categories=r?.categories||cats;const i=MAIL.L.findIndex(x=>x.id===m.id);if(i>=0)MAIL.L[i].categories=m.categories;
+    mailDessinerLecture(m,att);mailDessinerListe();toast(code?`Attribué à ${MAIL_PERS.find(p=>p.c===code).n} (catégorie ${code}, visible aussi dans Outlook)`:'Attribution retirée')}
+  catch(e){toast('Attribution impossible : '+e.message,true)}}
+async function mailMarquer(m,lu,att){
+  try{await mailPatch(m,{isRead:lu});m.isRead=lu;const i=MAIL.L.findIndex(x=>x.id===m.id);if(i>=0)MAIL.L[i].isRead=lu;mailDessinerLecture(m,att);mailDessinerListe();mailMajCompteur();toast(lu?'Marqué comme lu':'Marqué comme non lu')}
+  catch(e){toast('Échec : '+e.message,true)}}
+async function mailPJ(mid,aid,nom){
+  try{const j=await mailJeton();const r=await fetch(`https://graph.microsoft.com/v1.0${mailBase()}/messages/${encodeURIComponent(mid)}/attachments/${encodeURIComponent(aid)}/$value`,{headers:{Authorization:'Bearer '+j}});
+    if(!r.ok)throw new Error('Microsoft '+r.status);const b=await r.blob(),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=nom||'piece-jointe';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5e3)}
+  catch(e){toast('Téléchargement impossible : '+e.message,true)}}
 
 /* ---------- Charges machines (13/11/2026) ----------
    Planning de charge par machine, tenu par Arnaud (tournage) et Christophe (fraisage).
