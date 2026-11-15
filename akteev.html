@@ -1199,9 +1199,9 @@ async function mailBandeauAffaire(m){const box=$('mAff');if(!box)return;box.inne
   const dep=mailDepotDe(m);
   if(dep){box.innerHTML=`<div class="maff ok">Déjà dans « À traiter » : <b>${esc(txt(dep.Type))}</b> · ${badge(dep.Statut)} <a href="#/depot/${dep.id}">ouvrir la demande n° ${dep.id}</a></div>`;return}
   if(mailAffaireConnue(m)||MAIL_SANSAFF.has(m.internetMessageId||m.id))return;
-  const g=devinerDepot(m.subject||'',m._corps||m.bodyPreview||'',adr),num=mailNumPropose();
+  const g=devinerDepot(m.subject||'',m._corps||m.bodyPreview||'',adr),num='';
   const B=(ty,lib,cl)=>`<button class="btn ${cl||''}" data-ty="${ty}">${lib}</button>`;
-  box.innerHTML=`<div class="maff"><div><b>Aucune affaire reconnue.</b> Akteev pense : <b>${esc(g.type)}</b> <span class="mut">(${esc(g.indice)})</span>${num?` · n° proposé <b>${num}</b> <span class="mut">(vérifié dans le registre au lancement)</span>`:''}</div>
+  box.innerHTML=`<div class="maff"><div><b>Aucune affaire reconnue.</b> Akteev pense : <b>${esc(g.type)}</b> <span class="mut">(${esc(g.indice)})</span></div>
     <div class="mact" style="margin-top:6px">${B('DDP client','Nouvelle DDP',g.type==='DDP client'?'p':'')}${B('Commande client','Enregistrer une commande',g.type==='Commande client'?'p':'')}${B('Offre fournisseur','Offre fournisseur → CF',g.type==='Offre fournisseur'?'p':'')}<span style="flex:1"></span><button class="btn" data-ty="">Pas d'affaire</button></div></div>`;
   box.querySelectorAll('button[data-ty]').forEach(b=>b.onclick=()=>{if(!b.dataset.ty){MAIL_SANSAFF.add(m.internetMessageId||m.id);ls.set('mail_sansaff',[...MAIL_SANSAFF].slice(-500));box.innerHTML='';return}mailLancer(m,b.dataset.ty,g,num)})}
 async function mailLancer(m,type,g,num){
@@ -1216,7 +1216,7 @@ async function mailLancer(m,type,g,num){
     const quand=new Date().toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
     const corps={'Objet':m.subject||'(sans objet)','Type':opt('Type',type),'Statut':opt('Statut','À lancer'),'Reçu le':m.receivedDateTime,'Expéditeur':exped,'Boîte':'kte@',
       'Message-ID':m.internetMessageId||'','Client / fournisseur':nomCf,'Lien Outlook':lien,'À traiter par':qui,
-      'Proposition':action+(num&&type!=='Offre fournisseur'?` · n° proposé ${num} (à vérifier dans le registre avant attribution)`:''),
+      'Proposition':action+(type!=='Offre fournisseur'?' · n° à attribuer au lancement (registre)':''),
       'Indices':`${g.indice} — lancé depuis Mail kte@${qui?' par '+qui:''} le ${quand}`};
     const ex=mailDepotDe(m);
     const r=ex?await api(`/rows/table/${t}/${ex.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)}):await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
@@ -1224,12 +1224,12 @@ async function mailLancer(m,type,g,num){
     if(type==='DDP client'&&!(m.categories||[]).some(c=>/^DDP/i.test(c))){try{const cats=[...(m.categories||[]),'DDP – à traiter'];const x=await mailPatch(m,{categories:cats});m.categories=x?.categories||cats;const i=MAIL.L.findIndex(y=>y.id===m.id);if(i>=0)MAIL.L[i].categories=m.categories;delete MAIL.cache[m.id]}catch(e){console.warn(e)}}
     const verbe={'DDP client':'Lance la DDP','Commande client':'Enregistre la commande','Offre fournisseur':'Prépare la commande fournisseur'}[type];
     const consigne=`${verbe} de la demande Akteev « À traiter » n° ${r.id} : mail « ${m.subject||''} » de ${exped}, reçu le ${new Date(m.receivedDateTime).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})} sur kte@ (Message-ID ${m.internetMessageId||'?'}).`+
-      (type==='Offre fournisseur'?'':` Aucune affaire existante reconnue ; n° proposé ${num||'?'} : vérifie-le dans le registre avant de l’attribuer.`);
+      (type==='Offre fournisseur'?'':' Aucune affaire existante reconnue ; attribue le n° d’affaire d’après le registre.');
     try{await navigator.clipboard.writeText(consigne)}catch(e){}
     ouvrirModal('Demande prête à lancer',`<p style="margin-top:0"><b>${esc(type)}</b> enregistrée dans <a href="#/depot/${r.id}">« À traiter » n° ${r.id}</a>, statut <b>À lancer</b>.</p>
       <p>Pour la lancer avec Claude <b>maintenant</b> : collez cette consigne dans Claude (Cowork, projet Akteev).</p>
       <textarea id="mlCons" readonly style="width:100%;height:110px;font:13px/1.45 inherit;border:1px solid var(--trait);border-radius:8px;padding:8px">${esc(consigne)}</textarea>
-      <p class="mut" style="font-size:12.5px;margin-bottom:0">Sinon, la tâche automatique « À traiter » (toutes les heures, 7 h – 19 h en semaine) prépare le lancement — numéro vérifié dans le registre, dossier, pièces — et vous prévient pour valider la suite.</p>`,
+      <p class="mut" style="font-size:12.5px;margin-bottom:0">Sinon, la tâche automatique « À traiter » (toutes les heures, 7 h – 19 h en semaine) relit le mail et ses pièces, vérifie qu’aucune affaire n’existe déjà et prépare le lancement ; le n° d’affaire est attribué au lancement, avec Claude.</p>`,
       `<button class="btn" id="mlVoir">Voir dans « À traiter »</button><button class="btn p" id="mlCop">Copier la consigne</button>`);
     $('mlCop').onclick=async()=>{try{await navigator.clipboard.writeText(consigne)}catch(e){$('mlCons').select();document.execCommand('copy')}toast('Consigne copiée')};
     $('mlVoir').onclick=()=>{fermerModal(true);location.hash='#/depot/'+r.id};
