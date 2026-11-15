@@ -901,7 +901,7 @@ function mailDessiner(){
     <div class="puces" id="mPuces"></div></div><div id="mLignes"></div></div>
   <div class="card mlect" id="mLect"><div class="vide">Choisissez un mail à gauche.<br><span style="font-size:12.5px">Le lire ici ne le marque pas comme lu.</span></div></div></div>`;
   $('mNv').onclick=()=>mailNouveau();$('mBr').onclick=()=>mailBrouillons();
-  $('mMaj').onclick=async()=>{$('mMaj').disabled=true;MAIL.next=null;await mailCharger();mailDessiner();if(MAIL.sel)mailOuvrir(MAIL.sel,true);toast('Mails actualisés')};
+  $('mMaj').onclick=async()=>{$('mMaj').disabled=true;MAIL.next=null;MAIL.cache={};await mailCharger();mailDessiner();if(MAIL.sel)mailOuvrir(MAIL.sel,true);toast('Mails actualisés')};
   const q=$('mq');q.oninput=()=>{MAIL.q=q.value;mailDessinerListe()};
   q.onkeydown=async e=>{if(e.key==='Enter'&&q.value.trim().length>1){MAIL.recherche=q.value.trim();MAIL.q='';MAIL.next=null;$('mLignes').innerHTML='<div class="charge">Recherche dans toute la boîte…</div>';await mailCharger();mailDessiner()}};
   if($('mRaz'))$('mRaz').onclick=async()=>{MAIL.recherche=null;MAIL.next=null;MAIL.q='';await mailCharger();mailDessiner()};
@@ -944,8 +944,23 @@ async function mailOuvrir(id,silencieux){
     const i=MAIL.L.findIndex(x=>x.id===id);if(i>=0)Object.assign(MAIL.L[i],{categories:m.categories,isRead:m.isRead});
     if(MAIL.sel!==id)return;mailDessinerLecture(m,att);
     const L=MAIL.L.filter(mailFiltreActuel()),k=L.findIndex(x=>x.id===id);for(const x of [L[k+1],L[k-1]])if(x&&!MAIL.cache[x.id])mailLire(x.id).catch(()=>{});
-  }catch(e){box.innerHTML=`<div class="vide" style="color:var(--err)">Lecture impossible : ${esc(e.message)}</div>`;if(!silencieux)toast('Lecture impossible : '+e.message,true)}
+  }catch(e){
+    if(e.status===404){   // déplacé, archivé ou supprimé entre-temps (souvent depuis Outlook) : on retire de la liste et on rafraîchit
+      const i=MAIL.L.findIndex(x=>x.id===id);if(i>=0)MAIL.L.splice(i,1);delete MAIL.cache[id];if(MAIL.sel===id)MAIL.sel=null;
+      if(location.hash.startsWith('#/mail/'))history.replaceState(null,'','#/mail');
+      box.innerHTML='<div class="vide">Ce mail n’est plus dans la boîte de réception de kte@ :<br>il a été déplacé, archivé ou supprimé entre-temps (peut-être depuis Outlook).<br><span style="font-size:12.5px">La liste vient d’être actualisée.</span></div>';
+      mailRafraichir().catch(()=>{});return}
+    box.innerHTML=`<div class="vide" style="color:var(--err)">Lecture impossible : ${esc(e.message)}</div>`;if(!silencieux)toast('Lecture impossible : '+e.message,true)}
 }
+/* Actualisation : la 1re page est relue (toutes les 60 s si l'onglet est affiché) et fusionnée avec les mails plus anciens déjà chargés */
+async function mailRafraichir(){if(MAIL.recherche||MAIL.charge)return;MAIL.charge=true;
+  try{const j=await mailJeton();const r=await graph(j,`${mailBase()}/mailFolders/inbox/messages?$top=40&$orderby=receivedDateTime desc&$select=${MAIL_SEL}`);const v=r.value||[];
+    const ids=new Set(v.map(x=>x.id)),bas=v.length?v[v.length-1].receivedDateTime:'';
+    MAIL.L=v.concat(MAIL.L.filter(x=>!ids.has(x.id)&&String(x.receivedDateTime)<bas));if(!MAIL.next&&r['@odata.nextLink']&&MAIL.L.length<=40)MAIL.next=r['@odata.nextLink'];
+    for(const x of v){const c=MAIL.cache[x.id];if(c&&(c.m.isRead!==x.isRead||String(c.m.categories)!==String(x.categories)))delete MAIL.cache[x.id]}
+  }finally{MAIL.charge=false}
+  if(location.hash.startsWith('#/mail')&&$('mLignes')){mailDessinerListe();mailMajCompteur()}}
+setInterval(()=>{if(location.hash.startsWith('#/mail')&&document.visibilityState==='visible'&&MAIL.L.length&&!MAIL.comp)mailRafraichir().catch(e=>console.warn('rafraîchissement',e))},60e3);
 function mailDessinerLecture(m,att){
   const box=$('mLect');if(!box)return;const code=mailCodeDe(m),adr=m.from?.emailAddress||{};
   const dest=l=>(l||[]).map(x=>esc(x.emailAddress?.name||x.emailAddress?.address)).join(', ');
