@@ -106,6 +106,9 @@ a.chip:hover{background:var(--accentL);color:var(--accent)}
 .mact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}.mact .mattr{padding:5px 10px;font-weight:700}
 .mpj{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mpj .chip{cursor:pointer;border:1px solid var(--trait);background:#fff}
 .mcorps{border:0;width:100%;height:calc(100vh - 330px);min-height:320px;border-radius:0 0 var(--r) var(--r)}
+.mfil{margin:10px 14px 0;border:1px solid var(--trait);border-radius:10px;overflow:hidden}.mfilt{padding:7px 12px;font-size:12.5px;font-weight:600;background:#F6F8FB;border-bottom:1px solid var(--trait)}
+.mfm{border-bottom:1px solid #EEF1F6}.mfm:last-child{border-bottom:0}.mfh{display:flex;justify-content:space-between;gap:8px;padding:7px 12px 0;cursor:pointer;font-size:13px}.mfm .mpre{padding:0 12px 7px;cursor:pointer}.mfm.ouvert .mpre{display:none}.mfm:hover{background:var(--hover)}
+.mfcorps{border:0;width:100%;height:320px;background:#fff}
 .mcomp{margin:10px 14px;border:1px solid #B8CDF8;border-radius:10px;background:#FBFCFF;box-shadow:0 2px 8px rgba(47,111,237,.08)}.mcomp.survol{outline:2px dashed var(--accent)}
 .mcbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--trait)}.mcbar .btn{padding:2px 9px}
 .mcl{display:flex;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid #EEF1F6}.mcl label{width:42px;color:var(--mut);font-size:12.5px}
@@ -929,7 +932,7 @@ async function mailLire(id){const c=MAIL.cache[id];if(c&&Date.now()-c.t<120e3)re
   const j=await mailJeton(),B=mailBase()+'/messages/'+encodeURIComponent(id);
   const m=await graph(j,B+'?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,categories,isRead,importance,internetMessageId,conversationId',{headers:{Prefer:'outlook.body-content-type="html"'}});
   let att=[];if(m.hasAttachments||/cid:/i.test(m.body?.content||'')){try{att=(await graph(j,B+'/attachments?$select=id,name,size,contentType,isInline')).value||[]}catch(e){console.warn(e)}
-    for(const a of att.filter(a=>a.isInline&&a.size<400e3).slice(0,12)){try{const x=await graph(j,B+'/attachments/'+encodeURIComponent(a.id));a.contentId=x.contentId;a.contentBytes=x.contentBytes}catch(e){}}}
+    for(const a of att.filter(a=>a.isInline&&a.size<3e6).slice(0,12)){try{const x=await graph(j,B+'/attachments/'+encodeURIComponent(a.id));a.contentId=x.contentId;a.contentBytes=x.contentBytes}catch(e){}}}
   m._corps=String(m.body?.content||'').replace(/<[^>]+>/g,' ').slice(0,20000);
   return MAIL.cache[id]={m,att,t:Date.now()}}
 async function mailOuvrir(id,silencieux){
@@ -958,11 +961,12 @@ function mailDessinerLecture(m,att){
     ${pj.length?`<div class="mpj">${pj.map(a=>`<button class="chip" data-a="${esc(a.id)}" data-n="${esc(a.name)}">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span></button>`).join('')}</div>`:''}
     ${!MAIL.img&&/<img[^>]+src=["']?https?:/i.test(m.body?.content||'')?'<div class="mut" style="font-size:12px;margin-top:6px">Images distantes masquées. <a href="#" id="mImg">Les afficher</a></div>':''}
     <div class="mut" style="font-size:11.5px;margin-top:4px">${m.isRead?'Lu':'<b style="color:var(--accent)">Non lu</b> — reste non lu tant que vous ne cliquez pas « Marquer lu »'}</div></div>
-  <div id="mComp"></div><iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
+  <div id="mFil"></div><div id="mComp"></div><iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
   box.querySelector('iframe').srcdoc=mailCadre(m,att);MAIL.cur={m,att};
   $('mRep').onclick=()=>mailRediger(m,'repondre');$('mTous').onclick=()=>mailRediger(m,'tous');$('mTr').onclick=()=>mailRediger(m,'transferer');
   $('mRg').onclick=e=>{e.stopPropagation();mailMenuRanger(m,$('mRg'))};$('mArc').onclick=()=>mailRanger(m,'archive','Archive');
   if(MAIL.comp&&MAIL.comp.src===m.id)mailCompDessiner();
+  mailFil(m);
   box.querySelectorAll('.mattr').forEach(b=>b.onclick=()=>mailAttribuer(m,b.dataset.c,att));
   $('mLu').onclick=()=>mailMarquer(m,!m.isRead,att);
   if($('mImg'))$('mImg').onclick=e=>{e.preventDefault();MAIL.img=true;mailDessinerLecture(m,att)};
@@ -1142,6 +1146,19 @@ document.addEventListener('keydown',e=>{
   if(fait)e.preventDefault()});
 function mailNouveau(){if(!$('mLect'))return;MAIL.sel=null;MAIL.cur=null;document.querySelectorAll('#mLignes .mrow').forEach(d=>d.classList.remove('on'));
   $('mLect').innerHTML=`<div class="mtete"><h2>Nouveau message</h2><div class="mut" style="font-size:12.5px">Envoyé depuis kte@kte-fr.com</div></div><div id="mComp"></div>`;mailRediger(null,'nouveau')}
+/* ---- Conversation (15/11/2026) : comme Outlook, les autres messages du même fil (reçus et envoyés depuis kte@), du plus récent au plus ancien ---- */
+const MAIL_FIL={};
+async function mailFil(m){const box=$('mFil');if(!box||!m.conversationId)return;
+  try{let L=MAIL_FIL[m.conversationId];
+    if(!L||Date.now()-L.t>60e3){const j=await mailJeton();const r=await graph(j,mailBase()+`/messages?$filter=${encodeURIComponent(`conversationId eq '${m.conversationId.replace(/'/g,"''")}'`)}&$select=id,subject,from,toRecipients,receivedDateTime,isDraft,bodyPreview&$top=50`);
+      L=MAIL_FIL[m.conversationId]={t:Date.now(),v:(r.value||[]).filter(x=>!x.isDraft).sort((a,b)=>String(b.receivedDateTime).localeCompare(String(a.receivedDateTime)))}}
+    if(MAIL.sel!==m.id||!$('mFil'))return;const autres=L.v.filter(x=>x.id!==m.id);if(!autres.length){box.innerHTML='';return}
+    box.innerHTML=`<div class="mfil"><div class="mfilt">Conversation · ${L.v.length} messages <span class="mut">(cliquez pour lire)</span></div>${autres.map(x=>{const de=x.from?.emailAddress||{},env=/^kte@kte-fr\.com$/i.test(de.address||'');
+      return`<div class="mfm" data-id="${esc(x.id)}"><div class="mfh"><b>${env?'KTE (envoyé)':esc(de.name||de.address||'')}</b><span class="mut">${esc(new Date(x.receivedDateTime).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'}))}</span></div><div class="mpre">${esc(String(x.bodyPreview||'').slice(0,160))}</div><div class="mfc"></div></div>`}).join('')}</div>`;
+    box.querySelectorAll('.mfm').forEach(d=>d.querySelector('.mfh').onclick=d.querySelector('.mpre').onclick=async()=>{const c=d.querySelector('.mfc');if(c.innerHTML){c.innerHTML='';d.classList.remove('ouvert');return}
+      d.classList.add('ouvert');c.innerHTML='<div class="charge" style="padding:8px">Lecture…</div>';
+      try{const {m:x,att}=await mailLire(d.dataset.id);c.innerHTML='<iframe class="mfcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>';c.querySelector('iframe').srcdoc=mailCadre(x,att)}catch(e){c.innerHTML=`<div style="color:var(--err);padding:8px">${esc(e.message)}</div>`}});
+  }catch(e){console.warn('fil',e)}}
 /* ---------- Charges machines (13/11/2026) ----------
    Planning de charge par machine, tenu par Arnaud (tournage) et Christophe (fraisage).
    Table « Machines » T_MACH : Nom, Secteur (Fraisage / Tournage / Fraisage fil), Heures par jour, Ordre, Hors service, Notes.
