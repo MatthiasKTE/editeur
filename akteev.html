@@ -93,9 +93,9 @@ a.chip:hover{background:var(--accentL);color:var(--accent)}
 .mailg{display:grid;grid-template-columns:minmax(360px,1fr) minmax(0,1.35fr);gap:14px;align-items:start}
 @media(max-width:1100px){.mailg{grid-template-columns:1fr}}
 .mliste #mLignes{max-height:calc(100vh - 230px);overflow:auto}
-.mrow{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--trait);cursor:pointer;border-left:3px solid transparent}
+.mrow{display:flex;gap:10px;padding:10px 14px;border-bottom:1px solid var(--trait);cursor:pointer;border-left:5px solid transparent}
 .mrow:hover{background:var(--hover)}.mrow.on{background:var(--accentL)}
-.mrow.mnl{border-left-color:var(--accent)}.mrow.mnl .mde,.mrow.mnl .mobj{font-weight:700;color:var(--txt)}
+.mrow.mnl{border-left-color:#DC2626}.mrow.mnl .mde,.mrow.mnl .mobj{font-weight:700;color:var(--txt)}
 .mtxt{flex:1;min-width:0}.mh{display:flex;gap:8px}.mde{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mdt{color:var(--mut);font-size:12px;white-space:nowrap}.mobj{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mpre{color:var(--mut);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.mlie:empty{display:none}.mlie{margin-top:3px}
@@ -824,7 +824,7 @@ const MAIL_ACTIF=true;
 /* Phase 1 (15/11/2026, demande de Matthias) : onglet visible seulement par lui (profil Direction / Admin). */
 const mailVisible=()=>MAIL_ACTIF&&estAdmin();
 const MAIL_BOITE='kte@kte-fr.com',MAIL_SCOPES=['Mail.ReadWrite.Shared'];
-const MAIL_PERS=[{c:'MK',n:'Matthias',coul:'#2E7D32',re:/^matt/},{c:'SD',n:'Sébastien',coul:'#1F5FD1',re:/^s[eé]b/},{c:'WB',n:'William',coul:'#C2185B',re:/^will/}];
+const MAIL_PERS=[{c:'MK',n:'Matthias',coul:'#2E9440',re:/^matt/},{c:'SD',n:'Sébastien',coul:'#1F5FD1',re:/^s[eé]b/},{c:'WB',n:'William',coul:'#7B3FC4',re:/^will/}];
 const MAIL_CODES=new Set(MAIL_PERS.map(p=>p.c));
 const mailCodeDe=m=>(m.categories||[]).find(c=>MAIL_CODES.has(c))||((m.categories||[]).map(c=>(c.match(/^a traiter par (MK|SD|WB)$/i)||[])[1]).find(Boolean)||'').toUpperCase()||'';
 const MAIL={L:[],next:null,sel:null,charge:false,err:'',q:'',img:false,recherche:null};
