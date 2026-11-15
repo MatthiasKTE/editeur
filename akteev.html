@@ -106,6 +106,20 @@ a.chip:hover{background:var(--accentL);color:var(--accent)}
 .mact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}.mact .mattr{padding:5px 10px;font-weight:700}
 .mpj{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mpj .chip{cursor:pointer;border:1px solid var(--trait);background:#fff}
 .mcorps{border:0;width:100%;height:calc(100vh - 330px);min-height:320px;border-radius:0 0 var(--r) var(--r)}
+.mcomp{margin:10px 14px;border:1px solid #B8CDF8;border-radius:10px;background:#FBFCFF;box-shadow:0 2px 8px rgba(47,111,237,.08)}.mcomp.survol{outline:2px dashed var(--accent)}
+.mcbar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--trait)}.mcbar .btn{padding:2px 9px}
+.mcl{display:flex;align-items:center;gap:8px;padding:4px 12px;border-bottom:1px solid #EEF1F6}.mcl label{width:42px;color:var(--mut);font-size:12.5px}
+.mcl>input{flex:1;border:0;background:none;outline:none;padding:5px 0;font:inherit}
+.mdest{flex:1;display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-height:30px;cursor:text}.mdest input{flex:1;min-width:160px;border:0;background:none;outline:none;padding:4px 0;font:inherit}
+.mchip{background:var(--accentL);color:var(--accent);border-radius:14px;padding:2px 4px 2px 9px;font-size:12.5px;display:inline-flex;align-items:center;gap:4px}.mchip b{cursor:pointer;padding:0 5px;border-radius:9px}.mchip b:hover{background:#D3E1FC}
+.mchip.mauvais{background:#FEE2E2;color:#B91C1C}
+.mtb{display:flex;gap:4px;align-items:center;padding:5px 12px;border-bottom:1px solid #EEF1F6}.mtb button{border:1px solid transparent;background:none;border-radius:6px;padding:3px 8px;font-size:12.5px;color:var(--txt)}.mtb button:hover{background:var(--hover);border-color:var(--trait)}
+.mced{min-height:150px;max-height:45vh;overflow:auto;padding:10px 12px;outline:none;font:14px/1.5 Calibri,Arial,sans-serif;background:#fff}
+.mcsig{padding:6px 12px 10px;font:13px/1.45 Calibri,Arial,sans-serif;background:#fff;border-top:1px dashed #E3E7EE}
+.mcpj{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px}.mcpj:empty{display:none}.mcpj .chip{margin-top:8px}
+.mcbas{display:flex;align-items:center;gap:10px;padding:10px 12px}.menvoi{font-weight:600;color:var(--accent)}
+.mmenu{position:fixed;z-index:60;width:280px;max-height:360px;display:flex;flex-direction:column;background:#fff;border:1px solid var(--trait);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.14)}
+.mmenu .mmq{margin:8px;border:1px solid var(--trait);border-radius:7px;padding:6px 9px;outline:none}.mml{overflow:auto}.mml button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 12px;font-size:13px}.mml button:hover{background:var(--accentL)}
 .bascule{display:inline-flex;border:1px solid var(--trait);border-radius:7px;overflow:hidden;margin-left:auto}
 .bascule button{border:0;background:#fff;padding:6px 10px;color:var(--mut);display:flex;align-items:center;gap:5px}
 .bascule button.on{background:var(--accentL);color:var(--accent)}
@@ -827,7 +841,7 @@ const MAIL_BOITE='kte@kte-fr.com',MAIL_SCOPES=['Mail.ReadWrite.Shared'];
 const MAIL_PERS=[{c:'MK',n:'Matthias',coul:'#2E9440',re:/^matt/},{c:'SD',n:'Sébastien',coul:'#1F5FD1',re:/^s[eé]b/},{c:'WB',n:'William',coul:'#7B3FC4',re:/^will/}];
 const MAIL_CODES=new Set(MAIL_PERS.map(p=>p.c));
 const mailCodeDe=m=>(m.categories||[]).find(c=>MAIL_CODES.has(c))||((m.categories||[]).map(c=>(c.match(/^a traiter par (MK|SD|WB)$/i)||[])[1]).find(Boolean)||'').toUpperCase()||'';
-const MAIL={L:[],next:null,sel:null,charge:false,err:'',q:'',img:false,recherche:null};
+const MAIL={L:[],next:null,sel:null,charge:false,err:'',q:'',img:false,recherche:null,cache:{},cur:null,comp:null,brouillons:null};
 let MAILF=ls.get('mailf','');
 const mailBase=()=>`/users/${encodeURIComponent(MAIL_BOITE)}`;
 const MAIL_SEL='id,subject,from,receivedDateTime,isRead,categories,bodyPreview,hasAttachments,conversationId,importance';
@@ -876,13 +890,14 @@ function mailFiltres(){const moi=mailMoiCode();
 function mailDessiner(){
   const nl=MAIL.L.filter(m=>!m.isRead).length;
   $('main').innerHTML=`<div class="entete"><h1>Mail kte@</h1><span class="sous">${MAIL.recherche?`Recherche « ${esc(MAIL.recherche)} » dans toute la boîte · `:'Boîte de réception · '}${MAIL.L.length} mail(s) chargé(s)${nl?` · <b style="color:var(--accent)">${nl} non lu(s)</b>`:''}</span>
-    <div class="act"><button class="btn" id="mMaj">${ico('cal')}Actualiser</button><a class="btn" href="https://outlook.office.com/mail/${MAIL_BOITE}/" target="_blank">${ico('ext')}kte@ dans Outlook</a></div></div>
+    <div class="act"><button class="btn p" id="mNv" title="Nouveau message (n)">${ico('plus')}Nouveau</button><button class="btn" id="mBr">${ico('crayon')}Brouillons</button><button class="btn" id="mMaj">${ico('cal')}Actualiser</button><a class="btn" href="https://outlook.office.com/mail/${MAIL_BOITE}/" target="_blank">${ico('ext')}kte@ dans Outlook</a></div></div>
   ${MAIL.err?`<div class="card" style="padding:14px;margin-bottom:12px;color:var(--err)">${esc(MAIL.err)}</div>`:''}
   <div class="mailg"><div class="card mliste"><div class="outils">
     <div class="rech">${ico('loupe')}<input id="mq" placeholder="Filtrer (objet, expéditeur, n°…) · Entrée = toute la boîte" value="${esc(MAIL.q)}"></div>
     ${MAIL.recherche?'<button class="btn" id="mRaz">× Fin de la recherche</button>':''}
     <div class="puces" id="mPuces"></div></div><div id="mLignes"></div></div>
   <div class="card mlect" id="mLect"><div class="vide">Choisissez un mail à gauche.<br><span style="font-size:12.5px">Le lire ici ne le marque pas comme lu.</span></div></div></div>`;
+  $('mNv').onclick=()=>mailNouveau();$('mBr').onclick=()=>mailBrouillons();
   $('mMaj').onclick=async()=>{$('mMaj').disabled=true;MAIL.next=null;await mailCharger();mailDessiner();if(MAIL.sel)mailOuvrir(MAIL.sel,true);toast('Mails actualisés')};
   const q=$('mq');q.oninput=()=>{MAIL.q=q.value;mailDessinerListe()};
   q.onkeydown=async e=>{if(e.key==='Enter'&&q.value.trim().length>1){MAIL.recherche=q.value.trim();MAIL.q='';MAIL.next=null;$('mLignes').innerHTML='<div class="charge">Recherche dans toute la boîte…</div>';await mailCharger();mailDessiner()}};
@@ -910,17 +925,22 @@ function mailCadre(m,att){
   for(const a of att||[])if(a.contentId&&a.contentBytes)h=h.split('cid:'+a.contentId).join(`data:${a.contentType||'image/png'};base64,${a.contentBytes}`);
   const csp=`default-src 'none'; style-src 'unsafe-inline'; font-src data:; img-src data:${MAIL.img?' https: http:':''}`;
   return`<!doctype html><html><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="${csp}"><base target="_blank"><style>body{font:13.5px/1.5 -apple-system,Segoe UI,system-ui,sans-serif;color:#1F2937;margin:14px;word-wrap:break-word}img{max-width:100%;height:auto}table{max-width:100%}</style></head><body>${h}</body></html>`}
+async function mailLire(id){const c=MAIL.cache[id];if(c&&Date.now()-c.t<120e3)return c;
+  const j=await mailJeton(),B=mailBase()+'/messages/'+encodeURIComponent(id);
+  const m=await graph(j,B+'?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,categories,isRead,importance,internetMessageId,conversationId',{headers:{Prefer:'outlook.body-content-type="html"'}});
+  let att=[];if(m.hasAttachments||/cid:/i.test(m.body?.content||'')){try{att=(await graph(j,B+'/attachments?$select=id,name,size,contentType,isInline')).value||[]}catch(e){console.warn(e)}
+    for(const a of att.filter(a=>a.isInline&&a.size<400e3).slice(0,12)){try{const x=await graph(j,B+'/attachments/'+encodeURIComponent(a.id));a.contentId=x.contentId;a.contentBytes=x.contentBytes}catch(e){}}}
+  m._corps=String(m.body?.content||'').replace(/<[^>]+>/g,' ').slice(0,20000);
+  return MAIL.cache[id]={m,att,t:Date.now()}}
 async function mailOuvrir(id,silencieux){
+  if(MAIL.comp&&!MAIL.comp.envoi&&MAIL.comp.src!==id){try{await mailCompEnregistrer()}catch(e){}MAIL.comp=null;toast('Brouillon gardé dans kte@ (Brouillons)')}
   MAIL.sel=id;if(location.hash!=='#/mail/'+encodeURIComponent(id))history.replaceState(null,'','#/mail/'+encodeURIComponent(id));
   document.querySelectorAll('#mLignes .mrow').forEach(d=>d.classList.toggle('on',d.dataset.id===id));
-  const box=$('mLect');if(!box)return;box.innerHTML='<div class="charge">Lecture du mail…</div>';
-  try{const j=await mailJeton(),B=mailBase()+'/messages/'+encodeURIComponent(id);
-    const m=await graph(j,B+'?$select=id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,hasAttachments,categories,isRead,importance,internetMessageId',{headers:{Prefer:'outlook.body-content-type="html"'}});
-    let att=[];if(m.hasAttachments||/cid:/i.test(m.body?.content||'')){try{att=(await graph(j,B+'/attachments?$select=id,name,size,contentType,isInline')).value||[]}catch(e){console.warn(e)}
-      for(const a of att.filter(a=>a.isInline&&a.size<400e3).slice(0,12)){try{const x=await graph(j,B+'/attachments/'+encodeURIComponent(a.id));a.contentId=x.contentId;a.contentBytes=x.contentBytes}catch(e){}}}
+  const box=$('mLect');if(!box)return;if(!MAIL.cache[id])box.innerHTML='<div class="charge">Lecture du mail…</div>';
+  try{const {m,att}=await mailLire(id);
     const i=MAIL.L.findIndex(x=>x.id===id);if(i>=0)Object.assign(MAIL.L[i],{categories:m.categories,isRead:m.isRead});
-    m._corps=String(m.body?.content||'').replace(/<[^>]+>/g,' ').slice(0,20000);
     if(MAIL.sel!==id)return;mailDessinerLecture(m,att);
+    const L=MAIL.L.filter(mailFiltreActuel()),k=L.findIndex(x=>x.id===id);for(const x of [L[k+1],L[k-1]])if(x&&!MAIL.cache[x.id])mailLire(x.id).catch(()=>{});
   }catch(e){box.innerHTML=`<div class="vide" style="color:var(--err)">Lecture impossible : ${esc(e.message)}</div>`;if(!silencieux)toast('Lecture impossible : '+e.message,true)}
 }
 function mailDessinerLecture(m,att){
@@ -931,13 +951,18 @@ function mailDessinerLecture(m,att){
     <div class="mut" style="font-size:12.5px"><b style="color:var(--txt)">${esc(adr.name||'')}</b> &lt;${esc(adr.address||'')}&gt; · ${new Date(m.receivedDateTime).toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})}<br>À : ${dest(m.toRecipients)}${m.ccRecipients?.length?` · Cc : ${dest(m.ccRecipients)}`:''}</div>
     <div class="mlie" style="margin-top:6px">${mailLiens(m)}</div>
     <div class="mact"><span class="mut" style="font-size:12.5px">À traiter par</span>${MAIL_PERS.map(p=>`<button class="btn mattr ${code===p.c?'on':''}" data-c="${p.c}" style="${code===p.c?`background:${p.coul};border-color:${p.coul};color:#fff`:''}" title="${esc(p.n)}">${p.c}</button>`).join('')}<button class="btn mattr ${code?'':'on'}" data-c="" title="Retirer l'attribution">—</button>
-      <span style="flex:1"></span><button class="btn" id="mLu">${m.isRead?'Marquer non lu':'Marquer lu'}</button>
-      <a class="btn p" href="https://outlook.office.com/mail/${MAIL_BOITE}/inbox/id/${encodeURIComponent(m.id)}" target="_blank">${ico('ext')}Répondre dans Outlook</a></div>
+      <span style="flex:1"></span><button class="btn" id="mLu" title="u">${m.isRead?'Marquer non lu':'Marquer lu'}</button></div>
+    <div class="mact"><button class="btn p" id="mRep" title="r">Répondre</button><button class="btn" id="mTous" title="Maj + R">Répondre à tous</button><button class="btn" id="mTr" title="f">Transférer</button>
+      <span style="flex:1"></span><button class="btn" id="mRg" title="Ranger dans un dossier">${ico('dossier')}Ranger ▾</button><button class="btn" id="mArc" title="e">Archiver</button>
+      <a class="btn" href="https://outlook.office.com/mail/${MAIL_BOITE}/inbox/id/${encodeURIComponent(m.id)}" target="_blank" title="Ouvrir dans Outlook">${ico('ext')}</a></div>
     ${pj.length?`<div class="mpj">${pj.map(a=>`<button class="chip" data-a="${esc(a.id)}" data-n="${esc(a.name)}">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span></button>`).join('')}</div>`:''}
     ${!MAIL.img&&/<img[^>]+src=["']?https?:/i.test(m.body?.content||'')?'<div class="mut" style="font-size:12px;margin-top:6px">Images distantes masquées. <a href="#" id="mImg">Les afficher</a></div>':''}
     <div class="mut" style="font-size:11.5px;margin-top:4px">${m.isRead?'Lu':'<b style="color:var(--accent)">Non lu</b> — reste non lu tant que vous ne cliquez pas « Marquer lu »'}</div></div>
-  <iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
-  box.querySelector('iframe').srcdoc=mailCadre(m,att);
+  <div id="mComp"></div><iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
+  box.querySelector('iframe').srcdoc=mailCadre(m,att);MAIL.cur={m,att};
+  $('mRep').onclick=()=>mailRediger(m,'repondre');$('mTous').onclick=()=>mailRediger(m,'tous');$('mTr').onclick=()=>mailRediger(m,'transferer');
+  $('mRg').onclick=e=>{e.stopPropagation();mailMenuRanger(m,$('mRg'))};$('mArc').onclick=()=>mailRanger(m,'archive','Archive');
+  if(MAIL.comp&&MAIL.comp.src===m.id)mailCompDessiner();
   box.querySelectorAll('.mattr').forEach(b=>b.onclick=()=>mailAttribuer(m,b.dataset.c,att));
   $('mLu').onclick=()=>mailMarquer(m,!m.isRead,att);
   if($('mImg'))$('mImg').onclick=e=>{e.preventDefault();MAIL.img=true;mailDessinerLecture(m,att)};
@@ -947,16 +972,175 @@ async function mailPatch(m,corps){const j=await mailJeton();return graph(j,mailB
 async function mailAttribuer(m,code,att){
   const cats=(m.categories||[]).filter(c=>!MAIL_CODES.has(c)&&!/^a traiter par /i.test(c));if(code)cats.push(code);
   try{const r=await mailPatch(m,{categories:cats});m.categories=r?.categories||cats;const i=MAIL.L.findIndex(x=>x.id===m.id);if(i>=0)MAIL.L[i].categories=m.categories;
-    mailDessinerLecture(m,att);mailDessinerListe();toast(code?`Attribué à ${MAIL_PERS.find(p=>p.c===code).n} (catégorie ${code}, visible aussi dans Outlook)`:'Attribution retirée')}
+    delete MAIL.cache[m.id];mailDessinerLecture(m,att);mailDessinerListe();toast(code?`Attribué à ${MAIL_PERS.find(p=>p.c===code).n} (catégorie ${code}, visible aussi dans Outlook)`:'Attribution retirée')}
   catch(e){toast('Attribution impossible : '+e.message,true)}}
 async function mailMarquer(m,lu,att){
-  try{await mailPatch(m,{isRead:lu});m.isRead=lu;const i=MAIL.L.findIndex(x=>x.id===m.id);if(i>=0)MAIL.L[i].isRead=lu;mailDessinerLecture(m,att);mailDessinerListe();mailMajCompteur();toast(lu?'Marqué comme lu':'Marqué comme non lu')}
+  try{await mailPatch(m,{isRead:lu});m.isRead=lu;const i=MAIL.L.findIndex(x=>x.id===m.id);if(i>=0)MAIL.L[i].isRead=lu;delete MAIL.cache[m.id];mailDessinerLecture(m,att);mailDessinerListe();mailMajCompteur();toast(lu?'Marqué comme lu':'Marqué comme non lu')}
   catch(e){toast('Échec : '+e.message,true)}}
 async function mailPJ(mid,aid,nom){
   try{const j=await mailJeton();const r=await fetch(`https://graph.microsoft.com/v1.0${mailBase()}/messages/${encodeURIComponent(mid)}/attachments/${encodeURIComponent(aid)}/$value`,{headers:{Authorization:'Bearer '+j}});
     if(!r.ok)throw new Error('Microsoft '+r.status);const b=await r.blob(),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=nom||'piece-jointe';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5e3)}
   catch(e){toast('Téléchargement impossible : '+e.message,true)}}
 
+/* ---------- Mail kte@ : répondre, transférer, ranger (15/11/2026) ----------
+   Brouillon créé dans kte@ par Graph (createReply / createReplyAll / createForward, ou nouveau message) : il apparaît aussi
+   dans les Brouillons d'Outlook. Enregistrement automatique (PATCH) ; envoi DEPUIS kte@ (POST /send, scope Mail.Send.Shared)
+   après un clic sur « Envoyer » et 5 s pendant lesquelles « Annuler » arrête tout. Après l'envoi : mail d'origine lu +
+   catégorie de la personne qui répond (« Je suis »). Signature par personne (modifiable, gardée dans ce navigateur).
+   Ranger : déplacement vers l'archive ou un dossier de kte@. Raccourcis : r, Maj+R, f, e (archiver), u (lu/non lu),
+   j/k (suivant/précédent), n (nouveau) ; dans la rédaction : Cmd/Ctrl+Entrée = envoyer, Échap = fermer (brouillon gardé). */
+const MAIL_ENVOI=['Mail.ReadWrite.Shared','Mail.Send.Shared'];
+const MAIL_NOMS={MK:'Matthias Kielwasser',SD:'Sébastien Dessein',WB:'William Bonneau'};
+const mailSigDefaut=c=>`<p style="margin:0">Cordialement / Best regards,</p><p style="margin:12px 0 0">${esc(MAIL_NOMS[c]||'')}<br>KTE<br>6 rue de la gatine<br>49300 Cholet<br>02.41.62.27.71<br>www.kte-fr.com</p>`;
+const mailSig=()=>{const c=mailMoiCode();return c?ls.get('mailsig_'+c,mailSigDefaut(c)):''};
+const mailAdr=r=>({emailAddress:{address:r.a,...(r.n?{name:r.n}:{})}});
+const mailDeAdr=l=>(l||[]).map(x=>({a:x.emailAddress?.address||'',n:x.emailAddress?.name||''})).filter(x=>x.a);
+const mailEstAdr=s=>/^[^@\s<>;,]+@[\w.-]+\.\w{2,}$/.test(s);
+/* Adresses connues pour la saisie des destinataires : clients, fournisseurs, référents, mails chargés */
+function mailCarnet(){const m=new Map();const aj=(a,n)=>{a=String(a||'').trim().toLowerCase();if(mailEstAdr(a)&&!m.has(a))m.set(a,n||'')};
+  for(const x of MAIL.L){aj(x.from?.emailAddress?.address,x.from?.emailAddress?.name)}
+  for(const [k,f,nom] of [['clients','E-mail','Entreprise'],['fournisseurs','E-mail','Nom'],['referents','E-mail','Nom']])
+    for(const r of (MODS[k]&&S.rows[MODS[k].t])||[])String(txt(r[f])||'').split(/[;,\s]+/).forEach(a=>aj(a,txt(r[nom])));
+  return[...m].map(([a,n])=>({a,n}))}
+const MAIL_DOSSIERS={l:null};
+async function mailDossiers(){if(MAIL_DOSSIERS.l)return MAIL_DOSSIERS.l;const j=await mailJeton();
+  const [h,b]=await Promise.all([graph(j,mailBase()+'/mailFolders?$top=100&$select=id,displayName,wellKnownName'),graph(j,mailBase()+'/mailFolders/inbox/childFolders?$top=100&$select=id,displayName')]);
+  const exclus=/^(inbox|drafts|sentitems|outbox|deleteditems|junkemail|archive|conversationhistory|syncissues|scheduled|searchfolders|clutter)$/i;
+  const nomsExclus=/^(boîte de réception|inbox|brouillons|drafts|éléments envoyés|sent items|boîte d'envoi|outbox|éléments supprimés|deleted items|courrier indésirable|junk e-?mail|archive|historique des conversations|conversation history|problèmes de synchronisation.*|sync issues.*|flux rss|rss feeds|notes|journal|tâches|calendrier|contacts)$/i;
+  MAIL_DOSSIERS.l=[...(b.value||[]).map(f=>({id:f.id,n:'Boîte de réception › '+f.displayName})),...(h.value||[]).filter(f=>!exclus.test(f.wellKnownName||'')&&!nomsExclus.test(f.displayName)).map(f=>({id:f.id,n:f.displayName}))].sort((x,y)=>x.n.localeCompare(y.n,'fr'));
+  return MAIL_DOSSIERS.l}
+async function mailRanger(m,dest,nom){
+  try{const j=await mailJeton();await graph(j,mailBase()+'/messages/'+encodeURIComponent(m.id)+'/move',{method:'POST',body:JSON.stringify({destinationId:dest})});
+    const i=MAIL.L.findIndex(x=>x.id===m.id),suiv=MAIL.L.filter(mailFiltreActuel())[MAIL.L.filter(mailFiltreActuel()).findIndex(x=>x.id===m.id)+1];
+    if(i>=0)MAIL.L.splice(i,1);delete MAIL.cache[m.id];toast(`Rangé dans « ${nom} »`);
+    if(MAIL.comp&&MAIL.comp.src===m.id)MAIL.comp=null;
+    if(suiv){mailDessinerListe();mailOuvrir(suiv.id)}else{MAIL.sel=null;mailDessiner()}}
+  catch(e){toast('Rangement impossible : '+e.message,true)}}
+function mailMenuRanger(m,btn){
+  document.querySelectorAll('.mmenu').forEach(x=>x.remove());
+  const d=document.createElement('div');d.className='mmenu';d.innerHTML='<div class="charge" style="padding:10px">Dossiers…</div>';
+  const r=btn.getBoundingClientRect();d.style.top=(r.bottom+4)+'px';d.style.left=Math.max(8,r.right-280)+'px';document.body.appendChild(d);
+  setTimeout(()=>document.addEventListener('click',function f(e){if(!d.contains(e.target)){d.remove();document.removeEventListener('click',f)}}),0);
+  mailDossiers().then(L=>{d.innerHTML=`<input placeholder="Chercher un dossier…" class="mmq"><div class="mml">${[{id:'archive',n:'Archive'},...L].map(f=>`<button data-id="${esc(f.id)}">${esc(f.n)}</button>`).join('')}</div>`;
+    const q=d.querySelector('.mmq');q.focus();q.oninput=()=>d.querySelectorAll('.mml button').forEach(b=>b.style.display=norm(b.textContent).includes(norm(q.value))?'':'none');
+    d.querySelectorAll('.mml button').forEach(b=>b.onclick=()=>{d.remove();mailRanger(m,b.dataset.id,b.textContent)})}).catch(e=>{d.innerHTML=`<div style="padding:10px;color:var(--err)">${esc(e.message)}</div>`})}
+function mailFiltreActuel(){const F=mailFiltres();return(F.find(x=>x[0]===MAILF)||F[0])[2]}
+/* ---- Rédaction ---- */
+async function mailRediger(m,mode){
+  if(MAIL.comp&&MAIL.comp.envoi)return toast('Un envoi est en cours',true);
+  if(MAIL.comp)await mailCompEnregistrer().catch(()=>{});
+  const box=$('mComp');if(box)box.innerHTML='<div class="charge" style="padding:12px">Préparation du brouillon…</div>';
+  try{const j=await mailJeton();let d;
+    if(mode==='nouveau')d=await graph(j,mailBase()+'/messages',{method:'POST',body:JSON.stringify({subject:'',body:{contentType:'html',content:''}})});
+    else d=await graph(j,mailBase()+'/messages/'+encodeURIComponent(m.id)+'/'+{repondre:'createReply',tous:'createReplyAll',transferer:'createForward'}[mode],{method:'POST',body:'{}'});
+    MAIL.comp={id:d.id,mode,src:m?.id||null,to:mailDeAdr(d.toRecipients),cc:mailDeAdr(d.ccRecipients),bcc:[],sujet:d.subject||'',orig:String(d.body?.content||''),html:'',sig:mailSig(),pj:[],dirty:false};
+    if(mode==='transferer'&&m?.hasAttachments)MAIL.comp.pj=(await graph(j,mailBase()+'/messages/'+encodeURIComponent(d.id)+'/attachments?$select=id,name,size,isInline')).value.filter(a=>!a.isInline);
+    mailCompDessiner(true)}
+  catch(e){if(box)box.innerHTML='';toast('Brouillon impossible : '+e.message,true)}}
+/* Reprendre un brouillon existant (onglet Brouillons) : tout le corps devient modifiable */
+async function mailReprendre(id){
+  try{const j=await mailJeton();const d=await graph(j,mailBase()+'/messages/'+encodeURIComponent(id)+'?$select=id,subject,toRecipients,ccRecipients,bccRecipients,body,hasAttachments',{headers:{Prefer:'outlook.body-content-type="html"'}});
+    const corps=String(d.body?.content||'');const b=(corps.match(/<body[^>]*>([\s\S]*)<\/body>/i)||[0,corps])[1];
+    MAIL.comp={id:d.id,mode:'brouillon',src:null,to:mailDeAdr(d.toRecipients),cc:mailDeAdr(d.ccRecipients),bcc:mailDeAdr(d.bccRecipients),sujet:d.subject||'',orig:'',html:b,sig:'',pj:[],dirty:false};
+    if(d.hasAttachments)MAIL.comp.pj=(await graph(j,mailBase()+'/messages/'+encodeURIComponent(d.id)+'/attachments?$select=id,name,size,isInline')).value.filter(a=>!a.isInline);
+    $('mLect').innerHTML=`<div class="mtete"><h2>Brouillon</h2><div class="mut" style="font-size:12.5px">Enregistré dans les brouillons de kte@ (visible aussi dans Outlook).</div></div><div id="mComp"></div>`;
+    mailCompDessiner(true)}catch(e){toast('Brouillon illisible : '+e.message,true)}}
+function mailCorpsFinal(c){const neuf=`<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${c.html||''}${c.sig?`<br><br>${c.sig}`:''}</div>`;
+  if(!c.orig)return neuf;return /<body[^>]*>/i.test(c.orig)?c.orig.replace(/<body[^>]*>/i,x=>x+neuf):neuf+c.orig}
+function mailChips(champ){const c=MAIL.comp;return(c[champ]||[]).map((r,i)=>`<span class="mchip ${mailEstAdr(r.a)?'':'mauvais'}" title="${esc(r.a)}">${esc(r.n||r.a)}<b data-ch="${champ}" data-i="${i}">×</b></span>`).join('')}
+function mailCompDessiner(focus){
+  const box=$('mComp'),c=MAIL.comp;if(!box||!c)return;
+  const ligne=(ch,lib)=>`<div class="mcl"><label>${lib}</label><div class="mdest" data-ch="${ch}">${mailChips(ch)}<input data-ch="${ch}" list="mCarnet" autocomplete="off"></div></div>`;
+  box.innerHTML=`<div class="mcomp">
+    <div class="mcbar"><b>${{repondre:'Répondre',tous:'Répondre à tous',transferer:'Transférer',nouveau:'Nouveau message',brouillon:'Brouillon'}[c.mode]}</b> <span class="mut" style="font-size:12px">depuis kte@kte-fr.com</span><span style="flex:1"></span><span class="mut" id="mcEtat" style="font-size:12px"></span><button class="btn" id="mcFerm" title="Fermer (le brouillon reste dans kte@) – Échap">×</button></div>
+    ${ligne('to','À')}${ligne('cc','Cc')}${c.bcc.length||c.voirCci?ligne('bcc','Cci'):'<div class="mcl"><label></label><a href="#" id="mcCci" style="font-size:12px">Ajouter Cci</a></div>'}
+    <div class="mcl"><label>Objet</label><input id="mcSujet" value="${esc(c.sujet)}"></div>
+    <div class="mtb"><button data-x="bold" title="Gras"><b>G</b></button><button data-x="italic" title="Italique"><i>I</i></button><button data-x="underline" title="Souligné"><u>S</u></button><button data-x="insertUnorderedList" title="Liste">• Liste</button><button data-x="insertOrderedList" title="Liste numérotée">1. Liste</button><button data-x="lien" title="Lien">Lien</button><span style="flex:1"></span><label class="btn" style="padding:3px 9px;font-size:12px;cursor:pointer">📎 Joindre<input type="file" id="mcFic" multiple hidden></label></div>
+    <div id="mcEd" class="mced" contenteditable="true" spellcheck="true" lang="fr">${c.html||''}</div>
+    ${c.sig?`<div class="mcsig"><div class="mut" style="font-size:11px;margin-bottom:2px">Signature · <a href="#" id="mcSigM">modifier</a></div>${c.sig}</div>`:(c.mode!=='brouillon'?'<div class="mcsig mut" style="font-size:12px">Choisissez « Je suis » (en bas du menu) pour ajouter votre signature.</div>':'')}
+    <div class="mcpj" id="mcPj">${c.pj.map(a=>`<span class="chip">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span> <b data-pj="${esc(a.id)}" style="cursor:pointer;margin-left:4px">×</b></span>`).join('')}</div>
+    <div class="mcbas"><button class="btn p" id="mcEnv">Envoyer</button><span class="mut" style="font-size:12px">Cmd/Ctrl + Entrée</span><span style="flex:1"></span><button class="btn d" id="mcSupp">Supprimer le brouillon</button></div>
+  </div><datalist id="mCarnet">${mailCarnet().slice(0,800).map(r=>`<option value="${esc(r.a)}">${esc(r.n)}</option>`).join('')}</datalist>`;
+  const ed=$('mcEd'),sale=()=>{c.dirty=true;$('mcEtat').textContent='Modifications…';clearTimeout(c.t);c.t=setTimeout(()=>mailCompEnregistrer().catch(e=>{$('mcEtat').textContent='Échec de l’enregistrement';console.warn(e)}),1500)};
+  ed.oninput=()=>{c.html=ed.innerHTML;sale()};
+  $('mcSujet').oninput=e=>{c.sujet=e.target.value;sale()};
+  box.querySelectorAll('.mdest input').forEach(inp=>{const ch=inp.dataset.ch;
+    const ajout=()=>{const v=inp.value.trim().replace(/[;,]$/,'');if(!v)return false;for(const p of v.split(/[;,]\s*/)){const a=(p.match(/<([^>]+)>/)||[0,p])[1].trim();if(a)c[ch].push({a,n:''})}inp.value='';mailCompDessiner();box.querySelector(`.mdest input[data-ch="${ch}"]`).focus();sale();return true};
+    inp.onkeydown=e=>{if((e.key==='Enter'||e.key===','||e.key===';'||(e.key==='Tab'&&inp.value.trim()))&&inp.value.trim()){e.preventDefault();ajout()}else if(e.key==='Backspace'&&!inp.value&&c[ch].length){c[ch].pop();mailCompDessiner();box.querySelector(`.mdest input[data-ch="${ch}"]`).focus();sale()}};
+    inp.onchange=()=>{if(mailEstAdr(inp.value.trim()))ajout()};inp.onblur=()=>{if(inp.value.trim())ajout()}});
+  box.querySelectorAll('.mdest').forEach(d=>d.onclick=e=>{if(e.target===d)d.querySelector('input').focus()});
+  box.querySelectorAll('.mchip b').forEach(b=>b.onclick=()=>{c[b.dataset.ch].splice(+b.dataset.i,1);mailCompDessiner();sale()});
+  if($('mcCci'))$('mcCci').onclick=e=>{e.preventDefault();c.voirCci=true;mailCompDessiner()};
+  box.querySelectorAll('.mtb button[data-x]').forEach(b=>b.onmousedown=e=>{e.preventDefault();const x=b.dataset.x;if(x==='lien'){const u=prompt('Adresse du lien :','https://');if(u)document.execCommand('createLink',false,u)}else document.execCommand(x);c.html=ed.innerHTML;sale()});
+  $('mcFic').onchange=e=>mailCompJoindre([...e.target.files]);
+  box.querySelector('.mcomp').ondragover=e=>{e.preventDefault();box.querySelector('.mcomp').classList.add('survol')};
+  box.querySelector('.mcomp').ondragleave=()=>box.querySelector('.mcomp').classList.remove('survol');
+  box.querySelector('.mcomp').ondrop=e=>{e.preventDefault();box.querySelector('.mcomp').classList.remove('survol');if(e.dataTransfer.files.length)mailCompJoindre([...e.dataTransfer.files])};
+  box.querySelectorAll('[data-pj]').forEach(b=>b.onclick=()=>mailCompRetirerPJ(b.dataset.pj));
+  if($('mcSigM'))$('mcSigM').onclick=e=>{e.preventDefault();mailSignatureModifier()};
+  $('mcFerm').onclick=()=>mailCompFermer();$('mcEnv').onclick=()=>mailCompEnvoyer();$('mcSupp').onclick=()=>mailCompSupprimer();
+  box.querySelector('.mcomp').onkeydown=e=>{if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){e.preventDefault();mailCompEnvoyer()}else if(e.key==='Escape'){e.preventDefault();mailCompFermer()}};
+  if(focus){if(!c.to.length&&c.mode!=='repondre'&&c.mode!=='tous')box.querySelector('.mdest input').focus();else{ed.focus();const r=document.createRange();r.setStart(ed,0);r.collapse(true);const s=getSelection();s.removeAllRanges();s.addRange(r)}box.scrollIntoView({block:'nearest'})}
+}
+async function mailCompEnregistrer(){const c=MAIL.comp;if(!c||!c.dirty)return;clearTimeout(c.t);c.dirty=false;
+  const j=await mailJeton();const corps={toRecipients:c.to.filter(r=>mailEstAdr(r.a)).map(mailAdr),ccRecipients:c.cc.filter(r=>mailEstAdr(r.a)).map(mailAdr),bccRecipients:c.bcc.filter(r=>mailEstAdr(r.a)).map(mailAdr),subject:c.sujet,body:{contentType:'html',content:mailCorpsFinal(c)}};
+  c.enreg=graph(j,mailBase()+'/messages/'+encodeURIComponent(c.id),{method:'PATCH',body:JSON.stringify(corps)});await c.enreg;
+  if($('mcEtat')&&MAIL.comp===c)$('mcEtat').textContent='Brouillon enregistré '+new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'})}
+async function mailCompJoindre(files){const c=MAIL.comp;if(!c)return;const j=await mailJeton(),B=mailBase()+'/messages/'+encodeURIComponent(c.id)+'/attachments';
+  for(const f of files){toast('Ajout de '+f.name+'…');try{let a;
+    if(f.size<=3e6)a=await graph(j,B,{method:'POST',body:JSON.stringify({'@odata.type':'#microsoft.graph.fileAttachment',name:f.name,contentType:f.type||'application/octet-stream',contentBytes:await versB64(f)})});
+    else{const s=await graph(j,B+'/createUploadSession',{method:'POST',body:JSON.stringify({AttachmentItem:{attachmentType:'file',name:f.name,size:f.size}})});const pas=320*1024*10;
+      for(let o=0;o<f.size;o+=pas){const fin=Math.min(o+pas,f.size);const r=await fetch(s.uploadUrl,{method:'PUT',headers:{'Content-Range':`bytes ${o}-${fin-1}/${f.size}`,'Content-Type':'application/octet-stream'},body:f.slice(o,fin)});if(!r.ok&&r.status!==201&&r.status!==200&&r.status!==202)throw new Error('envoi '+r.status)}
+      a=(await graph(j,B+'?$select=id,name,size,isInline')).value.filter(x=>x.name===f.name).pop()}
+    if(a)c.pj.push({id:a.id,name:a.name||f.name,size:a.size||f.size})}catch(e){toast(`${f.name} non joint : ${e.message}`,true)}}
+  if(MAIL.comp===c){c.html=$('mcEd')?.innerHTML??c.html;mailCompDessiner()}}
+async function mailCompRetirerPJ(id){const c=MAIL.comp;try{const j=await mailJeton();await graph(j,mailBase()+'/messages/'+encodeURIComponent(c.id)+'/attachments/'+encodeURIComponent(id),{method:'DELETE'});c.pj=c.pj.filter(a=>a.id!==id);mailCompDessiner()}catch(e){toast('Échec : '+e.message,true)}}
+async function mailCompFermer(){const c=MAIL.comp;if(!c||c.envoi)return;try{await mailCompEnregistrer()}catch(e){}MAIL.comp=null;if($('mComp'))$('mComp').innerHTML='';toast('Brouillon gardé dans kte@ (Brouillons)')}
+async function mailCompSupprimer(){const c=MAIL.comp;if(!c||c.envoi)return;if(!confirm('Supprimer ce brouillon ?'))return;clearTimeout(c.t);
+  try{const j=await mailJeton();await graph(j,mailBase()+'/messages/'+encodeURIComponent(c.id),{method:'DELETE'})}catch(e){toast('Suppression impossible : '+e.message,true);return}
+  MAIL.comp=null;if($('mComp'))$('mComp').innerHTML='';MAIL.brouillons=null;toast('Brouillon supprimé')}
+async function mailCompEnvoyer(){const c=MAIL.comp;if(!c||c.envoi)return;c.html=$('mcEd')?.innerHTML??c.html;
+  if(!c.to.length&&!c.cc.length&&!c.bcc.length)return toast('Ajoutez au moins un destinataire',true);
+  const faux=[...c.to,...c.cc,...c.bcc].filter(r=>!mailEstAdr(r.a));if(faux.length)return toast('Adresse invalide : '+faux.map(r=>r.a).join(', '),true);
+  if(!c.sujet.trim()&&!confirm('Envoyer sans objet ?'))return;
+  c.envoi=true;const bas=document.querySelector('.mcbas');let n=5,annule=false;
+  bas.innerHTML=`<span class="menvoi">Envoi dans <b id="mcN">5</b> s…</span><button class="btn" id="mcAnn">Annuler l'envoi</button>`;
+  $('mcAnn').onclick=()=>{annule=true};$('mcAnn').focus();
+  try{c.dirty=true;await mailCompEnregistrer();
+    while(n>0&&!annule){await new Promise(r=>setTimeout(r,1000));n--;if($('mcN'))$('mcN').textContent=n}
+    if(annule){c.envoi=false;mailCompDessiner(true);return toast('Envoi annulé – le brouillon est conservé')}
+    if($('mcAnn'))$('mcAnn').disabled=true;bas.querySelector('.menvoi').textContent='Envoi…';
+    const j=await jetonGraph(MAIL_ENVOI);await graph(j,mailBase()+'/messages/'+encodeURIComponent(c.id)+'/send',{method:'POST'});
+    MAIL.comp=null;if($('mComp'))$('mComp').innerHTML='';MAIL.brouillons=null;toast('Envoyé depuis kte@');
+    const src=c.src&&MAIL.L.find(x=>x.id===c.src);
+    if(src){const moi=mailMoiCode(),cats=(src.categories||[]).filter(x=>!MAIL_CODES.has(x)&&!/^a traiter par /i.test(x));if(moi)cats.push(moi);
+      try{const r=await mailPatch(src,{isRead:true,...(moi?{categories:cats}:{})});src.isRead=true;src.categories=r?.categories||cats}catch(e){console.warn(e)}
+      delete MAIL.cache[src.id];mailDessinerListe();mailMajCompteur();if(MAIL.sel===src.id)mailOuvrir(src.id,true)}
+  }catch(e){c.envoi=false;toast('Envoi impossible : '+e.message,true);if(MAIL.comp===c)mailCompDessiner()}}
+function mailSignatureModifier(){const code=mailMoiCode();if(!code)return toast('Choisissez d’abord « Je suis »',true);
+  ouvrirModal('Ma signature ('+code+')',`<div id="sigEd" class="mced" contenteditable="true" style="min-height:140px;border:1px solid var(--trait);border-radius:8px">${mailSig()}</div><div class="mut" style="font-size:12px;margin-top:6px">Gardée dans ce navigateur. Vide = signature standard KTE.</div>`,
+    `<button class="btn" id="sigDef">Signature standard</button><button class="btn p" id="sigOk">Enregistrer</button>`);
+  $('sigDef').onclick=()=>{$('sigEd').innerHTML=mailSigDefaut(code)};
+  $('sigOk').onclick=()=>{const h=$('sigEd').innerHTML.trim();ls.set('mailsig_'+code,h||mailSigDefaut(code));if(MAIL.comp){MAIL.comp.sig=mailSig();MAIL.comp.dirty=true;mailCompDessiner();mailCompEnregistrer().catch(()=>{})}fermerModal(true);toast('Signature enregistrée')}}
+/* ---- Brouillons de kte@ ---- */
+async function mailBrouillons(){const box=$('mLignes');if(!box)return;box.innerHTML='<div class="charge">Brouillons de kte@…</div>';
+  try{const j=await mailJeton();const r=await graph(j,mailBase()+'/mailFolders/drafts/messages?$top=50&$orderby=lastModifiedDateTime desc&$select=id,subject,toRecipients,lastModifiedDateTime,bodyPreview');MAIL.brouillons=r.value||[];
+    box.innerHTML=MAIL.brouillons.map(d=>`<div class="mrow" data-br="${esc(d.id)}"><span class="mpers vide0">✎</span><div class="mtxt"><div class="mh"><span class="mde">${esc((d.toRecipients||[]).map(x=>x.emailAddress?.name||x.emailAddress?.address).join(', ')||'(sans destinataire)')}</span><span class="mdt">${esc(mailDate(d.lastModifiedDateTime))}</span></div><div class="mobj">${esc(d.subject||'(sans objet)')}</div><div class="mpre">${esc(String(d.bodyPreview||'').slice(0,120))}</div></div></div>`).join('')||'<div class="vide">Aucun brouillon</div>';
+    box.querySelectorAll('[data-br]').forEach(x=>x.onclick=()=>{box.querySelectorAll('.mrow').forEach(y=>y.classList.toggle('on',y===x));MAIL.sel=null;mailReprendre(x.dataset.br)})}
+  catch(e){box.innerHTML=`<div class="vide" style="color:var(--err)">${esc(e.message)}</div>`}}
+/* ---- Raccourcis clavier (onglet Mail seulement, hors saisie) ---- */
+document.addEventListener('keydown',e=>{
+  if(!location.hash.startsWith('#/mail')||e.metaKey||e.ctrlKey||e.altKey)return;
+  const t=e.target;if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))return;if($('modal')&&$('modal').style.display!=='none')return;
+  const cur=MAIL.cur,L=MAIL.L.filter(mailFiltreActuel()),i=cur?L.findIndex(x=>x.id===cur.m.id):-1;
+  const k=e.key;let fait=true;
+  if(k==='r'&&cur)mailRediger(cur.m,'repondre');else if(k==='R'&&cur)mailRediger(cur.m,'tous');else if(k==='f'&&cur)mailRediger(cur.m,'transferer');
+  else if(k==='e'&&cur)mailRanger(cur.m,'archive','Archive');else if(k==='u'&&cur)mailMarquer(cur.m,!cur.m.isRead,cur.att);
+  else if((k==='j'||k==='ArrowDown')&&L.length)mailOuvrir(L[Math.min(L.length-1,i+1)].id);else if((k==='k'||k==='ArrowUp')&&L.length)mailOuvrir(L[Math.max(0,i-1)].id);
+  else if(k==='n')mailNouveau();else fait=false;
+  if(fait)e.preventDefault()});
+function mailNouveau(){if(!$('mLect'))return;MAIL.sel=null;MAIL.cur=null;document.querySelectorAll('#mLignes .mrow').forEach(d=>d.classList.remove('on'));
+  $('mLect').innerHTML=`<div class="mtete"><h2>Nouveau message</h2><div class="mut" style="font-size:12.5px">Envoyé depuis kte@kte-fr.com</div></div><div id="mComp"></div>`;mailRediger(null,'nouveau')}
 /* ---------- Charges machines (13/11/2026) ----------
    Planning de charge par machine, tenu par Arnaud (tournage) et Christophe (fraisage).
    Table « Machines » T_MACH : Nom, Secteur (Fraisage / Tournage / Fraisage fil), Heures par jour, Ordre, Hors service, Notes.
