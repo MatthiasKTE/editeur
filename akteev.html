@@ -1103,6 +1103,7 @@ async function mailCompEnvoyer(){const c=MAIL.comp;if(!c||c.envoi)return;c.html=
   if(!c.to.length&&!c.cc.length&&!c.bcc.length)return toast('Ajoutez au moins un destinataire',true);
   const faux=[...c.to,...c.cc,...c.bcc].filter(r=>!mailEstAdr(r.a));if(faux.length)return toast('Adresse invalide : '+faux.map(r=>r.a).join(', '),true);
   if(!c.sujet.trim()&&!confirm('Envoyer sans objet ?'))return;
+  let jEnv;try{jEnv=await jetonGraph(MAIL_ENVOI)}catch(e){return toast('Autorisation d’envoi refusée : '+e.message,true)}   // demandé tout de suite (fenêtre Microsoft liée au clic)
   c.envoi=true;const bas=document.querySelector('.mcbas');let n=5,annule=false;
   bas.innerHTML=`<span class="menvoi">Envoi dans <b id="mcN">5</b> s…</span><button class="btn" id="mcAnn">Annuler l'envoi</button>`;
   $('mcAnn').onclick=()=>{annule=true};$('mcAnn').focus();
@@ -1110,7 +1111,7 @@ async function mailCompEnvoyer(){const c=MAIL.comp;if(!c||c.envoi)return;c.html=
     while(n>0&&!annule){await new Promise(r=>setTimeout(r,1000));n--;if($('mcN'))$('mcN').textContent=n}
     if(annule){c.envoi=false;mailCompDessiner(true);return toast('Envoi annulé – le brouillon est conservé')}
     if($('mcAnn'))$('mcAnn').disabled=true;bas.querySelector('.menvoi').textContent='Envoi…';
-    const j=await jetonGraph(MAIL_ENVOI);await graph(j,mailBase()+'/messages/'+encodeURIComponent(c.id)+'/send',{method:'POST'});
+    const j=await jetonGraph(MAIL_ENVOI).catch(()=>jEnv);await graph(j,mailBase()+'/messages/'+encodeURIComponent(c.id)+'/send',{method:'POST'});
     MAIL.comp=null;if($('mComp'))$('mComp').innerHTML='';MAIL.brouillons=null;toast('Envoyé depuis kte@');
     const src=c.src&&MAIL.L.find(x=>x.id===c.src);
     if(src){const moi=mailMoiCode(),cats=(src.categories||[]).filter(x=>!MAIL_CODES.has(x)&&!/^a traiter par /i.test(x));if(moi)cats.push(moi);
