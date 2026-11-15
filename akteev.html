@@ -3300,7 +3300,8 @@ function devinerDepot(objet,corps,exped){
   let type='',k='',ou='';
   for(const [txtA,lieu] of [[o,'l’objet'],[c,'le corps du mail']]){for(const [ty,re] of DEP_REGLES){if(pasOffre&&ty==='Offre fournisseur')continue;const r=txtA.match(re);if(r){type=ty;k=r[0].trim();ou=lieu;break}}if(type)break}
   let indice=type?`Type deviné par Akteev d’après « ${k} » dans ${ou}`:'Aucun indice clair';
-  if(four&&type!=='Commande client'){type='Offre fournisseur';indice+=` ; expéditeur = fournisseur connu (${titre(MODS.fournisseurs.t,four)})`}
+  if(four&&type==='DDP client'&&!dv0)indice+=` ; expéditeur aussi fournisseur connu (${titre(MODS.fournisseurs.t,four)}) mais demande de prix explicite → DDP`;
+  else if(four&&type!=='Commande client'){type='Offre fournisseur';indice+=` ; expéditeur = fournisseur connu (${titre(MODS.fournisseurs.t,four)})`}
   else if(cli)indice+=` ; expéditeur = client connu (${titre(MODS.clients.t,cli)})`;
   const dv=devis&&(S.rows[MODS.devis.t]||[]).find(r=>String(txt(r['N° devis'])).toUpperCase().startsWith(devis));
   if(!type&&devis){type='Commande client';indice=`Aucun mot-clé, mais n° de devis KTE cité (${devis}${dv?' : '+txt(dv.Client)+', '+txt(dv.Statut):''}) : probablement la commande de ce devis`}
