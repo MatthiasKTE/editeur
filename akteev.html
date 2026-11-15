@@ -1117,7 +1117,7 @@ async function mailCompEnvoyer(){const c=MAIL.comp;if(!c||c.envoi)return;c.html=
     if(src){const moi=mailMoiCode(),cats=(src.categories||[]).filter(x=>!MAIL_CODES.has(x)&&!/^a traiter par /i.test(x));if(moi)cats.push(moi);
       try{const r=await mailPatch(src,{isRead:true,...(moi?{categories:cats}:{})});src.isRead=true;src.categories=r?.categories||cats}catch(e){console.warn(e)}
       delete MAIL.cache[src.id];mailDessinerListe();mailMajCompteur();if(MAIL.sel===src.id)mailOuvrir(src.id,true)}
-  }catch(e){c.envoi=false;toast('Envoi impossible : '+e.message,true);if(MAIL.comp===c)mailCompDessiner()}}
+  }catch(e){c.envoi=false;toast(/ErrorSendAsDenied/.test(e.message)?'Envoi refusé par Microsoft : votre compte n’a pas le droit « Envoyer en tant que » sur kte@ (Exchange › Boîtes aux lettres › KTE › Délégation). Le brouillon est conservé.':'Envoi impossible : '+e.message,true);if(MAIL.comp===c)mailCompDessiner()}}
 function mailSignatureModifier(){const code=mailMoiCode();if(!code)return toast('Choisissez d’abord « Je suis »',true);
   ouvrirModal('Ma signature ('+code+')',`<div id="sigEd" class="mced" contenteditable="true" style="min-height:140px;border:1px solid var(--trait);border-radius:8px">${mailSig()}</div><div class="mut" style="font-size:12px;margin-top:6px">Gardée dans ce navigateur. Vide = signature standard KTE.</div>`,
     `<button class="btn" id="sigDef">Signature standard</button><button class="btn p" id="sigOk">Enregistrer</button>`);
