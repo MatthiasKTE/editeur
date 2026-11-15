@@ -956,7 +956,7 @@ function mailDessinerLecture(m,att){
     <div class="mact"><span class="mut" style="font-size:12.5px">À traiter par</span>${MAIL_PERS.map(p=>`<button class="btn mattr ${code===p.c?'on':''}" data-c="${p.c}" style="${code===p.c?`background:${p.coul};border-color:${p.coul};color:#fff`:''}" title="${esc(p.n)}">${p.c}</button>`).join('')}<button class="btn mattr ${code?'':'on'}" data-c="" title="Retirer l'attribution">—</button>
       <span style="flex:1"></span><button class="btn" id="mLu" title="u">${m.isRead?'Marquer non lu':'Marquer lu'}</button></div>
     <div class="mact"><button class="btn p" id="mRep" title="r">Répondre</button><button class="btn" id="mTous" title="Maj + R">Répondre à tous</button><button class="btn" id="mTr" title="f">Transférer</button>
-      <span style="flex:1"></span><button class="btn" id="mRg" title="Ranger dans un dossier">${ico('dossier')}Ranger ▾</button><button class="btn" id="mArc" title="e">Archiver</button>
+      <span style="flex:1"></span><button class="btn" id="mRg" title="Ranger dans un dossier">${ico('dossier')}Ranger ▾</button><button class="btn" id="mArc" title="e">Archiver</button><button class="btn d" id="mSup" title="Suppr">Supprimer</button>
       <a class="btn" href="https://outlook.office.com/mail/${MAIL_BOITE}/inbox/id/${encodeURIComponent(m.id)}" target="_blank" title="Ouvrir dans Outlook">${ico('ext')}</a></div>
     ${pj.length?`<div class="mpj">${pj.map(a=>`<button class="chip" data-a="${esc(a.id)}" data-n="${esc(a.name)}">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span></button>`).join('')}</div>`:''}
     ${!MAIL.img&&/<img[^>]+src=["']?https?:/i.test(m.body?.content||'')?'<div class="mut" style="font-size:12px;margin-top:6px">Images distantes masquées. <a href="#" id="mImg">Les afficher</a></div>':''}
@@ -964,7 +964,7 @@ function mailDessinerLecture(m,att){
   <div id="mFil"></div><div id="mComp"></div><iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
   box.querySelector('iframe').srcdoc=mailCadre(m,att);MAIL.cur={m,att};
   $('mRep').onclick=()=>mailRediger(m,'repondre');$('mTous').onclick=()=>mailRediger(m,'tous');$('mTr').onclick=()=>mailRediger(m,'transferer');
-  $('mRg').onclick=e=>{e.stopPropagation();mailMenuRanger(m,$('mRg'))};$('mArc').onclick=()=>mailRanger(m,'archive','Archive');
+  $('mRg').onclick=e=>{e.stopPropagation();mailMenuRanger(m,$('mRg'))};$('mArc').onclick=()=>mailRanger(m,'archive','Archive');$('mSup').onclick=()=>mailRanger(m,'deleteditems','Éléments supprimés');
   if(MAIL.comp&&MAIL.comp.src===m.id)mailCompDessiner();
   mailFil(m);
   box.querySelectorAll('.mattr').forEach(b=>b.onclick=()=>mailAttribuer(m,b.dataset.c,att));
@@ -992,7 +992,7 @@ async function mailPJ(mid,aid,nom){
    après un clic sur « Envoyer » et 5 s pendant lesquelles « Annuler » arrête tout. Après l'envoi : mail d'origine lu +
    catégorie de la personne qui répond (« Je suis »). Signature par personne (modifiable, gardée dans ce navigateur).
    Ranger : déplacement vers l'archive ou un dossier de kte@. Raccourcis : r, Maj+R, f, e (archiver), u (lu/non lu),
-   j/k (suivant/précédent), n (nouveau) ; dans la rédaction : Cmd/Ctrl+Entrée = envoyer, Échap = fermer (brouillon gardé). */
+   j/k (suivant/précédent), n (nouveau), Suppr (supprimer = Éléments supprimés, récupérable) ; dans la rédaction : Cmd/Ctrl+Entrée = envoyer, Échap = fermer (brouillon gardé). */
 const MAIL_ENVOI=['Mail.ReadWrite.Shared','Mail.Send.Shared'];
 const MAIL_NOMS={MK:'Matthias Kielwasser',SD:'Sébastien Dessein',WB:'William Bonneau'};
 const mailSigDefaut=c=>`<p style="margin:0">Cordialement / Best regards,</p><p style="margin:12px 0 0">${esc(MAIL_NOMS[c]||'')}<br>KTE<br>6 rue de la gatine<br>49300 Cholet<br>02.41.62.27.71<br>www.kte-fr.com</p>`;
@@ -1016,7 +1016,7 @@ async function mailDossiers(){if(MAIL_DOSSIERS.l)return MAIL_DOSSIERS.l;const j=
 async function mailRanger(m,dest,nom){
   try{const j=await mailJeton();await graph(j,mailBase()+'/messages/'+encodeURIComponent(m.id)+'/move',{method:'POST',body:JSON.stringify({destinationId:dest})});
     const i=MAIL.L.findIndex(x=>x.id===m.id),suiv=MAIL.L.filter(mailFiltreActuel())[MAIL.L.filter(mailFiltreActuel()).findIndex(x=>x.id===m.id)+1];
-    if(i>=0)MAIL.L.splice(i,1);delete MAIL.cache[m.id];toast(`Rangé dans « ${nom} »`);
+    if(i>=0)MAIL.L.splice(i,1);delete MAIL.cache[m.id];toast(dest==='deleteditems'?'Supprimé – récupérable dans « Éléments supprimés » de kte@ (Outlook)':`Rangé dans « ${nom} »`);
     if(MAIL.comp&&MAIL.comp.src===m.id)MAIL.comp=null;
     if(suiv){mailDessinerListe();mailOuvrir(suiv.id)}else{MAIL.sel=null;mailDessiner()}}
   catch(e){toast('Rangement impossible : '+e.message,true)}}
@@ -1140,7 +1140,7 @@ document.addEventListener('keydown',e=>{
   const cur=MAIL.cur,L=MAIL.L.filter(mailFiltreActuel()),i=cur?L.findIndex(x=>x.id===cur.m.id):-1;
   const k=e.key;let fait=true;
   if(k==='r'&&cur)mailRediger(cur.m,'repondre');else if(k==='R'&&cur)mailRediger(cur.m,'tous');else if(k==='f'&&cur)mailRediger(cur.m,'transferer');
-  else if(k==='e'&&cur)mailRanger(cur.m,'archive','Archive');else if(k==='u'&&cur)mailMarquer(cur.m,!cur.m.isRead,cur.att);
+  else if(k==='e'&&cur)mailRanger(cur.m,'archive','Archive');else if((k==='Delete'||k==='Backspace'||k==='#')&&cur)mailRanger(cur.m,'deleteditems','Éléments supprimés');else if(k==='u'&&cur)mailMarquer(cur.m,!cur.m.isRead,cur.att);
   else if((k==='j'||k==='ArrowDown')&&L.length)mailOuvrir(L[Math.min(L.length-1,i+1)].id);else if((k==='k'||k==='ArrowUp')&&L.length)mailOuvrir(L[Math.max(0,i-1)].id);
   else if(k==='n')mailNouveau();else fait=false;
   if(fait)e.preventDefault()});
