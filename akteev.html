@@ -106,6 +106,7 @@ a.chip:hover{background:var(--accentL);color:var(--accent)}
 .mact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}.mact .mattr{padding:5px 10px;font-weight:700}
 .mpj{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mpj .chip{cursor:pointer;border:1px solid var(--trait);background:#fff}
 .mcorps{border:0;width:100%;height:calc(100vh - 330px);min-height:320px;border-radius:0 0 var(--r) var(--r)}
+.maff{margin:10px 14px 0;padding:10px 12px;border:1px solid #FCD34D;background:#FFFBEB;border-radius:10px;font-size:13px}.maff.ok{border-color:#B8CDF8;background:var(--accentL)}.maff .mact{margin-top:6px}
 .mfil{margin:10px 14px 0;border:1px solid var(--trait);border-radius:10px;overflow:hidden}.mfilt{padding:7px 12px;font-size:12.5px;font-weight:600;background:#F6F8FB;border-bottom:1px solid var(--trait)}
 .mfm{border-bottom:1px solid #EEF1F6}.mfm:last-child{border-bottom:0}.mfh{display:flex;justify-content:space-between;gap:8px;padding:7px 12px 0;cursor:pointer;font-size:13px}.mfm .mpre{padding:0 12px 7px;cursor:pointer}.mfm.ouvert .mpre{display:none}.mfm:hover{background:var(--hover)}
 .mfcorps{border:0;width:100%;height:320px;background:#fff}
@@ -976,12 +977,12 @@ function mailDessinerLecture(m,att){
     ${pj.length?`<div class="mpj">${pj.map(a=>`<button class="chip" data-a="${esc(a.id)}" data-n="${esc(a.name)}">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span></button>`).join('')}</div>`:''}
     ${!MAIL.img&&/<img[^>]+src=["']?https?:/i.test(m.body?.content||'')?'<div class="mut" style="font-size:12px;margin-top:6px">Images distantes masquées. <a href="#" id="mImg">Les afficher</a></div>':''}
     <div class="mut" style="font-size:11.5px;margin-top:4px">${m.isRead?'Lu':'<b style="color:var(--accent)">Non lu</b> — reste non lu tant que vous ne cliquez pas « Marquer lu »'}</div></div>
-  <div id="mFil"></div><div id="mComp"></div><iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
+  <div id="mAff"></div><div id="mFil"></div><div id="mComp"></div><iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
   box.querySelector('iframe').srcdoc=mailCadre(m,att);MAIL.cur={m,att};
   $('mRep').onclick=()=>mailRediger(m,'repondre');$('mTous').onclick=()=>mailRediger(m,'tous');$('mTr').onclick=()=>mailRediger(m,'transferer');
   $('mRg').onclick=e=>{e.stopPropagation();mailMenuRanger(m,$('mRg'))};$('mArc').onclick=()=>mailRanger(m,'archive','Archive');$('mSup').onclick=()=>mailRanger(m,'deleteditems','Éléments supprimés');
   if(MAIL.comp&&MAIL.comp.src===m.id)mailCompDessiner();
-  mailFil(m);
+  mailFil(m);mailBandeauAffaire(m).catch(e=>console.warn('affaire',e));
   box.querySelectorAll('.mattr').forEach(b=>b.onclick=()=>mailAttribuer(m,b.dataset.c,att));
   $('mLu').onclick=()=>mailMarquer(m,!m.isRead,att);
   if($('mImg'))$('mImg').onclick=e=>{e.preventDefault();MAIL.img=true;mailDessinerLecture(m,att)};
@@ -1174,6 +1175,66 @@ async function mailFil(m){const box=$('mFil');if(!box||!m.conversationId)return;
       d.classList.add('ouvert');c.innerHTML='<div class="charge" style="padding:8px">Lecture…</div>';
       try{const {m:x,att}=await mailLire(d.dataset.id);c.innerHTML='<iframe class="mfcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>';c.querySelector('iframe').srcdoc=mailCadre(x,att)}catch(e){c.innerHTML=`<div style="color:var(--err);padding:8px">${esc(e.message)}</div>`}});
   }catch(e){console.warn('fil',e)}}
+/* ---- Mail sans affaire → lancement (15/11/2026, Matthias) ----
+   Si aucun n° d'affaire connu d'Akteev n'est trouvé (objet, texte, catégorie D26xxxx), un bandeau propose :
+   Nouvelle DDP / Enregistrer une commande / Offre fournisseur → CF / Pas d'affaire.
+   Un clic crée (ou met à jour, même Message-ID) la ligne de la boîte « À traiter » (table Dépôts) au statut « À lancer »,
+   avec le n° PROPOSÉ (prochain D<aa>xxxx des devis Akteev) : il n'est PAS réservé — Claude le vérifie dans le registre
+   au lancement avant de l'attribuer. La consigne pour Claude est copiée (à coller dans Cowork) ; sinon la tâche
+   planifiée « À traiter » prépare le lancement et prévient Matthias. */
+const MAIL_SANSAFF=new Set(ls.get('mail_sansaff',[]));
+function mailNumPropose(){const aa=String(new Date().getFullYear()%100).padStart(2,'0');let max=0;
+  for(const r of S.rows[MODS.devis.t]||[]){const m=String(txt(r['N° devis'])||'').toUpperCase().match(new RegExp('^D'+aa+'(\\d{4})'));if(m)max=Math.max(max,+m[1])}
+  return max?'D'+aa+String(max+1).padStart(4,'0'):''}
+function mailAffaireConnue(m){
+  if((m.categories||[]).some(c=>/^D2\d{5}$/i.test(c)))return true;
+  const nums=mailNums(m.subject||'',m.bodyPreview||'',m._corps||'');
+  return nums.some(n=>(S.rows[MODS.commandes.t]||[]).some(r=>txt(r['N° affaire']).toUpperCase()===n)||(S.rows[MODS.devis.t]||[]).some(r=>txt(r['N° devis']).toUpperCase().startsWith(n)))}
+const mailDepotDe=m=>m.internetMessageId&&MODS.depot&&(S.rows[MODS.depot.t]||[]).find(r=>txt(r['Message-ID'])===m.internetMessageId);
+async function mailBandeauAffaire(m){const box=$('mAff');if(!box)return;box.innerHTML='';
+  if(!MODS.depot||!peutEcrire('depot'))return;
+  const adr=String(m.from?.emailAddress?.address||'').toLowerCase();if(!adr||/@kte-fr\.com$/.test(adr))return;
+  await Promise.all([MODS.devis.t,MODS.commandes.t,MODS.clients.t,MODS.fournisseurs.t,MODS.depot.t].map(t=>charger(t).catch(()=>{})));
+  if(MAIL.sel!==m.id||!$('mAff'))return;
+  const dep=mailDepotDe(m);
+  if(dep){box.innerHTML=`<div class="maff ok">Déjà dans « À traiter » : <b>${esc(txt(dep.Type))}</b> · ${badge(dep.Statut)} <a href="#/depot/${dep.id}">ouvrir la demande n° ${dep.id}</a></div>`;return}
+  if(mailAffaireConnue(m)||MAIL_SANSAFF.has(m.internetMessageId||m.id))return;
+  const g=devinerDepot(m.subject||'',m._corps||m.bodyPreview||'',adr),num=mailNumPropose();
+  const B=(ty,lib,cl)=>`<button class="btn ${cl||''}" data-ty="${ty}">${lib}</button>`;
+  box.innerHTML=`<div class="maff"><div><b>Aucune affaire reconnue.</b> Akteev pense : <b>${esc(g.type)}</b> <span class="mut">(${esc(g.indice)})</span>${num?` · n° proposé <b>${num}</b> <span class="mut">(vérifié dans le registre au lancement)</span>`:''}</div>
+    <div class="mact" style="margin-top:6px">${B('DDP client','Nouvelle DDP',g.type==='DDP client'?'p':'')}${B('Commande client','Enregistrer une commande',g.type==='Commande client'?'p':'')}${B('Offre fournisseur','Offre fournisseur → CF',g.type==='Offre fournisseur'?'p':'')}<span style="flex:1"></span><button class="btn" data-ty="">Pas d'affaire</button></div></div>`;
+  box.querySelectorAll('button[data-ty]').forEach(b=>b.onclick=()=>{if(!b.dataset.ty){MAIL_SANSAFF.add(m.internetMessageId||m.id);ls.set('mail_sansaff',[...MAIL_SANSAFF].slice(-500));box.innerHTML='';return}mailLancer(m,b.dataset.ty,g,num)})}
+async function mailLancer(m,type,g,num){
+  const box=$('mAff');if(box)box.querySelectorAll('button').forEach(b=>b.disabled=true);
+  try{const t=MODS.depot.t,sc=sch(t),opt=(n,v)=>(sc.par[n]?.select_options||[]).find(o=>o.value===v)?.id??v;
+    const de=m.from?.emailAddress||{},exped=de.name&&de.name!==de.address?`${de.name} <${de.address}>`:de.address;
+    const dom=domaineDe(de.address),deDom=(tt,ch)=>dom&&(S.rows[tt]||[]).find(r=>String(txt(r[ch])||'').toLowerCase().split(/[\s,;]+/).some(a=>domaineDe(a)===dom));
+    const cli=deDom(MODS.clients.t,'E-mail'),fo=!cli&&deDom(MODS.fournisseurs.t,'E-mail');const nomCf=cli?titre(MODS.clients.t,cli):fo?titre(MODS.fournisseurs.t,fo):'';
+    const moi=mailMoiCode(),qui=moi?MAIL_NOMS[moi].split(' ')[0]:'';
+    const action={'DDP client':'Lancer le chiffrage (nouveau dossier)','Commande client':'Enregistrer la commande (aucun devis reconnu : vérifier s’il existe, sinon créer)','Offre fournisseur':'Rédiger la commande fournisseur'}[type];
+    const lien=`https://outlook.office.com/mail/${MAIL_BOITE}/inbox/id/${encodeURIComponent(m.id)}`;
+    const quand=new Date().toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'});
+    const corps={'Objet':m.subject||'(sans objet)','Type':opt('Type',type),'Statut':opt('Statut','À lancer'),'Reçu le':m.receivedDateTime,'Expéditeur':exped,'Boîte':'kte@',
+      'Message-ID':m.internetMessageId||'','Client / fournisseur':nomCf,'Lien Outlook':lien,'À traiter par':qui,
+      'Proposition':action+(num&&type!=='Offre fournisseur'?` · n° proposé ${num} (à vérifier dans le registre avant attribution)`:''),
+      'Indices':`${g.indice} — lancé depuis Mail kte@${qui?' par '+qui:''} le ${quand}`};
+    const ex=mailDepotDe(m);
+    const r=ex?await api(`/rows/table/${t}/${ex.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)}):await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
+    majRow(t,r);majCompteurs();
+    if(type==='DDP client'&&!(m.categories||[]).some(c=>/^DDP/i.test(c))){try{const cats=[...(m.categories||[]),'DDP – à traiter'];const x=await mailPatch(m,{categories:cats});m.categories=x?.categories||cats;const i=MAIL.L.findIndex(y=>y.id===m.id);if(i>=0)MAIL.L[i].categories=m.categories;delete MAIL.cache[m.id]}catch(e){console.warn(e)}}
+    const verbe={'DDP client':'Lance la DDP','Commande client':'Enregistre la commande','Offre fournisseur':'Prépare la commande fournisseur'}[type];
+    const consigne=`${verbe} de la demande Akteev « À traiter » n° ${r.id} : mail « ${m.subject||''} » de ${exped}, reçu le ${new Date(m.receivedDateTime).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})} sur kte@ (Message-ID ${m.internetMessageId||'?'}).`+
+      (type==='Offre fournisseur'?'':` Aucune affaire existante reconnue ; n° proposé ${num||'?'} : vérifie-le dans le registre avant de l’attribuer.`);
+    try{await navigator.clipboard.writeText(consigne)}catch(e){}
+    ouvrirModal('Demande prête à lancer',`<p style="margin-top:0"><b>${esc(type)}</b> enregistrée dans <a href="#/depot/${r.id}">« À traiter » n° ${r.id}</a>, statut <b>À lancer</b>.</p>
+      <p>Pour la lancer avec Claude <b>maintenant</b> : collez cette consigne dans Claude (Cowork, projet Akteev).</p>
+      <textarea id="mlCons" readonly style="width:100%;height:110px;font:13px/1.45 inherit;border:1px solid var(--trait);border-radius:8px;padding:8px">${esc(consigne)}</textarea>
+      <p class="mut" style="font-size:12.5px;margin-bottom:0">Sinon, la tâche automatique « À traiter » (toutes les heures, 7 h – 19 h en semaine) prépare le lancement — numéro vérifié dans le registre, dossier, pièces — et vous prévient pour valider la suite.</p>`,
+      `<button class="btn" id="mlVoir">Voir dans « À traiter »</button><button class="btn p" id="mlCop">Copier la consigne</button>`);
+    $('mlCop').onclick=async()=>{try{await navigator.clipboard.writeText(consigne)}catch(e){$('mlCons').select();document.execCommand('copy')}toast('Consigne copiée')};
+    $('mlVoir').onclick=()=>{fermerModal(true);location.hash='#/depot/'+r.id};
+    if(MAIL.sel===m.id)mailBandeauAffaire(m);mailDessinerListe()}
+  catch(e){toast('Enregistrement impossible : '+e.message,true);if(box)box.querySelectorAll('button').forEach(b=>b.disabled=false)}}
 /* ---------- Charges machines (13/11/2026) ----------
    Planning de charge par machine, tenu par Arnaud (tournage) et Christophe (fraisage).
    Table « Machines » T_MACH : Nom, Secteur (Fraisage / Tournage / Fraisage fil), Heures par jour, Ordre, Hors service, Notes.
