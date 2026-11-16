@@ -104,7 +104,8 @@ a.chip:hover{background:var(--accentL);color:var(--accent)}
 .mlect{position:sticky;top:0;display:flex;flex-direction:column;min-height:300px}
 .mtete{padding:14px 16px;border-bottom:1px solid var(--trait)}.mtete h2{margin:0 0 6px;font-size:17px}
 .mact{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px}.mact .mattr{padding:5px 10px;font-weight:700}
-.mpj{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mpj .chip{cursor:pointer;border:1px solid var(--trait);background:#fff}
+.mpj{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.mpj .chip{cursor:pointer;border:1px solid var(--trait);background:#fff}.mpjc{display:inline-flex}.mpjc .mpjo{border-top-right-radius:0;border-bottom-right-radius:0;border-right:0}.mpjc .mpjm{border-top-left-radius:0;border-bottom-left-radius:0;padding-left:7px;padding-right:7px}.mpj .chip:hover{background:var(--accentL)}
+.mav{position:fixed;inset:0;z-index:70;background:rgba(15,23,42,.86);display:flex;flex-direction:column}.mavh{display:flex;align-items:center;gap:8px;padding:10px 16px;color:#fff}.mavh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}.mavN{font-size:12.5px;opacity:.8}.mavc{flex:1;min-height:0;display:flex;padding:0 16px 16px}.mavc iframe{flex:1;width:100%;height:100%;border:0;background:#fff;border-radius:6px}.mavi{flex:1;overflow:auto;text-align:center}.mavi img{display:block;max-width:100%;margin:0 auto 12px;background:#fff}.mavi img{cursor:zoom-in}.mavi img.zoom{max-width:none;width:250%;cursor:zoom-out}.mavt{flex:1;overflow:auto;margin:0;background:#fff;border-radius:6px;padding:14px;font:12.5px/1.45 ui-monospace,Menlo,monospace;white-space:pre-wrap}.mpjmenu{width:230px;z-index:80}.mml button:disabled{color:#9CA3AF;cursor:default;background:none}
 .mcorps{border:0;width:100%;height:calc(100vh - 330px);min-height:320px;border-radius:0 0 var(--r) var(--r)}
 .maff{margin:10px 14px 0;padding:10px 12px;border:1px solid #FCD34D;background:#FFFBEB;border-radius:10px;font-size:13px}.maff.ok{border-color:#B8CDF8;background:var(--accentL)}.maff .mact{margin-top:6px}
 .mfil{margin:10px 14px 0;border:1px solid var(--trait);border-radius:10px;overflow:hidden}.mfilt{padding:7px 12px;font-size:12.5px;font-weight:600;background:#F6F8FB;border-bottom:1px solid var(--trait)}
@@ -974,7 +975,7 @@ function mailDessinerLecture(m,att){
     <div class="mact"><button class="btn p" id="mRep" title="r">Répondre</button><button class="btn" id="mTous" title="Maj + R">Répondre à tous</button><button class="btn" id="mTr" title="f">Transférer</button>
       <span style="flex:1"></span><button class="btn" id="mRg" title="Ranger dans un dossier">${ico('dossier')}Ranger ▾</button><button class="btn" id="mArc" title="e">Archiver</button><button class="btn d" id="mSup" title="Suppr">Supprimer</button>
       <a class="btn" href="https://outlook.office.com/mail/${MAIL_BOITE}/inbox/id/${encodeURIComponent(m.id)}" target="_blank" title="Ouvrir dans Outlook">${ico('ext')}</a></div>
-    ${pj.length?`<div class="mpj">${pj.map(a=>`<button class="chip" data-a="${esc(a.id)}" data-n="${esc(a.name)}">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span></button>`).join('')}</div>`:''}
+    ${pj.length?`<div class="mpj">${pj.map((a,i)=>`<span class="mpjc" data-i="${i}"><button class="chip mpjo" title="${pjGenre(a.name)?'Aperçu':'Télécharger'}">📎 ${esc(a.name)} <span class="mut">${Math.max(1,Math.round(a.size/1024))} Ko</span></button><button class="chip mpjm" title="Aperçu, ouvrir, télécharger…">▾</button></span>`).join('')}</div>`:''}
     ${!MAIL.img&&/<img[^>]+src=["']?https?:/i.test(m.body?.content||'')?'<div class="mut" style="font-size:12px;margin-top:6px">Images distantes masquées. <a href="#" id="mImg">Les afficher</a></div>':''}
     <div class="mut" style="font-size:11.5px;margin-top:4px">${m.isRead?'Lu':'<b style="color:var(--accent)">Non lu</b> — reste non lu tant que vous ne cliquez pas « Marquer lu »'}</div></div>
   <div id="mAff"></div><div id="mFil"></div><div id="mComp"></div><iframe class="mcorps" sandbox="allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer"></iframe>`;
@@ -986,7 +987,7 @@ function mailDessinerLecture(m,att){
   box.querySelectorAll('.mattr').forEach(b=>b.onclick=()=>mailAttribuer(m,b.dataset.c,att));
   $('mLu').onclick=()=>mailMarquer(m,!m.isRead,att);
   if($('mImg'))$('mImg').onclick=e=>{e.preventDefault();MAIL.img=true;mailDessinerLecture(m,att)};
-  box.querySelectorAll('.mpj .chip').forEach(b=>b.onclick=()=>mailPJ(m.id,b.dataset.a,b.dataset.n));
+  mailBrancherPJ(box,m,pj);
 }
 async function mailPatch(m,corps){const j=await mailJeton();return graph(j,mailBase()+'/messages/'+encodeURIComponent(m.id),{method:'PATCH',body:JSON.stringify(corps)})}
 async function mailAttribuer(m,code,att){
@@ -1235,6 +1236,100 @@ async function mailLancer(m,type,g,num){
     $('mlVoir').onclick=()=>{fermerModal(true);location.hash='#/depot/'+r.id};
     if(MAIL.sel===m.id)mailBandeauAffaire(m);mailDessinerListe()}
   catch(e){toast('Enregistrement impossible : '+e.message,true);if(box)box.querySelectorAll('button').forEach(b=>b.disabled=false)}}
+/* ---- Pièces jointes : Aperçu / Ouvrir / Télécharger, comme Outlook (16/11/2026, Matthias) ----
+   Clic sur la pièce = aperçu (ou téléchargement si le type n'a pas d'aperçu) ; ▾ = menu.
+   PDF, images, TIFF (utif2 + pako, chargés à la demande), texte : directement dans Akteev.
+   Word / Excel / PowerPoint : copie dans le OneDrive de la personne (« Pièces jointes Akteev/<jj-mm-aaaa> <objet>/ »,
+   copiée une fois puis réutilisée), aperçu Office (Graph /preview), ouverture dans le navigateur (Office en ligne)
+   ou dans l'application de bureau (ms-word: / ms-excel: / ms-powerpoint:). Scope Files.ReadWrite.All (déjà accordé). */
+const PJ_OFF={doc:'word',docx:'word',docm:'word',dot:'word',dotx:'word',rtf:'word',odt:'word',xls:'excel',xlsx:'excel',xlsm:'excel',xlsb:'excel',ods:'excel',ppt:'powerpoint',pptx:'powerpoint',pps:'powerpoint',ppsx:'powerpoint',odp:'powerpoint'};
+const PJ_APP={word:['Word','ms-word'],excel:['Excel','ms-excel'],powerpoint:['PowerPoint','ms-powerpoint']};
+const PJ_MIME={pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',gif:'image/gif',webp:'image/webp',bmp:'image/bmp',svg:'image/svg+xml',txt:'text/plain;charset=utf-8',csv:'text/plain;charset=utf-8',log:'text/plain;charset=utf-8',xml:'text/plain;charset=utf-8',json:'text/plain;charset=utf-8'};
+const pjExt=n=>String(n||'').toLowerCase().split('.').pop();
+function pjGenre(n){const x=pjExt(n);if(x==='pdf')return'pdf';if(/^(jpe?g|png|gif|webp|bmp|svg)$/.test(x))return'img';if(/^tiff?$/.test(x))return'tif';if(PJ_OFF[x])return'office';if(/^(txt|csv|log|xml|json)$/.test(x))return'txt';return''}
+const PJ_CACHE=new Map(),PJ_OD={};
+async function pjBlob(mid,aid,nom){const k=mid+'|'+aid;if(PJ_CACHE.has(k))return PJ_CACHE.get(k);
+  const j=await mailJeton();const r=await fetch(`https://graph.microsoft.com/v1.0${mailBase()}/messages/${encodeURIComponent(mid)}/attachments/${encodeURIComponent(aid)}/$value`,{headers:{Authorization:'Bearer '+j}});
+  if(!r.ok)throw new Error(r.status===404?'pièce jointe introuvable (mail déplacé ?)':'Microsoft '+r.status);
+  const b0=await r.blob(),ty=PJ_MIME[pjExt(nom)],b=ty?new Blob([b0],{type:ty}):b0;
+  PJ_CACHE.set(k,b);if(PJ_CACHE.size>12)PJ_CACHE.delete(PJ_CACHE.keys().next().value);return b}
+function pjTelecharger(b,nom){const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=nom||'piece-jointe';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),6e4)}
+/* TIFF → images PNG (une par page, 30 pages max) */
+async function pjTiff(b){
+  if(!window.UTIF){if(!window.pako)await chargerScript('https://cdn.jsdelivr.net/npm/pako@1.0.11/dist/pako.min.js').catch(()=>{});await chargerScript('https://cdn.jsdelivr.net/npm/utif2@4.1.0/UTIF.js')}
+  const buf=await b.arrayBuffer(),ifds=UTIF.decode(buf),out=[];
+  for(const ifd of ifds.slice(0,30)){UTIF.decodeImage(buf,ifd,ifds);const w=ifd.width,h=ifd.height;if(!w||!h)continue;
+    const px=UTIF.toRGBA8(ifd),bm=await createImageBitmap(new ImageData(new Uint8ClampedArray(px.buffer,px.byteOffset,w*h*4),w,h));
+    const k=Math.min(1,5000/Math.max(w,h)),c=document.createElement('canvas');c.width=Math.round(w*k);c.height=Math.round(h*k);   // plans CAO 13 000 px → 5 000 px
+    const cx=c.getContext('2d');cx.fillStyle='#fff';cx.fillRect(0,0,c.width,c.height);cx.drawImage(bm,0,0,c.width,c.height);bm.close();
+    out.push(URL.createObjectURL(await new Promise(ok=>c.toBlob(ok,'image/png'))))}
+  if(!out.length)throw new Error('TIFF illisible');return out}
+/* Copie dans le OneDrive de la personne (réutilisée si déjà là, même taille) */
+const pjNomOk=s=>String(s||'').replace(/["*:<>?\/\\|#%~&{}]/g,' ').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'')||'sans objet';
+async function pjOneDrive(m,a){const k=m.id+'|'+a.id;if(PJ_OD[k])return PJ_OD[k];
+  const b=await pjBlob(m.id,a.id,a.name),j=await jetonGraph(['Files.ReadWrite.All']);
+  const d=new Date(m.receivedDateTime||Date.now()),jj=x=>String(x).padStart(2,'0');
+  const dos=`Pièces jointes Akteev/${jj(d.getDate())}-${jj(d.getMonth()+1)}-${d.getFullYear()} ${pjNomOk(m.subject).slice(0,60)}`;
+  const ch=(dos+'/'+pjNomOk(a.name)).split('/').map(encodeURIComponent).join('/');
+  let it=null;try{it=await graph(j,`/me/drive/root:/${ch}`)}catch(e){if(e.status!==404)throw e}
+  if(!it||it.size!==b.size){
+    if(b.size<=4e6)it=await graph(j,`/me/drive/root:/${ch}:/content?@microsoft.graph.conflictBehavior=replace`,{method:'PUT',headers:{'Content-Type':'application/octet-stream'},body:b});
+    else{const s=await graph(j,`/me/drive/root:/${ch}:/createUploadSession`,{method:'POST',body:JSON.stringify({item:{'@microsoft.graph.conflictBehavior':'replace'}})});
+      const T=5*1048576;for(let i=0;i<b.size;i+=T){const f=Math.min(i+T,b.size);const x=await fetch(s.uploadUrl,{method:'PUT',headers:{'Content-Range':`bytes ${i}-${f-1}/${b.size}`},body:b.slice(i,f)});
+        if(!x.ok&&x.status!==202)throw new Error('copie OneDrive : '+x.status);if(x.status===200||x.status===201)it=await x.json()}}}
+  return PJ_OD[k]=it}
+/* Fenêtre d'aperçu plein écran, ‹ › pour passer d'une pièce à l'autre */
+function pjFermer(){const v=document.querySelector('.mav');if(v){(v._urls||[]).forEach(u=>URL.revokeObjectURL(u));v.remove()}window.removeEventListener('keydown',pjTouches,true)}
+function pjTouches(e){const v=document.querySelector('.mav');if(!v)return;e.stopImmediatePropagation();
+  if(e.key==='Escape'){e.preventDefault();pjFermer()}else if(e.key==='ArrowRight'||e.key==='ArrowLeft'){e.preventDefault();v.querySelector(e.key==='ArrowRight'?'.mavS':'.mavP')?.click()}}
+async function pjApercu(m,L,i){pjFermer();const a=L[i],g=pjGenre(a.name);
+  const v=document.createElement('div');v.className='mav';v._urls=[];
+  const nav=L.length>1?`<button class="btn mavP" ${i?'':'disabled'} title="Précédente (←)">‹</button><span class="mavN">${i+1} / ${L.length}</span><button class="btn mavS" ${i<L.length-1?'':'disabled'} title="Suivante (→)">›</button>`:'';
+  v.innerHTML=`<div class="mavh"><b title="${esc(a.name)}">📎 ${esc(a.name)} <span style="opacity:.7;font-weight:400">${Math.max(1,Math.round(a.size/1024))} Ko</span></b>${nav}
+    <button class="btn mavO">Ouvrir ▾</button><button class="btn mavT">Télécharger</button><button class="btn mavX" title="Fermer (Échap)">✕</button></div><div class="mavc"><div class="charge" style="color:#fff;padding:40px">Chargement…</div></div>`;
+  document.body.appendChild(v);window.addEventListener('keydown',pjTouches,true);
+  v.querySelector('.mavX').onclick=pjFermer;v.onclick=e=>{if(e.target===v||e.target.classList.contains('mavc'))pjFermer()};
+  if(v.querySelector('.mavP'))v.querySelector('.mavP').onclick=()=>pjApercu(m,L,i-1);if(v.querySelector('.mavS'))v.querySelector('.mavS').onclick=()=>pjApercu(m,L,i+1);
+  v.querySelector('.mavT').onclick=()=>pjAction(m,a,'dl');v.querySelector('.mavO').onclick=e=>{e.stopPropagation();pjMenu(m,a,e.currentTarget,L,true)};
+  const c=v.querySelector('.mavc'),ici=()=>document.querySelector('.mav')===v;
+  try{if(g==='office'){const it=await pjOneDrive(m,a);const p=await graph(await jetonGraph(['Files.ReadWrite.All']),`/me/drive/items/${it.id}/preview`,{method:'POST',body:'{}'});
+        if(!ici())return;c.innerHTML=`<iframe src="${esc(p.getUrl)}" allowfullscreen></iframe>`;return}
+    const b=await pjBlob(m.id,a.id,a.name);if(!ici())return;
+    if(g==='pdf'){const u=URL.createObjectURL(b);v._urls.push(u);c.innerHTML=`<iframe src="${u}"></iframe>`}
+    else if(g==='img'){const u=URL.createObjectURL(b);v._urls.push(u);c.innerHTML=`<div class="mavi"><img src="${u}" alt="" title="Cliquer pour zoomer"></div>`;c.querySelector('.mavi img').onclick=e=>e.target.classList.toggle('zoom')}
+    else if(g==='tif'){const U=await pjTiff(b);if(!ici()){U.forEach(u=>URL.revokeObjectURL(u));return}v._urls.push(...U);c.innerHTML=`<div class="mavi">${U.map(u=>`<img src="${u}" alt="" title="Cliquer pour zoomer">`).join('')}</div>`;c.querySelectorAll('.mavi img').forEach(im=>im.onclick=()=>im.classList.toggle('zoom'))}
+    else if(g==='txt'){c.innerHTML=`<pre class="mavt">${esc((await b.text()).slice(0,500000))}</pre>`}
+    else c.innerHTML=`<div style="color:#fff;padding:40px;text-align:center">Pas d'aperçu pour ce type de fichier.<br><br><button class="btn p" id="mavDl">Télécharger</button></div>`,$('mavDl').onclick=()=>pjAction(m,a,'dl')}
+  catch(e){if(ici())c.innerHTML=`<div style="color:#fff;padding:40px;text-align:center">Aperçu impossible : ${esc(e.message)}<br><br><button class="btn" id="mavDl">Télécharger</button></div>`,$('mavDl').onclick=()=>pjAction(m,a,'dl')}}
+/* Actions : dl, onglet (nouvel onglet), web (Office en ligne), app (application de bureau), od (enregistrer dans OneDrive) */
+async function pjAction(m,a,act,L){const g=pjGenre(a.name);let w=null;
+  if(act==='onglet'||act==='web'){w=window.open('','_blank');if(w)w.document.write('<p style="font:15px system-ui;padding:30px;color:#555">Ouverture de '+esc(a.name)+'…</p>')}
+  try{if(act==='dl')return pjTelecharger(await pjBlob(m.id,a.id,a.name),a.name);
+    if(act==='apercu')return pjApercu(m,L||[a],Math.max(0,(L||[a]).indexOf(a)));
+    if(act==='onglet'){const b=await pjBlob(m.id,a.id,a.name);
+      if(g==='tif'){const U=await pjTiff(b);const ht=`<title>${esc(a.name)}</title><body style="margin:0;background:#525659">${U.map(u=>`<img src="${u}" style="display:block;max-width:100%;margin:10px auto;background:#fff">`).join('')}</body>`;
+        if(w){w.document.open();w.document.write(ht);w.document.close()}return}
+      const u=URL.createObjectURL(b);if(w)w.location.href=u;else window.open(u,'_blank');setTimeout(()=>URL.revokeObjectURL(u),10*6e4);return}
+    const it=await pjOneDrive(m,a);
+    if(act==='web'){if(w)w.location.href=it.webUrl;else window.open(it.webUrl,'_blank');return}
+    if(act==='app'){const ap=PJ_APP[PJ_OFF[pjExt(a.name)]];location.href=`${ap[1]}:ofe|u|${it.webUrl}`;toast(`Ouverture dans ${ap[0]}…`);return}
+    if(act==='od'){toast('Copié dans votre OneDrive : '+decodeURIComponent(String(it.parentReference?.path||'').replace(/^.*root:\/?/,''))+'/'+it.name);return}}
+  catch(e){if(w)w.close();toast((act==='dl'?'Téléchargement':act==='od'?'Copie OneDrive':'Ouverture')+' impossible : '+e.message,true)}}
+function pjMenu(m,a,btn,L,dansApercu){
+  document.querySelectorAll('.mmenu').forEach(x=>x.remove());const g=pjGenre(a.name),ap=PJ_APP[PJ_OFF[pjExt(a.name)]];
+  const it=[];if(!dansApercu)it.push(['apercu','Aperçu',!g]);
+  if(g==='office')it.push(['web','Ouvrir dans le navigateur'],['app','Ouvrir dans '+ap[0]]);else it.push(['onglet','Ouvrir dans un nouvel onglet',!g]);
+  if(!dansApercu)it.push(['dl','Télécharger']);it.push(['od','Enregistrer dans OneDrive']);
+  const d=document.createElement('div');d.className='mmenu mpjmenu';
+  d.innerHTML=`<div class="mml">${it.map(([k,l,off])=>`<button data-k="${k}" ${off?'disabled title="Pas d’aperçu pour ce type de fichier"':''}>${l}</button>`).join('')}</div>`;
+  const r=btn.getBoundingClientRect();d.style.top=(r.bottom+4)+'px';d.style.left=Math.max(8,Math.min(r.left,innerWidth-240))+'px';document.body.appendChild(d);
+  setTimeout(()=>document.addEventListener('click',function f(e){if(!d.contains(e.target)){d.remove();document.removeEventListener('click',f)}}),0);
+  d.querySelectorAll('button[data-k]').forEach(b=>b.onclick=()=>{d.remove();pjAction(m,a,b.dataset.k,L)})}
+function mailBrancherPJ(box,m,pj){const L=pj.filter(a=>pjGenre(a.name));
+  box.querySelectorAll('.mpjc').forEach(s=>{const a=pj[+s.dataset.i];
+    s.querySelector('.mpjo').onclick=()=>pjGenre(a.name)?pjApercu(m,L,L.indexOf(a)):pjAction(m,a,'dl');
+    s.querySelector('.mpjm').onclick=e=>{e.stopPropagation();pjMenu(m,a,e.currentTarget,L)}})}
+
 /* ---------- Charges machines (13/11/2026) ----------
    Planning de charge par machine, tenu par Arnaud (tournage) et Christophe (fraisage).
    Table « Machines » T_MACH : Nom, Secteur (Fraisage / Tournage / Fraisage fil), Heures par jour, Ordre, Hors service, Notes.
