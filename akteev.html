@@ -1205,7 +1205,9 @@ async function mailBandeauAffaire(m){const box=$('mAff');if(!box)return;box.inne
   await Promise.all([MODS.devis.t,MODS.commandes.t,MODS.clients.t,MODS.fournisseurs.t,MODS.depot.t].map(t=>charger(t).catch(()=>{})));
   if(MAIL.sel!==m.id||!$('mAff'))return;
   const dep=mailDepotDe(m);
-  if(dep){box.innerHTML=`<div class="maff ok">Déjà dans « À traiter » : <b>${esc(txt(dep.Type))}</b> · ${badge(dep.Statut)} <a href="#/depot/${dep.id}">ouvrir la demande n° ${dep.id}</a></div>`;return}
+  if(dep){const lanc=/^(à lancer|à traiter)$/i.test(txt(dep.Statut))&&/^(DDP client|Commande client|Offre fournisseur)$/.test(txt(dep.Type));
+    box.innerHTML=`<div class="maff ok" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><span style="flex:1">Déjà dans « À traiter » : <b>${esc(txt(dep.Type))}</b> · ${badge(dep.Statut)} <a href="#/depot/${dep.id}">ouvrir la demande n° ${dep.id}</a>${/Consultations : /.test(txt(dep.Proposition))?` · <span class="mut">${esc(txt(dep.Proposition).replace(/^.*Consultations : /,'Consultations : '))}</span>`:''}</span>${lanc?`<button class="btn" id="mAffL">${txt(dep.Type)==='DDP client'?'Consultations… / lancer':'Lancer…'}</button>`:''}</div>`;
+    if($('mAffL'))$('mAffL').onclick=()=>{const de=m.from?.emailAddress||{};mailFenetreLancement(m,dep,txt(dep.Type),de.name&&de.name!==de.address?`${de.name} <${de.address}>`:de.address)};return}
   if(mailAffaireConnue(m)||MAIL_SANSAFF.has(m.internetMessageId||m.id))return;
   const g=devinerDepot(m.subject||'',m._corps||m.bodyPreview||'',adr),num='';
   const B=(ty,lib,cl)=>`<button class="btn ${cl||''}" data-ty="${ty}">${lib}</button>`;
@@ -1230,19 +1232,69 @@ async function mailLancer(m,type,g,num){
     const r=ex?await api(`/rows/table/${t}/${ex.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)}):await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});
     majRow(t,r);majCompteurs();
     if(type==='DDP client'&&!(m.categories||[]).some(c=>/^DDP/i.test(c))){try{const cats=[...(m.categories||[]),'DDP – à traiter'];const x=await mailPatch(m,{categories:cats});m.categories=x?.categories||cats;const i=MAIL.L.findIndex(y=>y.id===m.id);if(i>=0)MAIL.L[i].categories=m.categories;delete MAIL.cache[m.id]}catch(e){console.warn(e)}}
-    const verbe={'DDP client':'Lance la DDP','Commande client':'Enregistre la commande','Offre fournisseur':'Prépare la commande fournisseur'}[type];
-    const consigne=`${verbe} de la demande Akteev « À traiter » n° ${r.id} : mail « ${m.subject||''} » de ${exped}, reçu le ${new Date(m.receivedDateTime).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})} sur kte@ (Message-ID ${m.internetMessageId||'?'}).`+
-      (type==='Offre fournisseur'?'':' Aucune affaire existante reconnue ; attribue le n° d’affaire d’après le registre.');
-    try{await navigator.clipboard.writeText(consigne)}catch(e){}
-    ouvrirModal('Demande prête à lancer',`<p style="margin-top:0"><b>${esc(type)}</b> enregistrée dans <a href="#/depot/${r.id}">« À traiter » n° ${r.id}</a>, statut <b>À lancer</b>.</p>
-      <p>Pour la lancer avec Claude <b>maintenant</b> : collez cette consigne dans Claude (Cowork, projet Akteev).</p>
-      <textarea id="mlCons" readonly style="width:100%;height:110px;font:13px/1.45 inherit;border:1px solid var(--trait);border-radius:8px;padding:8px">${esc(consigne)}</textarea>
-      <p class="mut" style="font-size:12.5px;margin-bottom:0">Sinon, la tâche automatique « À traiter » (toutes les heures, 7 h – 19 h en semaine) relit le mail et ses pièces, vérifie qu’aucune affaire n’existe déjà et prépare le lancement ; le n° d’affaire est attribué au lancement, avec Claude.</p>`,
-      `<button class="btn" id="mlVoir">Voir dans « À traiter »</button><button class="btn p" id="mlCop">Copier la consigne</button>`);
-    $('mlCop').onclick=async()=>{try{await navigator.clipboard.writeText(consigne)}catch(e){$('mlCons').select();document.execCommand('copy')}toast('Consigne copiée')};
-    $('mlVoir').onclick=()=>{fermerModal(true);location.hash='#/depot/'+r.id};
+    await mailFenetreLancement(m,r,type,exped);
     if(MAIL.sel===m.id)mailBandeauAffaire(m);mailDessinerListe()}
   catch(e){toast('Enregistrement impossible : '+e.message,true);if(box)box.querySelectorAll('button').forEach(b=>b.disabled=false)}}
+/* ---- Fenêtre « Demande prête à lancer » + choix des consultations (16/11/2026, Matthias) ----
+   Pour une DDP : fournisseurs habituels à consulter (Ryan – Rogle, Victor – Tengkoo, Tournage, Fraisage), chacun pour
+   toute la DDP ou pour certaines pièces (pièces jointes du mail cochées et/ou repères tapés). Si tout est précisé, la
+   consigne demande à Claude de lancer aussi les consultations (compétence chiffrage-demande-prix, brouillons seulement) ;
+   sinon Claude lance la DDP puis renvoie vers cette fenêtre (« Consultations… » sur le mail). Les choix sont gardés dans
+   la « Proposition » de la ligne À traiter (« Consultations : … »). */
+const DEM_SST=[{k:'ryan',lib:'Ryan – Rogle (Chine)',det:'Ryan Peng – Rogle (ryanpeng@139.com), Elodie en copie, mail en anglais'},
+ {k:'victor',lib:'Victor – Tengkoo (Chine)',det:'Victor – Tengkoo (victor@tengkoomould.com), Elodie en copie, mail en anglais'},
+ {k:'tournage',lib:'Tournage (atelier KTE)',det:'Tournage – Arnaud (tournage@kte-fr.com), en français, client précisé'},
+ {k:'fraisage',lib:'Fraisage (atelier KTE)',det:'Usinage / fraisage – Christophe Eon (usinage@kte-fr.com), en français, client précisé'}];
+const PJ_PLAN=/\.(pdf|stp|step|igs|iges|dxf|dwg|tiff?|zip|7z|rar|x_t|sldprt|catpart|prt)$/i;
+async function mailPiecesPlans(m){let a=(MAIL.cur?.m?.id===m.id?MAIL.cur.att:null);
+  if(!a){try{const j=await mailJeton();a=(await graph(j,`${mailBase()}/messages/${encodeURIComponent(m.id)}/attachments?$select=id,name,size,isInline`)).value}catch(e){a=[]}}
+  return(a||[]).filter(x=>!x.isInline&&PJ_PLAN.test(x.name||'')).map(x=>x.name)}
+function mailConsultTexte(ch){const L=[];let ok=true;
+  for(const s of DEM_SST){const c=ch[s.k];if(!c?.on)continue;
+    if(c.tout)L.push(`${s.lib} : toute la DDP`);
+    else{const p=[...(c.pieces||[]),...String(c.autres||'').split(/[;,\n]+/).map(x=>x.trim()).filter(Boolean)];if(!p.length){ok=false;L.push(`${s.lib} : pièces à préciser`)}else L.push(`${s.lib} : ${p.map(x=>`« ${x} »`).join(', ')}`)}}
+  return{L,ok:ok&&L.length>0,vide:!L.length}}
+async function mailFenetreLancement(m,r,type,exped){
+  const ddp=type==='DDP client',pieces=ddp?await mailPiecesPlans(m):[];
+  const prev=String(txt(r.Proposition)||'').match(/Consultations : (.*)$/);const ch={};DEM_SST.forEach(s=>ch[s.k]={on:false,tout:true,pieces:[],autres:''});
+  if(prev)DEM_SST.forEach(s=>{const mm=prev[1].match(new RegExp(s.lib.replace(/[()]/g,'\\$&')+' : ([^;]+)'));if(mm){ch[s.k].on=true;if(!/toute la DDP/.test(mm[1])){ch[s.k].tout=false;const p=[...mm[1].matchAll(/« ([^»]+) »/g)].map(x=>x[1]);ch[s.k].pieces=p.filter(x=>pieces.includes(x));ch[s.k].autres=p.filter(x=>!pieces.includes(x)).join(', ')}}});
+  const verbe={'DDP client':'Lance la DDP','Commande client':'Enregistre la commande','Offre fournisseur':'Prépare la commande fournisseur'}[type];
+  const base=`${verbe} de la demande Akteev « À traiter » n° ${r.id} : mail « ${m.subject||''} » de ${exped}, reçu le ${new Date(m.receivedDateTime).toLocaleString('fr-FR',{dateStyle:'short',timeStyle:'short'})} sur kte@ (Message-ID ${m.internetMessageId||'?'}).`+
+    (type==='Offre fournisseur'?'':' Aucune affaire existante reconnue ; attribue le n° d’affaire d’après le registre.');
+  const consigne=()=>{if(!ddp)return base;const t=mailConsultTexte(ch);
+    if(t.ok)return base+` Puis lance les consultations (compétence chiffrage-demande-prix, étapes 7 et 9 : fichiers Excel + plans nettoyés « _KTE », mails en BROUILLON seulement) : ${t.L.join(' ; ')}. Pour « certaines pièces », ne mettre que ces repères dans le fichier de consultation du fournisseur.`;
+    return base+` Consultations non encore choisies${t.vide?'':' ou incomplètes ('+t.L.join(' ; ')+')'} : après la création du dossier, ne consulte personne et demande à Matthias de les préciser dans la fenêtre « Demande prête à lancer » d’Akteev (bouton « Consultations… » sur le mail, demande n° ${r.id}).`};
+  const bloc=!ddp?'':`<div style="margin:12px 0 4px;font-weight:600">Consultations à lancer</div>
+    <div class="mut" style="font-size:12.5px;margin-bottom:6px">Cochez les fournisseurs, puis « toute la DDP » ou « certaines pièces ». Si tout est précisé, Claude lance aussi les consultations (en brouillon).</div>
+    ${DEM_SST.map(s=>`<div class="mlS" data-k="${s.k}" style="border:1px solid var(--trait);border-radius:8px;padding:8px 10px;margin-bottom:6px">
+      <label style="display:flex;gap:8px;align-items:center;font-weight:500"><input type="checkbox" class="mlOn"> ${esc(s.lib)}</label>
+      <div class="mlDet" style="display:none;margin:6px 0 0 24px;font-size:13px">
+        <label style="margin-right:14px"><input type="radio" name="mlP_${s.k}" value="tout"> Toute la DDP</label><label><input type="radio" name="mlP_${s.k}" value="partiel"> Certaines pièces</label>
+        <div class="mlPieces" style="display:none;margin-top:6px">${pieces.length?pieces.map(p=>`<label style="display:block"><input type="checkbox" class="mlPc" value="${esc(p)}"> ${esc(p)}</label>`).join(''):'<div class="mut">Aucun plan joint au mail : indiquez les repères.</div>'}
+          <input class="mlAut" placeholder="Autres repères (séparés par des virgules)" style="margin-top:4px;width:100%;border:1px solid var(--trait);border-radius:6px;padding:5px 8px"></div></div></div>`).join('')}
+    <div id="mlEtat" style="font-size:12.5px;margin-top:4px"></div>`;
+  ouvrirModal('Demande prête à lancer',`<p style="margin-top:0"><b>${esc(type)}</b> enregistrée dans <a href="#/depot/${r.id}">« À traiter » n° ${r.id}</a>, statut <b>${esc(txt(r.Statut)||'À lancer')}</b>.</p>${bloc}
+      <p style="margin-top:12px">Pour la lancer avec Claude <b>maintenant</b> : collez cette consigne dans Claude (Cowork, projet Akteev).</p>
+      <textarea id="mlCons" readonly style="width:100%;height:120px;font:13px/1.45 inherit;border:1px solid var(--trait);border-radius:8px;padding:8px"></textarea>
+      <p class="mut" style="font-size:12.5px;margin-bottom:0">Sinon, la tâche automatique « À traiter » (toutes les heures, 7 h – 19 h en semaine) relit le mail et ses pièces et prépare le lancement ; le n° d’affaire est attribué au lancement, avec Claude.</p>`,
+    `<button class="btn" id="mlVoir">Voir dans « À traiter »</button>${ddp?'<button class="btn" id="mlEnr">Enregistrer les choix</button>':''}<button class="btn p" id="mlCop">Copier la consigne</button>`);
+  const maj=()=>{$('mlCons').value=consigne();if(!ddp)return;const t=mailConsultTexte(ch);
+    $('mlEtat').innerHTML=t.vide?'<span class="mut">Aucun fournisseur coché : Claude lancera la DDP sans consulter.</span>':t.ok?'<span style="color:#15803D">✓ Consultations complètes : Claude les lancera dans la foulée.</span>':'<span style="color:#B45309">Choix incomplet : précisez les pièces, sinon Claude vous renverra vers cette fenêtre.</span>'};
+  document.querySelectorAll('#mCorps .mlS').forEach(d=>{const c=ch[d.dataset.k],on=d.querySelector('.mlOn'),det=d.querySelector('.mlDet'),pz=d.querySelector('.mlPieces');
+    const vue=()=>{det.style.display=c.on?'':'none';pz.style.display=c.on&&!c.tout?'':'none';d.style.background=c.on?'var(--accentL)':''};
+    on.checked=c.on;d.querySelector(`input[value="${c.tout?'tout':'partiel'}"]`).checked=true;d.querySelectorAll('.mlPc').forEach(x=>x.checked=c.pieces.includes(x.value));d.querySelector('.mlAut').value=c.autres;
+    on.onchange=()=>{c.on=on.checked;vue();maj()};
+    d.querySelectorAll(`input[name="mlP_${d.dataset.k}"]`).forEach(x=>x.onchange=()=>{c.tout=x.value==='tout';vue();maj()});
+    d.querySelectorAll('.mlPc').forEach(x=>x.onchange=()=>{c.pieces=[...d.querySelectorAll('.mlPc:checked')].map(y=>y.value);maj()});
+    d.querySelector('.mlAut').oninput=e=>{c.autres=e.target.value;maj()};vue()});
+  maj();
+  const enregistrer=async()=>{if(!ddp)return;const t=mailConsultTexte(ch);
+    const p0=String(txt(r.Proposition)||'').replace(/\s*·\s*Consultations : .*$/,'');const p=t.vide?p0:`${p0} · Consultations : ${t.L.join(' ; ')}`;
+    if(p===txt(r.Proposition))return;const x=await api(`/rows/table/${MODS.depot.t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({Proposition:p})});majRow(MODS.depot.t,x);r.Proposition=p};
+  $('mlCop').onclick=async()=>{const c=consigne();try{await navigator.clipboard.writeText(c)}catch(e){$('mlCons').select();document.execCommand('copy')}
+    try{await enregistrer()}catch(e){console.warn(e)}toast('Consigne copiée'+(ddp&&!mailConsultTexte(ch).vide?' et choix enregistrés':''))};
+  if($('mlEnr'))$('mlEnr').onclick=async()=>{try{await enregistrer();toast('Choix des consultations enregistrés')}catch(e){toast('Enregistrement impossible : '+e.message,true)}};
+  $('mlVoir').onclick=()=>{fermerModal(true);location.hash='#/depot/'+r.id}}
 /* ---- Pièces jointes : Aperçu / Ouvrir / Télécharger, comme Outlook (16/11/2026, Matthias) ----
    Clic sur la pièce = aperçu (ou téléchargement si le type n'a pas d'aperçu) ; ▾ = menu.
    PDF, images, TIFF (utif2 + pako, chargés à la demande), texte : directement dans Akteev.
