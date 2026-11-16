@@ -396,6 +396,7 @@ const ls={get(k,d){try{const v=localStorage.getItem('akteev_'+k);return v==null?
 
 /* ---------- Icônes ---------- */
 const I={
+ etoile:'<path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
  accueil:'<path d="M3 11 12 3l9 8"/><path d="M5 10v10h14V10"/>',
  devis:'<path d="M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
@@ -437,6 +438,12 @@ const MODS={
  depot:{t:1317249,nom:'À traiter',un:'mail',ico:'ddp',grp:'Boîte de réception',cols:['Reçu le','Type','À traiter par','Objet','Action','Expéditeur','Client / fournisseur','Devis cité','Statut'],libOuverts:'Ouverts',
    virt:'depot',statut:'Statut',date:'Reçu le',cacheStatuts:['Traité','Ignoré'],solde:['Traité','Ignoré'],soldeVerbe:'classer',faitLe:'Traité le',faitRe:/^(trait|ignor)/i,
    ordreStatuts:['À traiter','À lancer','En cours','Traité','Ignoré'],ordreForm:['Objet','Type','À traiter par','Statut','Reçu le','Fichier déposé','Expéditeur','Boîte','Client / fournisseur','Devis cité','Proposition','Indices','Lien Outlook','Message-ID','Traité le','Commentaire']},
+ demande:{t:1322161,nom:'Demandes Claude',un:'demande',fem:true,ico:'etoile',grp:'Claude',cols:['Créée le','Demande','Type','Demandeur','Affaire','Priorité','Statut','Résultat'],
+   statut:'Statut',date:'Créée le',ref:'Demandeur',cacheStatuts:['Terminée','Annulée'],faitLe:'Traitée le',faitRe:/^termin/i,ordreStatuts:['Nouvelle','Question','En cours','Terminée','Annulée'],
+   ordreForm:['Demande','Type','Statut','Priorité','Demandeur','Affaire','Description','Fichiers','Question de Claude','Réponse du demandeur','Réponse de Claude','Résultat','Retour du demandeur','Créée le','Traitée le','Journal']},
+ regles:{t:1322162,nom:'Règles apprises',un:'règle',fem:true,ico:'ampoule',grp:'Claude',cols:['Règle','Domaine','Statut','Source','Proposée par','Proposée le','Validée le','Compétence'],
+   statut:'Statut',date:'Proposée le',ref:'Proposée par',cacheStatuts:['Refusée'],faitLe:'Validée le',faitRe:/^(valid|int)/i,ordreStatuts:['Proposée','Validée','Intégrée à la compétence','Refusée'],
+   ordreForm:['Règle','Domaine','Statut','Détail','Exemple','Source','Proposée par','Proposée le','Validée le','Compétence','Commentaire']},
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
@@ -1329,6 +1336,74 @@ function mailBrancherPJ(box,m,pj){const L=pj.filter(a=>pjGenre(a.name));
   box.querySelectorAll('.mpjc').forEach(s=>{const a=pj[+s.dataset.i];
     s.querySelector('.mpjo').onclick=()=>pjGenre(a.name)?pjApercu(m,L,L.indexOf(a)):pjAction(m,a,'dl');
     s.querySelector('.mpjm').onclick=e=>{e.stopPropagation();pjMenu(m,a,e.currentTarget,L)}})}
+
+/* ---------- Demandes à Claude (16/11/2026, Matthias) ----------
+   Onglet « Demandes Claude » (table 1322161) : chacun dépose une demande (commande fournisseur, document, DDP, commande client,
+   fiches atelier, question…) avec ses fichiers (rangés sur SharePoint « Devis et commandes » › _Demandes Claude/<année>/…).
+   La tâche planifiée « Demandes Claude » la traite avec les compétences Akteev, écrit sa réponse / sa question dans la ligne,
+   et note les corrections du demandeur dans « Règles apprises » (table 1322162, statut Proposée → validée par Matthias).
+   Rien n'est envoyé à un client ou un fournisseur sans validation : les mails restent en brouillon. */
+const DEM_TYPES=[['Commande fournisseur','Rédiger une CF à partir d’une offre (joindre l’offre)'],['Document à rédiger','Courrier, procédure, note, compte rendu…'],
+ ['DDP / chiffrage','Ouvrir un dossier de chiffrage (joindre le mail ou les plans)'],['Commande client','Enregistrer une commande reçue (joindre le bon de commande)'],
+ ['Fiches atelier / RC','Fiches de suivi, rapports de contrôle d’une affaire'],['Question','Une question sur une affaire, un client, un chiffre…'],['Autre','']];
+let DEM_FIC=[];
+function demandeZone(){if(!peutEcrire('demande'))return'';
+  return`<div id="demZone" class="card" style="margin:0 0 14px;padding:16px 18px">
+   <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px"><b style="font-size:15px">Nouvelle demande à Claude</b><span class="mut" style="font-size:12.5px">traitée automatiquement (heures ouvrées) — ou tout de suite en collant la consigne dans Cowork</span></div>
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+    <label class="mut" style="font-size:12.5px">Type<select id="demType" style="display:block;width:100%;margin-top:3px;border:1px solid var(--trait);border-radius:7px;padding:7px">${DEM_TYPES.map(([t])=>`<option>${esc(t)}</option>`).join('')}</select></label>
+    <label class="mut" style="font-size:12.5px">Affaire (facultatif)<input id="demAff" placeholder="D265xxx" style="display:block;width:100%;margin-top:3px;border:1px solid var(--trait);border-radius:7px;padding:7px"></label>
+    <label class="mut" style="font-size:12.5px">Priorité<select id="demPrio" style="display:block;width:100%;margin-top:3px;border:1px solid var(--trait);border-radius:7px;padding:7px"><option>Normale</option><option>Urgente</option></select></label></div>
+   <input id="demTitre" placeholder="En quelques mots : ex. « CF Norelem pour D265141 »" style="width:100%;margin-top:10px;border:1px solid var(--trait);border-radius:7px;padding:8px 10px;font-size:14px">
+   <textarea id="demDesc" placeholder="Décrivez ce que vous voulez obtenir, comme vous le diriez à un collègue." style="width:100%;margin-top:8px;height:96px;border:1px solid var(--trait);border-radius:7px;padding:8px 10px;font:14px/1.45 inherit"></textarea>
+   <div class="mut" id="demAide" style="font-size:12px;margin-top:4px"></div>
+   <div id="demDrop" style="margin-top:8px;border:2px dashed #C7D4F0;border-radius:10px;padding:10px 12px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+    <span class="mut" style="font-size:13px;flex:1">Glissez ici les fichiers utiles (offre, plans, mail .msg / .eml…)</span><label class="btn" style="cursor:pointer">${ico('dl')}Joindre<input id="demFic" type="file" multiple style="display:none"></label><div id="demListe" style="width:100%;font-size:12.5px"></div></div>
+   <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px"><span id="demEtat" class="mut" style="font-size:13px;flex:1;align-self:center"></span><button class="btn p" id="demEnv">Envoyer à Claude</button></div></div>`}
+function brancherDemande(){if(!$('demZone'))return;DEM_FIC=[];
+  const aide=()=>{$('demAide').textContent=(DEM_TYPES.find(x=>x[0]===$('demType').value)||[])[1]||''};$('demType').onchange=aide;aide();
+  const liste=()=>{$('demListe').innerHTML=DEM_FIC.map((f,i)=>`<span class="chip" style="margin:4px 6px 0 0;display:inline-flex;gap:6px">📎 ${esc(f.name)} <a href="#" data-i="${i}" title="Retirer">✕</a></span>`).join('');
+    $('demListe').querySelectorAll('a[data-i]').forEach(a=>a.onclick=e=>{e.preventDefault();DEM_FIC.splice(+a.dataset.i,1);liste()})};
+  const z=$('demDrop'),on=v=>{z.style.borderColor=v?'#2F64D8':'#C7D4F0';z.style.background=v?'#EEF3FD':''};
+  z.ondragover=e=>{e.preventDefault();on(true)};z.ondragleave=()=>on(false);
+  z.ondrop=e=>{e.preventDefault();on(false);DEM_FIC.push(...(e.dataTransfer?.files||[]));liste()};
+  $('demFic').onchange=e=>{DEM_FIC.push(...e.target.files);e.target.value='';liste()};
+  $('demEnv').onclick=envoyerDemande}
+async function envoyerDemande(){
+  const titreD=$('demTitre').value.trim(),desc=$('demDesc').value.trim(),type=$('demType').value,aff=$('demAff').value.trim().toUpperCase(),prio=$('demPrio').value;
+  if(!titreD&&!desc)return toast('Décrivez la demande',true);
+  if(!MOI)return toast('Choisissez d’abord « Je suis » en bas du menu',true);
+  const b=$('demEnv'),et=$('demEtat');b.disabled=true;
+  try{const t=MODS.demande.t,sc=sch(t),opt=(n,v)=>(sc.par[n]?.select_options||[]).find(o=>o.value===v)?.id??v;
+    const d=new Date(),jj=x=>String(x).padStart(2,'0'),titre=(titreD||desc.split('\n')[0]).slice(0,90);
+    let lien='';
+    if(DEM_FIC.length){et.textContent='Envoi des fichiers sur SharePoint…';const j=await jetonGraph(['Files.ReadWrite.All']);
+      const dos=`_Demandes Claude/${d.getFullYear()}/${jj(d.getDate())}-${jj(d.getMonth()+1)}-${d.getFullYear()} ${jj(d.getHours())}h${jj(d.getMinutes())} ${pjNomOk(titre).slice(0,60)}`;
+      for(const [i,f] of DEM_FIC.entries()){et.textContent=`Envoi des fichiers sur SharePoint… ${i+1} / ${DEM_FIC.length}`;await envoyerSP(j,dos,f)}
+      const it=await graph(j,`/drives/${DEPOT_DRIVE}/root:/${dos.split('/').map(encodeURIComponent).join('/')}`);lien=it.webUrl}
+    et.textContent='Enregistrement…';
+    const corps={'Demande':titre,'Type':opt('Type',type),'Statut':opt('Statut','Nouvelle'),'Priorité':opt('Priorité',prio),'Demandeur':[MOI],
+      'Description':desc,'Affaire':aff,'Fichiers':lien||null,'Créée le':d.toISOString()};
+    const r=await api(`/rows/table/${t}/?user_field_names=true`,{method:'POST',body:JSON.stringify(corps)});majRow(t,r);majCompteurs();
+    const consigne=`Traite la demande Akteev « Demandes Claude » n° ${r.id} (${type}) : « ${titre} »${aff?` – affaire ${aff}`:''}.`;
+    try{await navigator.clipboard.writeText(consigne)}catch(e){}
+    DEM_FIC=[];['demTitre','demDesc','demAff'].forEach(i=>$(i).value='');$('demListe').innerHTML='';et.textContent='';
+    if(location.hash.replace(/^#\/?/,'').split('?')[0]==='demande')await route();
+    ouvrirModal('Demande envoyée',`<p style="margin-top:0">Demande <a href="#/demande/${r.id}">n° ${r.id}</a> enregistrée${lien?' avec ses fichiers':''}. Claude la traitera au prochain passage (toutes les heures, 7 h – 19 h en semaine) et écrira sa réponse — ou sa question — dans la demande.</p>
+      <p>Pour la faire traiter <b>tout de suite</b> : collez cette consigne dans Claude (Cowork, projet Akteev).</p>
+      <textarea id="demCons" readonly style="width:100%;height:70px;font:13px/1.45 inherit;border:1px solid var(--trait);border-radius:8px;padding:8px">${esc(consigne)}</textarea>`,
+      `<button class="btn" id="demVoir">Voir la demande</button><button class="btn p" id="demCop">Copier la consigne</button>`);
+    $('demCop').onclick=async()=>{try{await navigator.clipboard.writeText(consigne)}catch(e){$('demCons').select();document.execCommand('copy')}toast('Consigne copiée')};
+    $('demVoir').onclick=()=>{fermerModal(true);location.hash='#/demande/'+r.id}}
+  catch(e){toast('Envoi impossible : '+e.message,true);et.textContent=''}
+  finally{b.disabled=false}}
+/* Bandeau en tête de liste : questions de Claude en attente de réponse, règles à valider. */
+function demandeBandeau(R){const q=(R||[]).filter(r=>txt(r.Statut)==='Question'&&!String(r['Réponse du demandeur']||'').trim());
+  const nr=(S.rows[MODS.regles?.t]||[]).filter(r=>txt(r.Statut)==='Proposée').length;
+  if(!q.length&&!nr)return'';
+  return`<div class="card" style="margin:0 0 14px;padding:12px 16px;border-color:#FCD34D;background:#FFFBEB;font-size:13.5px">
+    ${q.length?`<div><b>Claude attend votre réponse</b> sur ${q.length} demande${q.length>1?'s':''} : ${q.map(r=>`<a href="#/demande/${r.id}">n° ${r.id} ${esc(txt(r.Demande)).slice(0,50)}</a>`).join(' · ')} <span class="mut">— répondez dans « Réponse du demandeur ».</span></div>`:''}
+    ${nr&&estAdmin()?`<div style="margin-top:${q.length?6:0}px"><b>${nr} règle${nr>1?'s':''} apprise${nr>1?'s':''} à valider</b> : <a href="#/regles">Règles apprises</a></div>`:''}</div>`}
 
 /* ---------- Charges machines (13/11/2026) ----------
    Planning de charge par machine, tenu par Arnaud (tournage) et Christophe (fraisage).
@@ -2483,7 +2558,7 @@ function dessinerListe(k){
   const neuf=!peutEcrire(k)?'':k==='bl'?`<button class="btn p" onclick="nouveauBL()">${ico('plus')}Nouveau BL</button>`:m.editeur||k==='commandes'?`<a class="btn p" href="${EDITEUR}" target="_blank" title="${k==='commandes'?'Une commande se crée depuis le devis (bouton « Commande reçue » de l’éditeur)':'Numérotation et mise en page dans l’éditeur'}">${ico('plus')}${k==='commandes'?'Commande reçue (éditeur)':nouv(m)}</a>`:`<a class="btn p" href="#/${k}/nouveau">${ico('plus')}${nouv(m)}</a>`;
   const refs=S.rows[MODS.referents.t]||[];
   let h=`<div class="entete"><h1>${m.nom}</h1><span class="sous">${L.length} sur ${R.length}</span><div class="act">
-    ${k==='utilisateurs'&&peutVoir('droits')?`<a class="btn" href="#/droits">${ico('cle')}Droits d’accès par onglet</a>`:''}<button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>${k==='amelio'?amelioBandeau(R):''}${k==='depot'?depotZone():''}
+    ${k==='utilisateurs'&&peutVoir('droits')?`<a class="btn" href="#/droits">${ico('cle')}Droits d’accès par onglet</a>`:''}<button class="btn" onclick="exporter('${k}')">${ico('dl')}Export CSV</button>${neuf}</div></div>${k==='amelio'?amelioBandeau(R):''}${k==='depot'?depotZone():''}${k==='demande'?demandeBandeau(R)+demandeZone():''}
   <div class="card"><div class="outils">
     <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
     ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
@@ -2523,6 +2598,7 @@ function dessinerListe(k){
   brancherStatuts($('main'),()=>dessinerListe(k));
   if(k==='amelio')brancherAmelio();
   if(k==='depot')brancherDepot();
+  if(k==='demande')brancherDemande();
 }
 
 /* ---------- Améliorations Akteev (Paramètres) ----------
