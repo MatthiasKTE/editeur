@@ -811,7 +811,40 @@ async function vueDDP(){
   await Promise.all([charger(MODS.devis.t),charger(MODS.consult.t)]);
   charger(MODS.referents.t).catch(()=>{});
   dessinerDDP();
+  (MODS.depot?charger(MODS.depot.t).catch(()=>{}):Promise.resolve()).then(ddpDetecterEnvois).then(n=>{if(n&&location.hash.startsWith('#/ddp'))dessinerDDP()}).catch(e=>console.warn('envois',e));
 }
+/* ---- DDP : devis « Validé » envoyé depuis Outlook → statut « Envoyé » automatiquement (16/11/2026, Matthias) ----
+   À l'ouverture de « DDP en cours » : pour chaque devis Validé, cherche dans les éléments envoyés de la personne connectée
+   et de kte@ un mail envoyé après la validation, dont l'objet ou le texte cite le n° du devis et qui a une pièce jointe.
+   Trouvé → Statut = Envoyé (puis « Validé le » réécrit, sinon « Contrôle version » passe en ⚠), catégorie « DDP – répondu »
+   à la place de « DDP – en cours » / « DDP – à traiter » sur le mail source, ligne « À traiter » du même Message-ID → Traité.
+   Silencieux si Microsoft n'est pas connecté ; une seule recherche par devis et par session (ou toutes les 2 min). */
+const DDP_ENV_VU={};
+async function ddpDetecterEnvois(){
+  if(!peutEcrire('devis'))return 0;
+  const V=(S.rows[MODS.devis.t]||[]).filter(d=>txt(d.Statut)==='Validé'&&/^D2\d{5}/.test(txt(d['N° devis'])));
+  const a=V.filter(d=>!DDP_ENV_VU[d.id]||Date.now()-DDP_ENV_VU[d.id]>120e3);if(!a.length)return 0;
+  let j;try{j=await jetonGraph(['Mail.ReadWrite.Shared'],true)}catch(e){return 0}
+  const boites=['/me','/users/kte@kte-fr.com'];let n=0;
+  for(const d of a){DDP_ENV_VU[d.id]=Date.now();const num=txt(d['N° devis']).slice(0,7),depuis=new Date(txt(d['Validé le'])||txt(d['Date'])||0).getTime()-36e5;
+    let trouve=null;
+    for(const b of boites){try{const r=await graph(j,`${b}/mailFolders/sentitems/messages?$search=${encodeURIComponent('"'+num+'"')}&$top=10&$select=subject,sentDateTime,hasAttachments,toRecipients&$expand=attachments($select=name)`);
+        trouve=(r.value||[]).find(m=>new Date(m.sentDateTime).getTime()>=depuis&&(m.attachments||[]).some(x=>/\.pdf$/i.test(x.name||'')&&(/devis/i.test(x.name)||(x.name||'').toUpperCase().includes(num)))&&(m.toRecipients||[]).some(x=>!/@kte-fr\.com$/i.test(x.emailAddress?.address||''))&&!/^(re: |tr: |fw: )*(rfq|consultation|usinage|tournage|po |cf-)/i.test(m.subject||''));if(trouve)break}catch(e){console.warn('envoi',num,e.message)}}
+    if(!trouve)continue;
+    try{const t=MODS.devis.t,sc=sch(t),opt=(nm,v)=>(sc.par[nm]?.select_options||[]).find(o=>o.value===v)?.id??v;
+      let r=await api(`/rows/table/${t}/${d.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({Statut:opt('Statut','Envoyé')})});
+      await new Promise(x=>setTimeout(x,1500));
+      r=await api(`/rows/table/${t}/${d.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Validé le':new Date().toISOString()})});majRow(t,r);n++;
+      const src=srcMail(d['Mail source']);
+      if(src){const base=`/users/${src.box||'kte@kte-fr.com'}`;
+        try{const L=await graph(j,`${base}/messages?$filter=internetMessageId eq '${encodeURIComponent(src.id)}'&$select=id,categories`);const m=(L.value||[])[0];
+          if(m){const cats=[...new Set((m.categories||[]).filter(c=>!/^DDP – (en cours|à traiter)$/.test(c)).concat(['DDP – répondu']))];await graph(j,`${base}/messages/${m.id}`,{method:'PATCH',body:JSON.stringify({categories:cats})})}}catch(e){console.warn('catégorie',num,e.message)}
+        if(MODS.depot){const dep=(S.rows[MODS.depot.t]||[]).find(x=>txt(x['Message-ID'])===src.id&&!/^(trait|ignor)/i.test(txt(x.Statut)));
+          if(dep){try{const sd=sch(MODS.depot.t),o=(sd.par.Statut?.select_options||[]).find(x=>x.value==='Traité')?.id??'Traité';
+            const x=await api(`/rows/table/${MODS.depot.t}/${dep.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({Statut:o,'Traité le':new Date().toISOString()})});majRow(MODS.depot.t,x)}catch(e){console.warn(e)}}}}
+      toast(`${num} envoyé le ${new Date(trouve.sentDateTime).toLocaleDateString('fr-FR')} (« ${trouve.subject} ») : statut « Envoyé »`)}
+    catch(e){console.warn('statut',num,e.message)}}
+  return n}
 function dessinerDDP(){
   const T=ddpListe(S.rows[MODS.devis.t],S.rows[MODS.consult.t]),cpt={};T.forEach(x=>cpt[x.etat]=(cpt[x.etat]||0)+1);
   const q=norm($('dq')?.value||'').split(/\s+/).filter(Boolean),ordre={complet:0,partiel:1,aucune:2,sans:3};
