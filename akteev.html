@@ -2520,6 +2520,7 @@ function dessinerStats(){
    - « FIN-SITU-aaaa-mm » : situations mensuelles figées (le 10 du mois, ou bouton « Figer »).
    CA prévisionnel : commandes Akteev (Commandé / Livrée) − déjà facturé dans Axonaut sur l'affaire, au mois de la
    « Date Livraison ». Rien n'est écrit ailleurs que dans les lignes FIN-PARAM / FIN-SITU de la table 1277595. */
+const finE=x=>Math.round(+x||0).toLocaleString('fr-FR')+' €',finK=x=>{x=+x||0;return Math.abs(x)>=10000?(x/1000).toLocaleString('fr-FR',{maximumFractionDigits:1})+' k€':finE(x)};
 const FIN_ACHATS=new Set(['Matière','Sous-traitance','Traitements','Composants & outillage']);
 const FIN_CHEXT=new Set(['Locaux & énergie','Transport','Personnel & honoraires','Autres']);
 const FIN_STATUTS=new Set(['Commandé','Livrée']);
@@ -2535,7 +2536,7 @@ const finMoisPlus=(m,k)=>{const d=new Date(m+'-01T12:00');d.setMonth(d.getMonth(
 const finJour=(d,k)=>{const x=new Date(d+'T12:00');x.setDate(x.getDate()+k);return x.toISOString().slice(0,10)};
 const finCle=s=>String(s||'').trim().split(/\s+/)[0].toUpperCase();
 const finPct=(a,b)=>b?((a-b)/Math.abs(b)):NaN;
-const finEcart=(a,b)=>{const p=finPct(a,b);return`<span style="color:${a>=b?'#15803D':'var(--err)'}">${a>=b?'+':''}${keur(a-b)}${isFinite(p)?` · ${a>=b?'+':''}${pct(p)}`:''}</span>`};
+const finEcart=(a,b)=>{const p=finPct(a,b);return`<span style="color:${a>=b?'#15803D':'var(--err)'}">${a>=b?'+':''}${finK(a-b)}${isFinite(p)?` · ${a>=b?'+':''}${pct(p)}`:''}</span>`};
 function finDonnees(){
   const R=S.rows[T_STATS]||[],a=auj(),an=+a.slice(0,4),mc=a.slice(0,7);
   const F={},D={},livrAx={};let maj='';const sp={};
@@ -2575,7 +2576,7 @@ function finForfaits(X){
   for(const[k]of FIN_FORF){
     if(X.pa[k]!=null&&X.pa[k]!==''){f[k]=+X.pa[k];src[k]='saisi'}
     else if(k==='loyer'){const v=Object.values(X.D).flat().filter(x=>FIN_LOYER.test(x.four)&&x.ht>1000).map(x=>x.ht).sort((p,q)=>p-q);
-      f[k]=v.length?Math.round(v[Math.floor(v.length/2)]):0;src[k]=v.length?`médiane des ${v.length} factures Immomeca`:'—'}
+      f[k]=v.length?Math.round(v[Math.floor(v.length/2)]/3):0;src[k]=v.length?`factures Immomeca trimestrielles ÷ 3`:'—'}
     else{const v=ms2.map(m=>+X.sx.mois[m][k]||0);f[k]=v.length?Math.round(v.reduce((a,b)=>a+b,0)/v.length):0;src[k]=v.length?`moyenne Sorex ${ms2.length} mois`:'—'}}
   return{f,src};
 }
@@ -2599,42 +2600,178 @@ function finCalc(v,det){
 function finSorex(X,m){const s=X.sx?.mois?.[m];if(!s)return null;const o={...s,achats:s.ca-s.marge,va:s.marge-s.chext,rcour:s.rexp+s.fin};return o}
 const finSomme=L=>{const o={};for(const x of L)for(const[k]of FIN_LIGNES)o[k]=(o[k]||0)+(+x?.[k]||0);return o};
 /* Trésorerie prévisionnelle : semaines de 7 jours à partir d'aujourd'hui (9 semaines ≈ 2 mois) */
+/* Trésorerie prévisionnelle (montants HT, 9 semaines). La TVA est regroupée sur une ligne :
+   TVA encaissée sur les règlements clients − TVA payée aux fournisseurs − TVA reversée à l'État (déclaration du mois M
+   payée au jour habituel du prélèvement DGFIP de M+1, TVA sur les débits : factures émises − factures reçues).
+   Commandes fournisseurs Akteev non encore facturées : date de livraison lue dans « Délai », paiement selon les
+   « Conditions de paiement ». Rapprochement : facture Axonaut du même fournisseur datée après la CF (affectée de la plus
+   ancienne CF à la plus récente) ; fournisseurs chinois (relevé M+1) : virement passé le mois suivant la livraison. */
+const FIN_CHINE=/rogle|nuoge|tengkoo|kingvow|ruichi|dongguan/i,FIN_ALIAS={rogle:'nuoge'};
+const FIN_STOP=new Set(['ets','sas','sarl','france','aciers','acier','speciaux','the','ltd','and','precision','mould','tool','die','industries','industrie','electrique','cholet','groupe','societe','des']);
+const finFinMois=d=>{const x=new Date(+d.slice(0,4),+d.slice(5,7),0);return`${d.slice(0,7)}-${String(x.getDate()).padStart(2,'0')}`};
+const finNorm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'');
+const finToks=s=>{const t=finNorm(s).split(/[^a-z0-9]+/).filter(w=>w.length>=3&&!FIN_STOP.has(w));return[...new Set([...t,...t.map(w=>FIN_ALIAS[w]).filter(Boolean)])]};
+const finMemeFour=(tk,nom)=>{const n=finNorm(nom);return tk.some(w=>n.includes(w))};
+function finLivrCF(c){
+  const d0=String(txt(c.Date)||auj()).slice(0,10),t=String(txt(c['Délai'])||'');
+  let m=t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);if(m)return`${m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;
+  m=t.match(/\bS(\d{1,2})(?:\s*\/\s*(\d{4}))?\b/);if(m){const y=+(m[2]||d0.slice(0,4)),w=+m[1],j4=new Date(Date.UTC(y,0,4));j4.setUTCDate(j4.getUTCDate()-((j4.getUTCDay()+6)%7)+(w-1)*7);return j4.toISOString().slice(0,10)}
+  m=t.match(/(\d+)\s*(?:semaines?|sem\b|weeks?)/i);if(m)return finJour(d0,7*m[1]);
+  m=t.match(/(\d+)\s*(?:jours?|days?|j\b)/i);if(m)return finJour(d0,+m[1]);
+  if(/\d\s*h\b/i.test(t))return finJour(d0,2);
+  return finJour(d0,21);
+}
+function finPaieCF(cond,liv){
+  const t=finNorm(cond);
+  if(/relev|monthly|m\s*\+\s*1/.test(t))return finMoisPlus(liv.slice(0,7),1)+'-10';
+  const m=t.match(/(\d+)\s*jours?(.*)$/);if(!m&&/comptant|reception|acompte|confirmer|negoci/.test(t))return liv;
+  let d=finJour(liv,m?+m[1]:30);const r=m?m[2]:'';
+  if(/fin de mois/.test(r))d=finFinMois(d);
+  const k=r.match(/le\s*(\d{1,2})\b/);if(k){const j=+k[1];let mm=d.slice(0,7);if(+d.slice(8)>j)mm=finMoisPlus(mm,1);d=`${mm}-${String(j).padStart(2,'0')}`}
+  return d;
+}
+function finCFAPayer(X){
+  const num=v=>+String(txt(v)??'').replace(/\s/g,'').replace(',','.').replace(/[^\d.-]/g,'')||0;
+  const L=(S.rows[MODS.cf.t]||[]).filter(c=>txt(c['N° CF'])&&txt(c.Statut)&&!/brouillon|annul/i.test(txt(c.Statut))&&(!txt(c.Devise)||/EUR/i.test(txt(c.Devise))))
+    .map(c=>{const four=txt(c.Fournisseur),liv=finLivrCF(c);return{id:c.id,cf:txt(c['N° CF']),four,date:String(txt(c.Date)||'').slice(0,10),liv,cond:txt(c['Conditions de paiement']),
+      ht:num(c.Total),chine:FIN_CHINE.test(four),tk:finToks(four),statut:txt(c.Statut),lie:(c['Factures fournisseurs']||[]).length>0}})
+    .filter(x=>x.ht>0).sort((a,b)=>a.date<b.date?-1:1);
+  const toutesD=Object.values(X.D).flat(),vir=Object.values(X.tr?.chine||{}).flat(),pris=new Map(),out=[],fact=[];
+  for(const c of L){
+    if(c.lie){fact.push({...c,raison:'facture rattachée'});continue}
+    if(c.chine){const mP=finMoisPlus(c.liv.slice(0,7),1),paye=vir.some(v=>String(v[0]).slice(0,7)>=mP&&finMemeFour(c.tk,v[2]));
+      if(paye||mP<X.mc){fact.push({...c,raison:paye?'réglée (virement)':'ancienne, supposée réglée'});continue}
+      out.push({...c,reste:c.ht,paie:finPaieCF(c.cond,c.liv)});continue}
+    let reste=c.ht;
+    if(c.tk.length)toutesD.forEach((d,i)=>{if(reste<=0.01||d.ht<=0||d.date<finJour(c.date,-3)||!finMemeFour(c.tk,d.four))return;
+      const dispo=d.ht-(pris.get(i)||0);if(dispo<=0.01)return;const u=Math.min(dispo,reste);pris.set(i,(pris.get(i)||0)+u);reste-=u});
+    if(reste<=Math.max(20,c.ht*0.05)){fact.push({...c,raison:'facturée (Axonaut)'});continue}
+    out.push({...c,reste,paie:finPaieCF(c.cond,c.liv)})}
+  return{L:out,fact};
+}
 function finTreso(X,CM,FF){
   const T=X.tr;if(!T)return null;
   const a=X.a,NS=9,fin=finJour(a,NS*7-1),sem=d=>{if(d<a)return 0;const n=Math.floor((new Date(d+'T12:00')-new Date(a+'T12:00'))/864e5/7);return n<NS?n:-1};
   const comptes=T.comptes.reduce((s,c)=>s+c.solde,0),cat=T.cat?.montant||0,depart=comptes+cat;
-  const lig={encF:[],encC:[],decF:[],decE:[],rec:{}};const det={encF:[],encC:[],decF:[],decE:[]};
-  const VIEUX=finJour(a,-60),exclus={cli:0,ncli:0,four:0,nfour:0};
-  const z=()=>Array(NS).fill(0);lig.encF=z();lig.encC=z();lig.decF=z();lig.decE=z();
-  // factures clients non soldées (N et N-1)
-  for(const f of X.toutesF)if(f.reste>0.005){if(f.ech&&f.ech<VIEUX){exclus.cli+=f.reste;exclus.ncli++;continue}const d=f.ech&&f.ech>a?f.ech:a,s=sem(d);if(s<0)continue;lig.encF[s]+=f.reste;det.encF.push({d,lib:`${f.num} · ${f.cli}`,mt:f.reste,echu:!!(f.ech&&f.ech<a)})}
-  // commandes à facturer : facture à la livraison (ou aujourd'hui si en retard), payée après le délai moyen du client
+  const z=()=>Array(NS).fill(0),lig={encF:z(),encC:z(),decF:z(),decCF:z(),decE:z(),tva:z(),rec:{}},det={encF:[],encC:[],decF:[],decCF:[]};
+  const tvaS={enc:z(),dec:z(),verse:z()},VIEUX=finJour(a,-60),exclus={cli:0,ncli:0,four:0,nfour:0,cf:0,ncf:0};
+  // factures clients non soldées (HT ; la TVA du règlement va sur la ligne TVA)
+  for(const f of X.toutesF)if(f.reste>0.005){const r=f.ttc?f.ht/f.ttc:1,ht=f.reste*r;
+    if(f.ech&&f.ech<VIEUX){exclus.cli+=ht;exclus.ncli++;continue}const d=f.ech&&f.ech>a?f.ech:a,s=sem(d);if(s<0)continue;
+    lig.encF[s]+=ht;tvaS.enc[s]+=f.reste-ht;det.encF.push({d,lib:`${f.num} · ${f.cli}`,mt:ht,echu:!!(f.ech&&f.ech<a)})}
+  // commandes clients à facturer : facture à la livraison (ou aujourd'hui si en retard), payée après le délai moyen du client
   for(const o of CM.L){const df=o.livr<a?a:o.livr,dl=(T.delais||{})[o.cidAx]??T.delaiMoyen??45,d=finJour(df,dl),s=sem(d);if(s<0)continue;
-    const mt=o.reste*o.tva;lig.encC[s]+=mt;det.encC.push({d,lib:`${o.aff} · ${o.cli} (livr. ${dfr(o.livr)}, délai ${dl} j)`,mt})}
-  // factures fournisseurs à payer (Axonaut)
+    lig.encC[s]+=o.reste;tvaS.enc[s]+=o.reste*(o.tva-1);det.encC.push({d,lib:`${o.aff} · ${o.cli} (livr. ${dfr(o.livr)}, délai ${dl} j)`,mt:o.reste})}
+  // factures fournisseurs saisies dans Axonaut, non payées
   const duesMois={};
-  for(const x of T.dues||[]){const reste=+x[8]||0;if(reste<=0.005)continue;const pr=x[9]||finJour(x[0],30);if(pr<VIEUX){exclus.four+=reste;exclus.nfour++;continue}const d=pr>a?pr:a,s=sem(d);
-    duesMois[d.slice(0,7)]=(duesMois[d.slice(0,7)]||0)+reste;if(s<0)continue;lig.decF[s]+=reste;det.decF.push({d,lib:`${x[1]} · ${x[2]}`,mt:reste,echu:pr<a})}
-  // charges récurrentes vues en banque : chaque mois au jour habituel
+  for(const x of T.dues||[]){const reste=+x[8]||0;if(reste<=0.005)continue;const r=+x[7]?(+x[3]||0)/(+x[7]):1,ht=reste*r,pr=x[9]||finJour(x[0],30);
+    if(pr<VIEUX){exclus.four+=ht;exclus.nfour++;continue}const d=pr>a?pr:a,s=sem(d);duesMois[d.slice(0,7)]=(duesMois[d.slice(0,7)]||0)+ht;if(s<0)continue;
+    lig.decF[s]+=ht;tvaS.dec[s]+=reste-ht;det.decF.push({d,lib:`${x[1]} · ${x[2]}`,mt:ht,echu:pr<a})}
+  // commandes fournisseurs Akteev pas encore facturées
+  const CFP=finCFAPayer(X),cfMois={};
+  for(const c of CFP.L){if(c.paie<VIEUX){exclus.cf+=c.reste;exclus.ncf++;continue}const d=c.paie>a?c.paie:a,s=sem(d);cfMois[d.slice(0,7)]=(cfMois[d.slice(0,7)]||0)+c.reste;if(s<0)continue;
+    lig.decCF[s]+=c.reste;tvaS.dec[s]+=c.chine?0:c.reste*0.2;det.decCF.push({d,lib:`${c.cf} · ${c.four} (livr. ${dfr(c.liv)})`,mt:c.reste,echu:c.paie<a,id:c.id})}
+  // charges récurrentes vues en banque, ramenées en HT ; DGFIP : seuls les petits prélèvements (impôts) restent, la TVA est calculée
   const moisH=[X.mc,finMoisPlus(X.mc,1),finMoisPlus(X.mc,2)];
-  for(const r of T.recurrents||[]){const L=lig.rec[r.famille]=z();
-    for(const m of moisH){const j=String(Math.min(r.jour||10,28)).padStart(2,'0'),d=`${m}-${j}`;const s=sem(d);if(s>=0&&d>=a)L[s]+=r.mensuel}}
-  // achats et frais courants non encore facturés : moyenne 3 mois (hors charges récurrentes) − factures déjà connues du mois, au prorata des jours
-  const moyA=Object.values(T.autresFournisseurs||{}).reduce((s,x)=>s+x,0)/Math.max(1,Object.keys(T.autresFournisseurs||{}).length);
+  const dg=(T.recurrents||[]).find(r=>/DGFIP/.test(r.famille)),grosDG=(dg?.lignes||[]).filter(l=>l[1]>=5000).map(l=>+String(l[0]).slice(8)).sort((p,q)=>p-q);
+  const jourTVA=grosDG.length?grosDG[Math.floor(grosDG.length/2)]:25;
+  const recs=(T.recurrents||[]).map(r=>{
+    if(/DGFIP/.test(r.famille)){const p=(r.lignes||[]).filter(l=>l[1]<5000);return{...r,famille:'Impôts (DGFIP, hors TVA)',ht:p.reduce((s,l)=>s+l[1],0)/3,tva:0,jour:p.length?+String(p[0][0]).slice(8):r.jour}}
+    if(/Crédit-bail/.test(r.famille)){const fx=finFixes(X).filter(f=>/crédit-bail|location/i.test(f.l)).reduce((s,f)=>s+(+f.m||0),0),ht=Math.max(r.mensuel/1.2,fx);
+      return{...r,ht,tva:ht*0.2,src:fx>r.mensuel/1.2?'charges fixes du seuil':'banque'}}
+    return{...r,ht:r.mensuel,tva:0}});
+  for(const r of recs){const L=lig.rec[r.famille]=z();
+    for(const m of moisH){const d=`${m}-${String(Math.min(r.jour||10,28)).padStart(2,'0')}`,s=sem(d);if(s>=0&&d>=a){L[s]+=r.ht;tvaS.dec[s]+=r.tva}}}
+  // autres achats et frais non encore connus : moyenne bancaire des 3 derniers mois (HT) − factures et CF déjà connues du mois
+  const moyTTC=Object.values(T.autresFournisseurs||{}).reduce((s,x)=>s+x,0)/Math.max(1,Object.keys(T.autresFournisseurs||{}).length),moyA=moyTTC/1.2;
   const fenC=T.fenetre||[],moyC=fenC.reduce((s,m)=>s+((T.chine||{})[m]||[]).reduce((t,x)=>t+(+x[1]||0),0),0)/Math.max(1,fenC.length);
-  const estMois={};
-  for(const m of moisH){const est=Math.max(0,moyA+moyC-(duesMois[m]||0));estMois[m]=est;const nbJ=new Date(+m.slice(0,4),+m.slice(5,7),0).getDate();
-    for(let j=1;j<=nbJ;j++){const d=`${m}-${String(j).padStart(2,'0')}`;if(d<a||d>fin)continue;lig.decE[sem(d)]+=est/nbJ}}
-  const famRec=Object.keys(lig.rec);
-  const soldes=[];let s0=depart;
-  for(let i=0;i<NS;i++){const e=lig.encF[i]+lig.encC[i],dd=lig.decF[i]+lig.decE[i]+famRec.reduce((t,f)=>t+lig.rec[f][i],0);const s1=s0+e-dd;soldes.push({deb:s0,enc:e,dec:dd,fin:s1,du:finJour(a,i*7),au:finJour(a,i*7+6)});s0=s1}
-  const auMois=m=>{const d=new Date(+m.slice(0,4),+m.slice(5,7),0);const dj=`${m}-${String(d.getDate()).padStart(2,'0')}`;const i=sem(dj);return i>=0?soldes[i].fin:null};
-  return{NS,depart,comptes,cat,lig,det,soldes,famRec,moyA,moyC,estMois,moisH,fin,auMois,exclus};
+  const estMois={},partFr=moyA+moyC?moyA/(moyA+moyC):1;
+  for(const m of moisH){const est=Math.max(0,moyA+moyC-(duesMois[m]||0)-(cfMois[m]||0));estMois[m]=est;const nbJ=+finFinMois(m+'-01').slice(8);
+    for(let j=1;j<=nbJ;j++){const d=`${m}-${String(j).padStart(2,'0')}`;if(d<a||d>fin)continue;const s=sem(d);lig.decE[s]+=est/nbJ;tvaS.dec[s]+=est/nbJ*partFr*0.2}}
+  // TVA à reverser : déclaration du mois M (TVA sur les débits) payée le jour habituel de M+1
+  const tvaCB=recs.filter(r=>r.tva).reduce((s,r)=>s+r.tva,0),declas=[];
+  for(const M of [finMoisPlus(X.mc,-1),X.mc,finMoisPlus(X.mc,1),finMoisPlus(X.mc,2)]){
+    const dP=`${finMoisPlus(M,1)}-${String(Math.min(jourTVA,28)).padStart(2,'0')}`;if(dP<a)continue;
+    const collF=(X.F[M]||[]).reduce((s,f)=>s+f.ttc-f.ht,0),collC=M>=X.mc?CM.L.filter(o=>o.mFact===M).reduce((s,o)=>s+o.reste*(o.tva-1),0):0;
+    const dD=(X.D[M]||[]).filter(x=>!x.chine).reduce((s,x)=>s+x.ht,0),dCF=M>=X.mc?CFP.L.filter(c=>!c.chine&&c.liv.slice(0,7)===M).reduce((s,c)=>s+c.reste,0):0;
+    const dEst=M>=X.mc?Math.max(0,moyA-dD-dCF):0,ded=(dD+dCF+dEst)*0.2+tvaCB,net=collF+collC-ded,s=sem(dP);
+    declas.push({M,dP,coll:collF+collC,collF,collC,ded,net,dansHorizon:s>=0});if(s>=0&&net>0)tvaS.verse[s]+=net}
+  for(let i=0;i<NS;i++)lig.tva[i]=tvaS.enc[i]-tvaS.dec[i]-tvaS.verse[i];
+  const famRec=Object.keys(lig.rec),soldes=[];let s0=depart;
+  for(let i=0;i<NS;i++){const e=lig.encF[i]+lig.encC[i],dd=lig.decF[i]+lig.decCF[i]+lig.decE[i]+famRec.reduce((t,f)=>t+lig.rec[f][i],0);
+    const s1=s0+e-dd+lig.tva[i];soldes.push({deb:s0,enc:e,dec:dd,tva:lig.tva[i],fin:s1,du:finJour(a,i*7),au:finJour(a,i*7+6)});s0=s1}
+  const auMois=m=>{const i=sem(finFinMois(m+'-01'));return i>=0?soldes[i].fin:null};
+  return{NS,depart,comptes,cat,lig,det,soldes,famRec,recs,moyA,moyC,estMois,moisH,fin,auMois,exclus,tvaS,declas,jourTVA,CFP};
+}
+/* Blocs déplaçables de l'Analyse financière : chaque bloc (section.fw) peut être déplacé (glisser-déposer), mis en
+   largeur ¼ ⅓ ½ ⅔ 1, réduit ou masqué. Disposition par onglet, enregistrée dans le navigateur et, en quittant le mode
+   personnalisation, dans FIN-PARAM.dispo[id du référent] (retrouvée sur un autre poste). */
+const finW=(k,t,l,html,split)=>html?`<section class="fw" data-w="${k}" data-l="${l}" data-t="${esc(t||'')}"${split?' data-split="1"':''}>${html}</section>`:'';
+const FIN_LARG=[[3,'¼'],[4,'⅓'],[6,'½'],[8,'⅔'],[12,'1']];
+function finCssW(){if($('finCss'))return;const st=document.createElement('style');st.id='finCss';st.textContent=`
+#fiG{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:14px;align-items:start;margin-top:14px}
+#fiG>*:not(.fw){grid-column:1/-1}
+#fiG>.fw{background:var(--card);border-radius:var(--r);box-shadow:var(--sh);border:1px solid #EAEDF2;min-width:0;overflow:hidden}
+#fiG .fwt{display:flex;align-items:center;gap:8px;padding:11px 16px 4px;font-size:13px;font-weight:600;color:var(--mut)}
+#fiG .fwc{padding:4px 16px 14px;min-width:0}#fiG .fwc .tw{margin:0 -16px}#fiG .fwc .graph{padding:0}
+#fiG .fwc .kpi{padding:0;box-shadow:none;border:0;cursor:default;background:none}
+#fiG .fw.sanst .fwt{display:none}#fiG.perso .fw.sanst .fwt{display:flex}
+#fiG .fwp,#fiG .fwctl{display:none}#fiG.perso .fwp{display:inline;cursor:grab;color:#9AA3B5;font-size:15px}
+#fiG.perso .fwctl{display:flex;gap:3px;margin-left:auto}
+#fiG .fwctl button{border:1px solid var(--trait);background:#fff;border-radius:6px;font-size:11px;padding:1px 6px;cursor:pointer;color:var(--txt)}
+#fiG .fwctl button.on{background:#E8F0FE;border-color:#2F6FED;color:#2F6FED}
+#fiG.perso>.fw{outline:2px dashed #C9D6F5;outline-offset:-2px}
+#fiG .fw.reduit .fwc{display:none}#fiG .fw.drag{opacity:.4}#fiG .fw.cible{box-shadow:0 0 0 3px #2F6FED}
+#fiBandeau{background:#E8F0FE;border:1px solid #C9D6F5;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#1E40AF;margin-top:14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+@media(max-width:900px){#fiG>.fw{grid-column:1/-1!important}}`;document.head.appendChild(st)}
+function finWidgets(o){
+  const G=$('fiG');if(!G)return;finCssW();
+  FINV.dispo=FINV.dispo||{};
+  // une rangée d'indicateurs marquée data-split devient un bloc par indicateur
+  G.querySelectorAll(':scope>section.fw[data-split]').forEach(s=>{[...s.querySelectorAll('.kpi')].forEach((k,i)=>{const n=document.createElement('section');n.className='fw';
+    n.dataset.w=s.dataset.w+'-'+i;n.dataset.l=s.dataset.l;const lab=k.querySelector('.lab');n.dataset.t=lab?lab.textContent.trim():'';if(lab)lab.remove();k.classList.remove('card');n.appendChild(k);s.before(n)});s.remove()});
+  const secs=[...G.querySelectorAll(':scope>section.fw')];
+  secs.forEach(s=>{const f=s.firstElementChild;if(f&&f.tagName==='H3'){if(!s.dataset.t)s.dataset.t=f.textContent.trim();f.remove()}});
+  const D=FINV.dispo[o]||[],rang=s=>{const i=D.findIndex(x=>x.k===s.dataset.w);return i<0?1000+secs.indexOf(s):i};
+  secs.sort((a,b)=>rang(a)-rang(b)).forEach(s=>G.appendChild(s));
+  const perso=!!FINV.perso;G.classList.toggle('perso',perso);
+  for(const s of secs){const e=D.find(x=>x.k===s.dataset.w)||{},l=e.l||+s.dataset.l||12;s.dataset.lc=l;
+    s.style.gridColumn=`span ${l}`;s.classList.toggle('reduit',!!e.r);s.classList.toggle('sanst',!s.dataset.t);if(e.h)s.style.display='none';
+    const c=document.createElement('div');c.className='fwc';while(s.firstChild)c.appendChild(s.firstChild);
+    s.innerHTML=`<div class="fwt"><span class="fwp" title="Glisser pour déplacer">⠿</span><span>${esc(s.dataset.t||'(bloc sans titre)')}</span><span class="fwctl">${FIN_LARG.map(([n,x])=>`<button data-l="${n}" class="${l===n?'on':''}" title="Largeur ${x}">${x}</button>`).join('')}<button data-r title="${e.r?'Agrandir':'Réduire'}">${e.r?'+':'–'}</button><button data-h title="Masquer">✕</button></span></div>`;
+    s.appendChild(c);s.draggable=perso}
+  const etat=()=>[...G.querySelectorAll(':scope>section.fw')].map(s=>{const p=D.find(x=>x.k===s.dataset.w)||{};return{k:s.dataset.w,l:+s.dataset.lc,r:!!p.r,h:!!p.h}});
+  const maj=(k,ch)=>{const L=etat();Object.assign(L.find(x=>x.k===k),ch);FINV.dispo[o]=L;ls.set('fin',FINV);dessinerFinance()};
+  if(perso){
+    const cach=secs.filter(s=>(D.find(x=>x.k===s.dataset.w)||{}).h);
+    G.insertAdjacentHTML('beforebegin',`<div id="fiBandeau"><b>Personnalisation</b> glissez un bloc par sa poignée ⠿, choisissez sa largeur (¼ ⅓ ½ ⅔ 1), réduisez-le (–) ou masquez-le (✕).
+      <button class="btn" id="fiReinit" style="padding:3px 8px">Réinitialiser cet onglet</button>${cach.length?' · Masqués :'+cach.map(s=>`<button class="btn" data-montrer="${esc(s.dataset.w)}" style="padding:3px 8px">${esc(s.dataset.t||s.dataset.w)}</button>`).join(''):''}</div>`);
+    $('fiReinit').onclick=()=>{delete FINV.dispo[o];ls.set('fin',FINV);dessinerFinance()};
+    document.querySelectorAll('[data-montrer]').forEach(b=>b.onclick=()=>maj(b.dataset.montrer,{h:false}));
+  }
+  let drag=null;
+  for(const s of secs){const k=s.dataset.w;
+    s.querySelectorAll('.fwctl [data-l]').forEach(b=>b.onclick=()=>maj(k,{l:+b.dataset.l}));
+    s.querySelector('.fwctl [data-r]').onclick=()=>maj(k,{r:!s.classList.contains('reduit')});
+    s.querySelector('.fwctl [data-h]').onclick=()=>maj(k,{h:true});
+    if(!perso)continue;
+    s.ondragstart=ev=>{drag=s;s.classList.add('drag');ev.dataTransfer.effectAllowed='move';try{ev.dataTransfer.setData('text/plain',k)}catch(e){}};
+    s.ondragend=()=>{s.classList.remove('drag');drag=null};
+    s.ondragover=ev=>{if(!drag||drag===s)return;ev.preventDefault();s.classList.add('cible')};
+    s.ondragleave=()=>s.classList.remove('cible');
+    s.ondrop=ev=>{ev.preventDefault();s.classList.remove('cible');if(!drag||drag===s)return;const L=etat(),i=L.findIndex(x=>x.k===drag.dataset.w),[d]=L.splice(i,1);
+      L.splice(L.findIndex(x=>x.k===k)+(i<=L.findIndex(x=>x.k===k)?1:0),0,d);FINV.dispo[o]=L;ls.set('fin',FINV);dessinerFinance()};
+  }
+}
+async function finSauverDispo(){
+  if(!MOI)return;const pa=finDonnees().pa,dispo={...(pa.dispo||{}),[MOI]:FINV.dispo||{}};
+  try{await finEcrire('FIN-PARAM',{...pa,dispo})}catch(e){toast('Disposition gardée sur ce poste seulement : '+e.message,true)}
 }
 async function vueFinance(){
   document.title='Akteev – Analyse financière';
   if(!S.rows[T_STATS])chargement();
-  await Promise.all([charger(T_STATS),charger(MODS.clients.t).catch(()=>[]),charger(MODS.commandes.t).catch(()=>[])]);
+  await Promise.all([charger(T_STATS),charger(MODS.clients.t).catch(()=>[]),charger(MODS.commandes.t).catch(()=>[]),charger(MODS.cf.t).catch(()=>[])]);
+  const pd=finDonnees().pa.dispo;if(MOI&&pd?.[MOI]&&!Object.keys(FINV.dispo||{}).length)FINV.dispo=pd[MOI];
   dessinerFinance();
 }
 function finTable(cols,rows,opt={}){
@@ -2655,42 +2792,42 @@ function dessinerFinance(){
   const aFact=m=>CM.L.filter(o=>o.mFact===m).reduce((s,o)=>s+o.reste,0);
   const resteAn=CM.L.filter(o=>o.mFact<=`${an}-12`).reduce((s,o)=>s+o.reste,0),prevAn=ytd+resteAn;
   const TR=finTreso(X,CM,FF);
-  const ong=[['ca','CA et comparatif N-1'],['prev','CA prévisionnel'],['situ','Situation mensuelle'],['treso','Trésorerie prévisionnelle']];
+  const ong=[['ca','CA et comparatif N-1'],['prev','CA prévisionnel'],['situ','Situation mensuelle'],['treso','Trésorerie prévisionnelle'],['seuil','Seuil de rentabilité']];
   const o=ong.some(x=>x[0]===FINV.o)?FINV.o:'ca';
   let h=`<div class="entete"><h1>Analyse financière ${an}</h1><span class="sous">Axonaut mis à jour le ${dtfr(X.maj)||'—'}${X.sx?` · dernière situation Sorex : fin ${MOIS_LONG(X.sx.dernier)}`:''}</span>
-    <div class="act"><button class="btn" id="fiMaj">${ico('cal')}Recharger</button></div></div>
+    <div class="act"><button class="btn ${FINV.perso?'p':''}" id="fiPerso">${FINV.perso?'✓ Terminer':ico('crayon')+'Personnaliser la page'}</button><button class="btn" id="fiMaj">${ico('cal')}Recharger</button></div></div>
   <div class="kpis">
-   <div class="card kpi" data-o="ca"><div class="lab">${ico('euro')}CA ${MOIS_LONG(mc)} (au ${jour})</div><div class="val">${keur(caMc)}</div><div class="det">N-1 au même jour ${keur(caMcN1J)} · ${finEcart(caMc,caMcN1J)}<br>N-1 mois complet ${keur(caMcN1)}</div></div>
-   <div class="card kpi" data-o="ca"><div class="lab">${ico('euro')}CA ${MOIS_LONG(mp)}</div><div class="val">${keur(caMp)}</div><div class="det">N-1 ${keur(caMpN1)} · ${finEcart(caMp,caMpN1)}</div></div>
-   <div class="card kpi" data-o="ca"><div class="lab">${ico('stats')}CA cumulé ${an} (au ${dfr(a)})</div><div class="val">${keur(ytd)}</div><div class="det">N-1 à date ${keur(ytdN1)} · ${finEcart(ytd,ytdN1)}</div></div>
-   <div class="card kpi" data-o="prev"><div class="lab" style="color:#2F6FED">${ico('commandes')}CA prévisionnel ${an}</div><div class="val" style="color:#2F6FED">${keur(prevAn)}</div><div class="det">facturé ${keur(ytd)} + à facturer ${keur(resteAn)} · N-1 ${keur(totN1)} · ${finEcart(prevAn,totN1)}</div></div>
-   <div class="card kpi" data-o="treso"><div class="lab">${ico('cle')}Trésorerie</div><div class="val">${TR?keur(TR.depart):'—'}</div><div class="det">${TR?`comptes ${keur(TR.comptes)} + compte à terme ${keur(TR.cat)}<br>prévue fin ${MOIS_LONG(finMoisPlus(mc,1)).split(' ')[0]} : <b>${keur(TR.auMois(finMoisPlus(mc,1))??TR.soldes[TR.NS-1].fin)}</b>`:'en attente de la synchronisation'}</div></div>
+   <div class="card kpi" data-o="ca"><div class="lab">${ico('euro')}CA ${MOIS_LONG(mc)} (au ${jour})</div><div class="val">${finK(caMc)}</div><div class="det">N-1 au même jour ${finK(caMcN1J)} · ${finEcart(caMc,caMcN1J)}<br>N-1 mois complet ${finK(caMcN1)}</div></div>
+   <div class="card kpi" data-o="ca"><div class="lab">${ico('euro')}CA ${MOIS_LONG(mp)}</div><div class="val">${finK(caMp)}</div><div class="det">N-1 ${finK(caMpN1)} · ${finEcart(caMp,caMpN1)}</div></div>
+   <div class="card kpi" data-o="ca"><div class="lab">${ico('stats')}CA cumulé ${an} (au ${dfr(a)})</div><div class="val">${finK(ytd)}</div><div class="det">N-1 à date ${finK(ytdN1)} · ${finEcart(ytd,ytdN1)}</div></div>
+   <div class="card kpi" data-o="prev"><div class="lab" style="color:#2F6FED">${ico('commandes')}CA prévisionnel ${an}</div><div class="val" style="color:#2F6FED">${finK(prevAn)}</div><div class="det">facturé ${finK(ytd)} + à facturer ${finK(resteAn)} · N-1 ${finK(totN1)} · ${finEcart(prevAn,totN1)}</div></div>
+   <div class="card kpi" data-o="treso"><div class="lab">${ico('cle')}Trésorerie</div><div class="val">${TR?finK(TR.comptes):'—'}</div><div class="det">${TR?`sur les comptes · + compte à terme ${finK(TR.cat)}<br>comptes prévus fin ${MOIS_LONG(finMoisPlus(mc,1)).split(' ')[0]} : <b>${finK((TR.auMois(finMoisPlus(mc,1))??TR.soldes[TR.NS-1].fin)-TR.cat)}</b>`:'en attente de la synchronisation'}</div></div>
   </div>
-  <div class="card"><div class="onglets">${ong.map(([k,n])=>`<button data-o="${k}" class="${o===k?'on':''}">${n}</button>`).join('')}</div>`;
+  <div class="card"><div class="onglets">${ong.map(([k,n])=>`<button data-o="${k}" class="${o===k?'on':''}">${n}</button>`).join('')}</div></div><div id="fiG">`;
   // ----- CA et comparatif N-1
   if(o==='ca'){
     const L=moisAn.map(m=>{const ca=m<=mc?X.caM(m):0,ca1=X.caM(n1(m)),pr=m>=mc?aFact(m):0;return{m,ca,ca1,pr,fut:m>mc}});
     let c=0,c1=0;L.forEach(r=>{c+=r.ca;c1+=r.ca1;r.cum=c;r.cum1=c1});
-    h+=`<div class="graph">${grapheStats(moisAn,[{n:'CA '+an,v:L.map(r=>r.ca),c:STATS_COUL.ca},{n:'À facturer (commandes)',v:L.map(r=>r.pr),c:'#BFD3FB'},{n:'CA '+(an-1),v:L.map(r=>r.ca1),c:'#C9CFDA'}])}</div>`;
-    h+=finTable([{k:'m',l:'Mois',p:1,f:(v,r)=>esc(MOIS_LONG(v))+(v===mc?` <span class="mut">(au ${jour})</span>`:'')},{k:'ca',l:`CA ${an} HT`,n:1,f:(v,r)=>r.fut?'<span class="mut">—</span>':eur(v)},{k:'ca1',l:`CA ${an-1} HT`,n:1,f:eur},
+    h+=finW('ca-graph','Évolution mensuelle du CA',12,`<div class="graph">${grapheStats(moisAn,[{n:'CA '+an,v:L.map(r=>r.ca),c:STATS_COUL.ca},{n:'À facturer (commandes)',v:L.map(r=>r.pr),c:'#BFD3FB'},{n:'CA '+(an-1),v:L.map(r=>r.ca1),c:'#C9CFDA'}])}</div>`);
+    h+=finW('ca-table','CA par mois',12,finTable([{k:'m',l:'Mois',p:1,f:(v,r)=>esc(MOIS_LONG(v))+(v===mc?` <span class="mut">(au ${jour})</span>`:'')},{k:'ca',l:`CA ${an} HT`,n:1,f:(v,r)=>r.fut?'<span class="mut">—</span>':finE(v)},{k:'ca1',l:`CA ${an-1} HT`,n:1,f:finE},
       {k:'ec',l:'Écart',n:1,f:(v,r)=>r.fut?'<span class="mut">—</span>':r.m===mc?`${finEcart(r.ca,caMcN1J)}<div class="mut" style="font-size:11px">vs N-1 au ${jour}</div>`:finEcart(r.ca,r.ca1)},
-      {k:'cum',l:`Cumul ${an}`,n:1,f:(v,r)=>r.fut?'<span class="mut">—</span>':eur(v)},{k:'cum1',l:`Cumul ${an-1}`,n:1,f:eur},{k:'pr',l:'À facturer (livraisons prévues)',n:1,f:v=>v?`<span style="color:#2F6FED">${eur(v)}</span>`:'<span class="mut">—</span>'}],L,
-      {pied:(c,i)=>i===0?'Total':c.k==='ca'?eur(ytd):c.k==='ca1'?eur(totN1):c.k==='pr'?eur(L.reduce((s,r)=>s+r.pr,0)):''});
-    h+=`<div class="plus mut" style="font-size:12.5px;text-align:left">CA = factures Axonaut HT (avoirs déduits), à la date de facture. Mois en cours comparé à N-1 au même jour du mois. « À facturer » = commandes Akteev Commandé / Livrée − déjà facturé sur l’affaire, au mois de livraison prévu (commandes en retard comptées sur le mois en cours).</div>`;
+      {k:'cum',l:`Cumul ${an}`,n:1,f:(v,r)=>r.fut?'<span class="mut">—</span>':finE(v)},{k:'cum1',l:`Cumul ${an-1}`,n:1,f:finE},{k:'pr',l:'À facturer (livraisons prévues)',n:1,f:v=>v?`<span style="color:#2F6FED">${finE(v)}</span>`:'<span class="mut">—</span>'}],L,
+      {pied:(c,i)=>i===0?'Total':c.k==='ca'?finE(ytd):c.k==='ca1'?finE(totN1):c.k==='pr'?finE(L.reduce((s,r)=>s+r.pr,0)):''}));
+    h+=finW('ca-note','Méthode',12,`<div class="plus mut" style="font-size:12.5px;text-align:left">CA = factures Axonaut HT (avoirs déduits), à la date de facture. Mois en cours comparé à N-1 au même jour du mois. « À facturer » = commandes Akteev Commandé / Livrée − déjà facturé sur l’affaire, au mois de livraison prévu (commandes en retard comptées sur le mois en cours).</div>`);
   }
   // ----- CA prévisionnel
   if(o==='prev'){
     const m1=finMoisPlus(mc,1),m2=finMoisPlus(mc,2);
-    const bloc=(m,t)=>{const fact=m===mc?caMc:0,af=aFact(m),n1v=X.caM(n1(m));return`<div class="card kpi" style="cursor:default"><div class="lab">${t} – ${MOIS_LONG(m)}</div><div class="val">${keur(fact+af)}</div><div class="det">${m===mc?`facturé ${keur(fact)} + à facturer ${keur(af)}`:`à facturer ${keur(af)}`}<br>N-1 ${keur(n1v)} · ${finEcart(fact+af,n1v)}</div></div>`};
-    h+=`<div class="kpis" style="padding:16px 16px 0">${bloc(mc,'Mois en cours')}${bloc(m1,'M+1')}${bloc(m2,'M+2')}
-      <div class="card kpi" style="cursor:default"><div class="lab">Exercice ${an}</div><div class="val">${keur(prevAn)}</div><div class="det">N-1 ${keur(totN1)} · ${finEcart(prevAn,totN1)}<br>au-delà du 31/12 : ${keur(CM.L.filter(o=>o.mFact>`${an}-12`).reduce((s,o)=>s+o.reste,0))}</div></div></div>`;
+    const bloc=(m,t)=>{const fact=m===mc?caMc:0,af=aFact(m),n1v=X.caM(n1(m));return`<div class="card kpi" style="cursor:default"><div class="lab">${t} – ${MOIS_LONG(m)}</div><div class="val">${finK(fact+af)}</div><div class="det">${m===mc?`facturé ${finK(fact)} + à facturer ${finK(af)}`:`à facturer ${finK(af)}`}<br>N-1 ${finK(n1v)} · ${finEcart(fact+af,n1v)}</div></div>`};
+    h+=finW('prev-kpi','',3,`<div class="kpis">${bloc(mc,'Mois en cours')}${bloc(m1,'M+1')}${bloc(m2,'M+2')}
+      <div class="card kpi" style="cursor:default"><div class="lab">Exercice ${an}</div><div class="val">${finK(prevAn)}</div><div class="det">N-1 ${finK(totN1)} · ${finEcart(prevAn,totN1)}<br>au-delà du 31/12 : ${finK(CM.L.filter(o=>o.mFact>`${an}-12`).reduce((s,o)=>s+o.reste,0))}</div></div></div>`,1);
     const ret=CM.L.filter(o=>o.retard);
-    if(ret.length)h+=`<div style="margin:0 16px 12px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#9A3412">⚠ ${ret.length} commande(s) dont la date de livraison est passée et qui restent à facturer (${keur(ret.reduce((s,o)=>s+o.reste,0))}) : comptées sur ${MOIS_LONG(mc)}.</div>`;
+    if(ret.length)h+=finW('prev-retard','Commandes en retard',12,`<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#9A3412">⚠ ${ret.length} commande(s) dont la date de livraison est passée et qui restent à facturer (${finK(ret.reduce((s,o)=>s+o.reste,0))}) : comptées sur ${MOIS_LONG(mc)}.</div>`);
     const L=[...CM.L].sort((x,y)=>x.livr<y.livr?-1:1).map(o=>({...o,_h:`#/commandes/${o.id}`}));
-    h+=finTable([{k:'mFact',l:'Mois',f:v=>esc(MOIS_LONG(v))},{k:'aff',l:'Affaire',p:1},{k:'cli',l:'Client'},{k:'objet',l:'Objet',f:v=>esc(String(v).slice(0,50))},{k:'livr',l:'Livraison prévue',f:(v,r)=>`<span class="${r.retard?'retard':''}">${dfr(v)}</span>${r.livrAx?' <span class="mut" title="Date Livraison vide dans Akteev : date prévue de la commande Axonaut">(Axonaut)</span>':''}`},
-      {k:'statut',l:'Statut'},{k:'mt',l:'Commande HT',n:1,f:eur},{k:'fact',l:'Déjà facturé',n:1,f:v=>v?eur(v):'<span class="mut">—</span>'},{k:'reste',l:'À facturer HT',n:1,f:v=>`<b>${eur(v)}</b>`}],L,
-      {pied:(c,i)=>i===0?'Total':c.k==='reste'?eur(L.reduce((s,r)=>s+r.reste,0)):''});
-    if(CM.sansDate.length)h+=`<div class="plus mut" style="font-size:12.5px;text-align:left">${CM.sansDate.length} commande(s) sans date de livraison non comptées (${keur(CM.sansDate.reduce((s,o)=>s+o.reste,0))} à facturer) : ${CM.sansDate.slice(0,12).map(o=>`<a href="#/commandes/${o.id}">${esc(o.aff)}</a>`).join(', ')}${CM.sansDate.length>12?'…':''}</div>`;
+    h+=finW('prev-table','Commandes à facturer',12,finTable([{k:'mFact',l:'Mois',f:v=>esc(MOIS_LONG(v))},{k:'aff',l:'Affaire',p:1},{k:'cli',l:'Client'},{k:'objet',l:'Objet',f:v=>esc(String(v).slice(0,50))},{k:'livr',l:'Livraison prévue',f:(v,r)=>`<span class="${r.retard?'retard':''}">${dfr(v)}</span>${r.livrAx?' <span class="mut" title="Date Livraison vide dans Akteev : date prévue de la commande Axonaut">(Axonaut)</span>':''}`},
+      {k:'statut',l:'Statut'},{k:'mt',l:'Commande HT',n:1,f:finE},{k:'fact',l:'Déjà facturé',n:1,f:v=>v?finE(v):'<span class="mut">—</span>'},{k:'reste',l:'À facturer HT',n:1,f:v=>`<b>${finE(v)}</b>`}],L,
+      {pied:(c,i)=>i===0?'Total':c.k==='reste'?finE(L.reduce((s,r)=>s+r.reste,0)):''}));
+    if(CM.sansDate.length)h+=finW('prev-sansdate','Commandes sans date de livraison',12,`<div class="plus mut" style="font-size:12.5px;text-align:left">${CM.sansDate.length} commande(s) sans date de livraison non comptées (${finK(CM.sansDate.reduce((s,o)=>s+o.reste,0))} à facturer) : ${CM.sansDate.slice(0,12).map(o=>`<a href="#/commandes/${o.id}">${esc(o.aff)}</a>`).join(', ')}${CM.sansDate.length>12?'…':''}</div>`);
   }
   // ----- Situation mensuelle
   if(o==='situ'){
@@ -2708,46 +2845,60 @@ function dessinerFinance(){
     const pc=(v,b)=>b?pct(v/b):'';
     const lig=FIN_LIGNES.map(([k,l,g])=>({k,l,g,m:+cur[k]||0,mp:pc(+cur[k]||0,cur.ca),c:cum[k]||0,cp:pc(cum[k]||0,cum.ca),m1:s1?+s1[k]||0:null,c1:cum1.ca?cum1[k]||0:null,
       src:k==='ca'?'Axonaut':['achats','chext'].includes(k)?(cur._src==='Sorex'?'Sorex':'factures Axonaut'+(k==='achats'?' + virements Chine':' + loyer forfait')):FIN_FORF.some(f=>f[0]===k)?(cur._src==='Sorex'?'Sorex':'forfait'):'calcul',_s:g?'font-weight:600;background:#F7F9FC':''}));
-    h+=finTable([{k:'l',l:'',p:1},{k:'m',l:MOIS_LONG(sm),n:1,f:eur},{k:'mp',l:'%',n:1},{k:'c',l:`Cumul ${an}`,n:1,f:eur},{k:'cp',l:'%',n:1},
-      {k:'m1',l:MOIS_LONG(m1),n:1,f:v=>v==null?'<span class="mut">—</span>':eur(v)},{k:'em',l:'Écart mois',n:1,f:(v,r)=>r.m1==null?'':finEcart(r.m,r.m1)},
-      {k:'c1',l:`Cumul ${an-1}`,n:1,f:v=>v==null?'<span class="mut">—</span>':eur(v)},{k:'ec',l:'Écart cumul',n:1,f:(v,r)=>r.c1==null?'':finEcart(r.c,r.c1)},{k:'src',l:'Source',f:v=>`<span class="mut" style="font-size:11.5px">${esc(v)}</span>`}],lig);
+    h+=finW('situ-table','Situation mensuelle',12,finTable([{k:'l',l:'',p:1},{k:'m',l:MOIS_LONG(sm),n:1,f:finE},{k:'mp',l:'%',n:1},{k:'c',l:`Cumul ${an}`,n:1,f:finE},{k:'cp',l:'%',n:1},
+      {k:'m1',l:MOIS_LONG(m1),n:1,f:v=>v==null?'<span class="mut">—</span>':finE(v)},{k:'em',l:'Écart mois',n:1,f:(v,r)=>r.m1==null?'':finEcart(r.m,r.m1)},
+      {k:'c1',l:`Cumul ${an-1}`,n:1,f:v=>v==null?'<span class="mut">—</span>':finE(v)},{k:'ec',l:'Écart cumul',n:1,f:(v,r)=>r.c1==null?'':finEcart(r.c,r.c1)},{k:'src',l:'Source',f:v=>`<span class="mut" style="font-size:11.5px">${esc(v)}</span>`}],lig));
     const dt=est.det;
-    h+=`<div class="plus mut" style="font-size:12.5px;text-align:left;line-height:1.6">Cumul ${an} = ${nbSx} mois Sorex${ms.length>nbSx?` + ${ms.length-nbSx} mois ${X.situs.some(s=>ms.includes(s.m)&&!finSorex(X,s.m))?'figés / ':''}estimés par Akteev`:''}. N-1 : tableaux de bord Sorex.<br>
-      Estimation Akteev de ${MOIS_LONG(sm)} : CA ${keur(est.ca)} (${dt.nbF} factures) · achats ${keur(est.achats)} (${dt.nbD} factures fournisseurs dont achats ${keur(dt.achD)}${dt.chineConnue?`, virements Chine ${keur(dt.chine)}`:', virements Chine non disponibles'}) · charges externes ${keur(est.chext)} (factures ${keur(dt.chextF??est.chext)} + loyer) · investissements ≥ ${keur(FIN_INVEST_MIN)} HT exclus (immobilisations) ${keur(dt.inv)} · forfaits : ${FIN_FORF.map(([k,l])=>`${l.split(' (')[0].toLowerCase()} ${keur(FF.f[k])} (${FF.src[k]})`).join(', ')}.</div>`;
+    h+=finW('situ-note','Méthode',12,`<div class="plus mut" style="font-size:12.5px;text-align:left;line-height:1.6">Cumul ${an} = ${nbSx} mois Sorex${ms.length>nbSx?` + ${ms.length-nbSx} mois ${X.situs.some(s=>ms.includes(s.m)&&!finSorex(X,s.m))?'figés / ':''}estimés par Akteev`:''}. N-1 : tableaux de bord Sorex.<br>
+      Estimation Akteev de ${MOIS_LONG(sm)} : CA ${finK(est.ca)} (${dt.nbF} factures) · achats ${finK(est.achats)} (${dt.nbD} factures fournisseurs dont achats ${finK(dt.achD)}${dt.chineConnue?`, virements Chine ${finK(dt.chine)}`:', virements Chine non disponibles'}) · charges externes ${finK(est.chext)} (factures ${finK(dt.chextF??est.chext)} + loyer) · investissements ≥ ${finK(FIN_INVEST_MIN)} HT exclus (immobilisations) ${finK(dt.inv)} · forfaits : ${FIN_FORF.map(([k,l])=>`${l.split(' (')[0].toLowerCase()} ${finK(FF.f[k])} (${FF.src[k]})`).join(', ')}.</div>`);
     // contrôle de la méthode sur les mois connus de Sorex
     const ctl=moisAn.filter(m=>finSorex(X,m)&&X.D[m]&&(((X.tr?.chine||{})[m])||m>=(X.tr?.premiereOperation||'9').slice(0,7))).slice(-4).map(m=>{const e=finSituation(X,m,FF),s=finSorex(X,m);return{m,ca:e.ca,cas:s.ca,ach:e.achats,achs:s.achats,ch:e.chext,chs:s.chext,net:e.net,nets:s.net}});
-    if(ctl.length)h+=`<h3 style="font-size:14px;margin:14px 16px 6px">Contrôle de la méthode : estimation Akteev / Sorex sur les derniers mois connus</h3>`+finTable([{k:'m',l:'Mois',p:1,f:v=>esc(MOIS_LONG(v))},{k:'ca',l:'CA Akteev',n:1,f:keur},{k:'cas',l:'CA Sorex',n:1,f:keur},{k:'ach',l:'Achats Akteev',n:1,f:keur},{k:'achs',l:'Achats Sorex',n:1,f:keur},{k:'ch',l:'Ch. ext. Akteev',n:1,f:keur},{k:'chs',l:'Ch. ext. Sorex',n:1,f:keur},{k:'net',l:'Résultat Akteev',n:1,f:keur},{k:'nets',l:'Résultat Sorex',n:1,f:keur}],ctl);
-    if(X.situs.length)h+=`<h3 style="font-size:14px;margin:14px 16px 6px">Situations figées</h3>`+finTable([{k:'m',l:'Mois',p:1,f:v=>esc(MOIS_LONG(v))},{k:'le',l:'Figée le',f:dtfr},{k:'ca',l:'CA',n:1,f:keur},{k:'marge',l:'Marge',n:1,f:keur},{k:'ebe',l:'EBE',n:1,f:keur},{k:'net',l:'Résultat',n:1,f:keur},{k:'sx',l:'Résultat Sorex',n:1,f:v=>v==null?'<span class="mut">en attente</span>':keur(v)}],
-      X.situs.map(s=>({m:s.m,le:s.v.le,ca:s.v.lignes.ca,marge:s.v.lignes.marge,ebe:s.v.lignes.ebe,net:s.v.lignes.net,sx:finSorex(X,s.m)?.net??null})));
+    if(ctl.length)h+=finW('situ-ctl','',12,`<h3 style="font-size:14px;margin:14px 16px 6px">Contrôle de la méthode : estimation Akteev / Sorex sur les derniers mois connus</h3>`+finTable([{k:'m',l:'Mois',p:1,f:v=>esc(MOIS_LONG(v))},{k:'ca',l:'CA Akteev',n:1,f:finK},{k:'cas',l:'CA Sorex',n:1,f:finK},{k:'ach',l:'Achats Akteev',n:1,f:finK},{k:'achs',l:'Achats Sorex',n:1,f:finK},{k:'ch',l:'Ch. ext. Akteev',n:1,f:finK},{k:'chs',l:'Ch. ext. Sorex',n:1,f:finK},{k:'net',l:'Résultat Akteev',n:1,f:finK},{k:'nets',l:'Résultat Sorex',n:1,f:finK}],ctl));
+    if(X.situs.length)h+=finW('situ-figees','',12,`<h3 style="font-size:14px;margin:14px 16px 6px">Situations figées</h3>`+finTable([{k:'m',l:'Mois',p:1,f:v=>esc(MOIS_LONG(v))},{k:'le',l:'Figée le',f:dtfr},{k:'ca',l:'CA',n:1,f:finK},{k:'marge',l:'Marge',n:1,f:finK},{k:'ebe',l:'EBE',n:1,f:finK},{k:'net',l:'Résultat',n:1,f:finK},{k:'sx',l:'Résultat Sorex',n:1,f:v=>v==null?'<span class="mut">en attente</span>':finK(v)}],
+      X.situs.map(s=>({m:s.m,le:s.v.le,ca:s.v.lignes.ca,marge:s.v.lignes.marge,ebe:s.v.lignes.ebe,net:s.v.lignes.net,sx:finSorex(X,s.m)?.net??null}))));
   }
-  // ----- Trésorerie
+  // ----- Trésorerie (HT ; TVA regroupée sur une ligne)
   if(o==='treso'){
     if(!TR)h+=`<div class="vide">Données bancaires pas encore synchronisées (ligne FIN-TRESO).</div>`;
     else{
-      const T=X.tr,S2=TR.soldes,mini=S2.reduce((m,s)=>s.fin<m.fin?s:m,S2[0]);
-      h+=`<div style="padding:14px 16px;display:flex;gap:28px;flex-wrap:wrap;border-bottom:1px solid var(--trait)">
-        <div><div class="mut" style="font-size:12px">Aujourd’hui</div><b style="font-size:18px">${eur(TR.depart)}</b><div class="mut" style="font-size:11.5px">${T.comptes.map(c=>`${esc(c.nom)} ${keur(c.solde)}`).join(' · ')}${T.cat?` · compte à terme ${keur(T.cat.montant)} (éch. ${dfr(T.cat.echeance)})`:''}</div></div>
-        ${TR.moisH.slice(0,2).map(m=>`<div><div class="mut" style="font-size:12px">Fin ${MOIS_LONG(m)}</div><b style="font-size:18px">${TR.auMois(m)==null?'—':eur(TR.auMois(m))}</b></div>`).join('')}
-        <div><div class="mut" style="font-size:12px">Au ${dfr(TR.fin)}</div><b style="font-size:18px">${eur(S2[TR.NS-1].fin)}</b></div>
-        <div><div class="mut" style="font-size:12px">Point bas</div><b style="font-size:18px;${mini.fin<TR.cat?'color:var(--err)':''}">${eur(mini.fin)}</b><div class="mut" style="font-size:11.5px">semaine du ${dfr(mini.du)}</div></div></div>`;
-      const sems=S2.map((s,i)=>i);
-      const ligne=(l,v,st='')=>`<tr style="${st}"><td class="prim">${l}</td>${sems.map(i=>`<td class="n">${v[i]?keur(v[i]):'<span class="mut">·</span>'}</td>`).join('')}<td class="n">${keur(v.reduce((s,x)=>s+x,0))}</td></tr>`;
-      h+=`<div class="tw"><table class="l"><thead><tr><th style="cursor:default">Semaine</th>${S2.map(s=>`<th class="n" style="cursor:default">${dfr(s.du).slice(0,5)}<div class="mut" style="font-weight:400">→ ${dfr(s.au).slice(0,5)}</div></th>`).join('')}<th class="n" style="cursor:default">Total</th></tr></thead><tbody>
-        <tr style="background:#F7F9FC;font-weight:600"><td class="prim">Solde début</td>${S2.map(s=>`<td class="n">${keur(s.deb)}</td>`).join('')}<td></td></tr>
-        ${ligne('+ Factures clients émises',TR.lig.encF,'color:#15803D')}${ligne('+ Commandes à facturer (livraison + délai client)',TR.lig.encC,'color:#15803D')}
-        ${ligne('− Factures fournisseurs à payer',TR.lig.decF,'color:var(--err)')}${ligne('− Achats et frais courants non encore facturés (estim.)',TR.lig.decE,'color:var(--err)')}
+      const T=X.tr,S2=TR.soldes,cat=TR.cat,mini=S2.reduce((m,s)=>s.fin<m.fin?s:m,S2[0]);
+      const duo=(l,v,st='')=>`<div><div class="mut" style="font-size:12px">${l}</div><b style="font-size:20px;${st}">${finK(v-cat)}</b>${cat?`<div class="mut" style="font-size:11.5px">avec compte à terme ${finK(v)}</div>`:''}</div>`;
+      h+=finW('tr-resume','Solde des comptes prévu (hors compte à terme)',12,`<div style="display:flex;gap:30px;flex-wrap:wrap">${duo('Aujourd’hui',TR.depart)}${TR.moisH.slice(0,2).map(m=>TR.auMois(m)==null?'':duo('Fin '+MOIS_LONG(m),TR.auMois(m))).join('')}${duo('Au '+dfr(TR.fin),S2[TR.NS-1].fin)}${duo('Point bas · semaine du '+dfr(mini.du),mini.fin,mini.fin-cat<0?'color:var(--err)':'')}</div>
+        <div class="mut" style="font-size:11.5px;margin-top:8px">${T.comptes.map(c=>`${esc(c.nom)} ${finK(c.solde)}`).join(' · ')}${cat?` · compte à terme ${finK(cat)}${T.cat?.echeance?` (échéance ${dfr(T.cat.echeance)})`:''}`:''}</div>`);
+      const ligne=(l,v,st='')=>`<tr style="${st}"><td class="prim">${l}</td>${v.map(x=>`<td class="n">${Math.abs(x)>=0.5?finK(x):'<span class="mut">·</span>'}</td>`).join('')}<td class="n">${finK(v.reduce((s,x)=>s+x,0))}</td></tr>`;
+      const sol=(l,f,st)=>`<tr style="${st}"><td class="prim">${l}</td>${S2.map(s=>{const v=f(s);return`<td class="n" style="${v<0?'color:var(--err)':''}">${finK(v)}</td>`}).join('')}<td></td></tr>`;
+      h+=finW('tr-semaines','Semaine par semaine (montants HT)',12,`<div class="tw"><table class="l"><thead><tr><th style="cursor:default">Semaine</th>${S2.map(s=>`<th class="n" style="cursor:default">${dfr(s.du).slice(0,5)}<div class="mut" style="font-weight:400">→ ${dfr(s.au).slice(0,5)}</div></th>`).join('')}<th class="n" style="cursor:default">Total</th></tr></thead><tbody>
+        ${sol('Solde début (comptes)',s=>s.deb-cat,'background:#F7F9FC;font-weight:600')}
+        ${ligne('+ Factures clients émises',TR.lig.encF,'color:#15803D')}${ligne('+ Commandes clients à facturer (livraison + délai client)',TR.lig.encC,'color:#15803D')}
+        ${ligne('− Factures fournisseurs saisies (Axonaut)',TR.lig.decF,'color:var(--err)')}${ligne('− Commandes fournisseurs Akteev non facturées',TR.lig.decCF,'color:var(--err)')}
+        ${ligne('− Autres achats et frais (estimation)',TR.lig.decE,'color:var(--err)')}
         ${TR.famRec.map(f=>ligne('− '+esc(f),TR.lig.rec[f],'color:var(--err)')).join('')}
-        <tr style="background:#F7F9FC;font-weight:700"><td class="prim">Solde fin</td>${S2.map(s=>`<td class="n" style="${s.fin<0?'color:var(--err)':''}">${keur(s.fin)}</td>`).join('')}<td></td></tr></tbody></table></div>`;
-      h+=`<div class="graph">${grapheStats(S2.map(s=>s.du.slice(0,7)),[{n:'Encaissements',v:S2.map(s=>s.enc),c:'#86EFAC'},{n:'Décaissements',v:S2.map(s=>-s.dec),c:'#FCA5A5'},{n:'Solde fin de semaine',v:S2.map(s=>s.fin),c:STATS_COUL.ca,type:'ligne'}])}</div>`;
-      const top=(L,t)=>`<h3 style="font-size:14px;margin:14px 16px 6px">${t}</h3>`+finTable([{k:'d',l:'Date prévue',f:(v,r)=>`<span class="${r.echu?'retard':''}">${dfr(v)}${r.echu?' (échu)':''}</span>`},{k:'lib',l:'Libellé',p:1},{k:'mt',l:'Montant TTC',n:1,f:eur}],
-        [...L].sort((x,y)=>y.mt-x.mt).slice(0,15),{pied:(c,i)=>i===0?`${L.length} ligne(s)`:c.k==='mt'?eur(L.reduce((s,r)=>s+r.mt,0)):''});
-      h+=`<div class="grille" style="padding:0 0 8px"><div>${top(TR.det.encF,'Factures clients à encaisser (2 mois)')}${top(TR.det.encC,'Commandes à facturer puis encaisser')}</div><div>${top(TR.det.decF,'Factures fournisseurs à payer (2 mois)')}
-        <h3 style="font-size:14px;margin:14px 16px 6px">Charges récurrentes (moyenne ${(T.fenetre||[]).map(m=>MOIS_COURT(m)).join(', ')})</h3>${finTable([{k:'famille',l:'Famille',p:1},{k:'jour',l:'Jour habituel',n:1},{k:'mensuel',l:'Par mois',n:1,f:eur}],T.recurrents||[],{pied:(c,i)=>i===0?'Total':c.k==='mensuel'?eur((T.recurrents||[]).reduce((s,r)=>s+r.mensuel,0)):''})}</div></div>`;
-      h+=`<div class="plus mut" style="font-size:12.5px;text-align:left;line-height:1.6">Départ : soldes des comptes synchronisés dans Axonaut (${dtfr(T.maj)}) + compte à terme en cours (renouvelé chaque mois, compté comme disponible). Factures clients au jour d’échéance (échues depuis moins de 60 jours : semaine en cours ; échues depuis plus de 60 jours non comptées : ${TR.exclus.ncli} facture(s), ${keur(TR.exclus.cli)} TTC — paiements à vérifier dans Axonaut) ; commandes facturées à la livraison prévue puis encaissées après le délai moyen observé du client (sinon ${T.delaiMoyen} j), TVA 20 % pour la France. Factures fournisseurs Axonaut non payées à leur date de paiement prévue (même règle des 60 jours : ${TR.exclus.nfour} facture(s), ${keur(TR.exclus.four)} TTC non comptées, sans doute réglées mais non rapprochées). Charges récurrentes (salaires nets, URSSAF, caisses, TVA et impôts, emprunts, crédit-bail, assurances) : moyenne des 3 derniers mois au jour habituel. Achats et frais courants non encore facturés : moyenne mensuelle des autres paiements fournisseurs (${keur(TR.moyA)}) et des virements Chine (${keur(TR.moyC)}), diminuée des factures déjà connues du mois.</div>`;
+        ${ligne('± TVA (encaissée − payée − reversée à l’État)',TR.lig.tva,'color:#7C3AED')}
+        ${sol('Solde fin (comptes)',s=>s.fin-cat,'background:#F7F9FC;font-weight:700')}
+        ${cat?sol('Solde fin avec compte à terme',s=>s.fin,'color:var(--mut)'):''}</tbody></table></div>`);
+      h+=finW('tr-graph','Encaissements, décaissements et solde des comptes',12,`<div class="graph">${grapheStats(S2.map(s=>s.du.slice(0,7)),[{n:'Encaissements HT',v:S2.map(s=>s.enc),c:'#86EFAC'},{n:'Décaissements HT',v:S2.map(s=>-s.dec),c:'#FCA5A5'},{n:'Solde des comptes',v:S2.map(s=>s.fin-cat),c:STATS_COUL.ca,type:'ligne'}])}</div>`);
+      const top=L=>finTable([{k:'d',l:'Date prévue',f:(v,r)=>`<span class="${r.echu?'retard':''}">${dfr(v)}${r.echu?' (échu)':''}</span>`},{k:'lib',l:'Libellé',p:1},{k:'mt',l:'Montant HT',n:1,f:finE}],
+        [...L].sort((x,y)=>y.mt-x.mt).slice(0,15),{pied:(c,i)=>i===0?`${L.length} ligne(s)`:c.k==='mt'?finE(L.reduce((s,r)=>s+r.mt,0)):''});
+      h+=finW('tr-encF','Factures clients à encaisser (2 mois)',6,top(TR.det.encF));
+      h+=finW('tr-encC','Commandes clients à facturer puis encaisser',6,top(TR.det.encC));
+      h+=finW('tr-decF','Factures fournisseurs à payer (Axonaut)',6,top(TR.det.decF));
+      const nF=TR.CFP.fact.length;
+      h+=finW('tr-cf','Commandes fournisseurs Akteev à payer',6,top(TR.det.decCF.map(x=>({...x,_h:`#/cf/${x.id}`})))+`<div class="mut" style="font-size:11.5px;padding:6px 2px 0">${nF} autre(s) CF déjà facturée(s) dans Axonaut ou réglée(s) : non comptées. Rapprochement par fournisseur et montant${TR.exclus.ncf?` · ${TR.exclus.ncf} CF au paiement dépassé de plus de 60 jours écartée(s) (${finK(TR.exclus.cf)})`:''}.</div>`);
+      h+=finW('tr-rec',`Charges récurrentes HT (moyenne ${(T.fenetre||[]).map(m=>MOIS_COURT(m)).join(', ')})`,6,finTable([{k:'famille',l:'Famille',p:1},{k:'jour',l:'Jour habituel',n:1},{k:'ht',l:'Par mois HT',n:1,f:finE}],TR.recs,{pied:(c,i)=>i===0?'Total':c.k==='ht'?finE(TR.recs.reduce((s,r)=>s+r.ht,0)):''}));
+      h+=finW('tr-tva','TVA à reverser (déclarations)',6,finTable([{k:'M',l:'Mois déclaré',p:1,f:v=>esc(MOIS_LONG(v))},{k:'coll',l:'TVA collectée',n:1,f:(v,r)=>finE(v)+(r.collC?`<div class="mut" style="font-size:11px">dont prévue ${finK(r.collC)}</div>`:'')},{k:'ded',l:'TVA déductible',n:1,f:finE},{k:'net',l:'À reverser',n:1,f:v=>`<b>${finE(v)}</b>`},{k:'dP',l:'Paiement prévu',f:(v,r)=>dfr(v)+(r.dansHorizon?'':' <span class="mut">(hors période)</span>')}],TR.declas)
+        +`<div class="mut" style="font-size:11.5px;padding:6px 2px 0">Sur la période : TVA encaissée ${finK(TR.tvaS.enc.reduce((s,x)=>s+x,0))} · TVA payée aux fournisseurs ${finK(TR.tvaS.dec.reduce((s,x)=>s+x,0))} · TVA reversée ${finK(TR.tvaS.verse.reduce((s,x)=>s+x,0))}.</div>`);
+      h+=finW('tr-note','Méthode',12,`<div class="mut" style="font-size:12.5px;line-height:1.6">Tous les montants sont HT ; la TVA est regroupée sur une seule ligne pour que le solde reste celui de la banque. Départ : soldes des comptes Axonaut (${dtfr(T.maj)}) ; le compte à terme (${finK(cat)}) est affiché à part.
+        Factures clients : à l’échéance (aujourd’hui si échue) ; ${TR.exclus.ncli} facture(s) échue(s) depuis plus de 60 jours écartée(s) (${finK(TR.exclus.cli)} HT). Commandes à facturer : facturées à la date de livraison prévue, encaissées après le délai de paiement habituel du client.
+        Fournisseurs : factures Axonaut non payées à leur date de paiement prévue (${TR.exclus.nfour} échue(s) depuis plus de 60 jours écartée(s), ${finK(TR.exclus.four)} HT) ; commandes Akteev non facturées à la date tirée du délai et des conditions de paiement ; relevés chinois réglés le 10 du mois suivant la livraison.
+        Autres achats et frais : moyenne bancaire des 3 derniers mois (${finK(TR.moyA)} HT + Chine ${finK(TR.moyC)}) diminuée des factures et commandes déjà connues du mois. TVA : déclaration du mois M (factures émises − factures reçues) payée vers le ${TR.jourTVA} du mois suivant.</div>`);
     }
   }
+  if(o==='seuil')h+=finVueSeuil(X,mc);
   h+='</div>';
   $('main').innerHTML=h;
+  finWidgets(o);
+  $('fiPerso').onclick=()=>{const fin=FINV.perso;FINV.perso=!fin;ls.set('fin',FINV);dessinerFinance();if(fin)finSauverDispo()};
+  if(o==='seuil')finBrancherSeuil();
   document.querySelectorAll('#main tr[data-h]').forEach(tr=>tr.onclick=()=>location.hash=tr.dataset.h);
   document.querySelectorAll('.onglets button[data-o],.kpi[data-o]').forEach(b=>b.onclick=()=>{FINV.o=b.dataset.o;ls.set('fin',FINV);dessinerFinance()});
   const sel=$('fiSm');if(sel)sel.onchange=()=>{FINV.sm=sel.value;ls.set('fin',FINV);dessinerFinance()};
@@ -2777,8 +2928,80 @@ function finEditerForfaits(){
   ouvrirModal('Charges habituelles (forfaits mensuels)',`<p class="mut" style="margin-top:0">Montants mensuels utilisés pour estimer la situation tant que l’expert-comptable n’a pas transmis la sienne. Laisser vide = moyenne des mois Sorex de l’exercice.</p>
     ${FIN_FORF.map(([k,l])=>`<label style="display:block;margin:10px 0 4px;font-weight:600">${l}</label><input type="number" step="1" data-fk="${k}" value="${X.pa[k]??''}" placeholder="${FF.f[k]} (${esc(FF.src[k])})" style="width:100%">`).join('')}`,
     `<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="fiForfOk">Enregistrer</button>`);
-  $('fiForfOk').onclick=async()=>{const o={};document.querySelectorAll('[data-fk]').forEach(i=>{if(i.value!=='')o[i.dataset.fk]=+i.value});
+  $('fiForfOk').onclick=async()=>{const o={...X.pa};FIN_FORF.forEach(([k])=>delete o[k]);document.querySelectorAll('[data-fk]').forEach(i=>{if(i.value!=='')o[i.dataset.fk]=+i.value});
     try{await finEcrire('FIN-PARAM',o);fermerModal(true);toast('Charges habituelles enregistrées');dessinerFinance()}catch(e){toast('Échec : '+e.message,true)}};
+}
+
+/* ---------- Seuil de rentabilité (16/11/2026) ----------
+   Charges fixes mensuelles HT (FIN-PARAM.fixes, modifiables : libellé, montant HT, type fixe | estimé | emprunt).
+   Marge du mois = CA facturé − achats de l'affaire au prorata (taux d'achat = achats / max(commandé, facturé) ;
+   achats = max(commandes fournisseurs Axonaut, commandes fournisseurs Akteev de l'affaire)), et en variante prudente
+   CA × taux de marge globale Sorex de l'exercice. Rentable dans le mois quand la marge cumulée couvre les charges fixes. */
+const FIN_FIXES_DEF=[
+ ['Salaires nets (moyenne avril–septembre, dirigeant compris, hors prime d’octobre)',18560,'fixe'],['Nouveau salarié (novembre 2026 : 14,50 €/h × 151,67 h = 2 199 € brut ; coût employeur estimé)',2860,'fixe'],['URSSAF (salariés 8 600 + dirigeant 3 800)',12400,'fixe'],['Retraite, prévoyance, mutuelles (AG2R, Abeille, Alptis, Smiso, GGVIE)',4428,'fixe'],['Loyer des locaux (Immomeca, 9 000 € HT par trimestre)',3000,'fixe'],
+ ['Crédit-bail Sogelease n° 002055772 (2 009,88 TTC)',1675,'fixe'],['Crédit-bail Sogelease n° 002103926 – tour CMZ (1er loyer 40 851,58 TTC le 27/10/2026)',2490,'fixe'],['Location fourgon (Eskimo)',2000,'fixe'],['Assurances (Allianz, MMA)',1342,'fixe'],
+ ['Impôts et taxes',1375,'fixe'],['Électricité (EDF)',1079,'estimé'],['Expert-comptable (Sorex)',1572,'estimé'],
+ ['Carte bancaire (carburant, petites fournitures)',1459,'estimé'],['Véhicules (entretien, péages)',605,'estimé'],
+ ['Téléphonie, informatique (Koesio…)',255,'estimé'],['Frais bancaires, intérêts et garantie PGE',410,'fixe'],['Dotations aux amortissements (moyenne Sorex 2026)',6915,'fixe']];
+const finFixes=X=>(Array.isArray(X.pa.fixes)&&X.pa.fixes.length?X.pa.fixes:FIN_FIXES_DEF.map(([l,m,t])=>({l,m,t})));
+function finAchatsAff(X){
+  const SD=statsDonnees(),ak={};
+  for(const c of S.rows[MODS.cf.t]||[]){if(/annul/i.test(txt(c.Statut))||(txt(c.Devise)&&!/EUR/i.test(txt(c.Devise))))continue;
+    const affs=(c.Affaire||[]).map(x=>finCle(x.value)).filter(Boolean);if(!affs.length)continue;
+    const tot=+String(txt(c.Total)).replace(/\s/g,'').replace(',','.').replace(/[^\d.-]/g,'')||0;for(const a of affs)ak[a]=(ak[a]||0)+tot/affs.length}
+  return aff=>{const af=SD.AF[aff];const ach=Math.max(af?.achats||0,ak[aff]||0),base=Math.max(af?.cde||0,af?.ca||0);return{ach,taux:base?Math.min(1,ach/base):0,connu:ach>0}};
+}
+function finSeuil(X,m){
+  const fixes=finFixes(X),tot=t=>fixes.filter(x=>!t||t.includes(x.t)).reduce((s,x)=>s+(+x.m||0),0);
+  const seuilExpl=tot(['fixe','estimé']),seuil=seuilExpl+tot(['emprunt']);
+  const ms=Object.keys(X.sx?.mois||{}).filter(k=>k.startsWith(String(X.an))),ca=ms.reduce((s,k)=>s+X.sx.mois[k].ca,0),mg=ms.reduce((s,k)=>s+X.sx.mois[k].marge,0);
+  const tauxMoy=ca?mg/ca:0.5,ach=finAchatsAff(X);
+  const F=[...(X.F[m]||[])].sort((a,b)=>a.date<b.date?-1:1);
+  const L=F.map(f=>{const a=ach(f.aff);return{...f,taux:a.taux,connu:a.connu,marge:f.ht*(1-a.taux),margeP:f.ht*tauxMoy}});
+  const nbJ=new Date(+m.slice(0,4),+m.slice(5,7),0).getDate(),jours=[];let c=0,cp=0,ca2=0,dR=null,dRP=null;
+  for(let j=1;j<=nbJ;j++){const d=`${m}-${String(j).padStart(2,'0')}`;for(const x of L.filter(x=>x.date===d)){c+=x.marge;cp+=x.margeP;ca2+=x.ht}
+    jours.push({d,ca:ca2,mg:c,mgP:cp});if(dR==null&&c>=seuil&&c>0)dR=d;if(dRP==null&&cp>=seuil&&cp>0)dRP=d}
+  return{fixes,seuil,seuilExpl,tauxMoy,caSeuil:tauxMoy?seuil/tauxMoy:0,L,jours,ca:ca2,mg:c,mgP:cp,dR,dRP,
+    sansAchat:L.filter(x=>!x.connu).reduce((s,x)=>s+x.ht,0)};
+}
+function finVueSeuil(X,mc){
+  const opts=Object.keys(X.F).filter(k=>k.startsWith(String(X.an))&&k<=mc).sort().reverse();
+  const m=opts.includes(FINV.ms)?FINV.ms:mc,R=finSeuil(X,m),a=X.a,enCours=m===mc;
+  const coul=v=>v>=R.seuil?'#15803D':'var(--err)';
+  let h=`<div class="outils"><span class="mut">Mois</span><select id="fiMs">${opts.map(k=>`<option value="${k}" ${k===m?'selected':''}>${MOIS_LONG(k)}</option>`).join('')}</select>
+    ${estAdmin()?`<button class="btn" id="fiFixes">${ico('crayon')}Modifier les charges fixes</button>`:''}</div>`;
+  h+=finW('se-kpi','',3,`<div class="kpis">
+   <div class="card kpi" style="cursor:default"><div class="lab">Seuil de rentabilité mensuel</div><div class="val">${finK(R.seuil)}</div><div class="det">${R.seuil>R.seuilExpl?`charges fixes ${finK(R.seuilExpl)} + emprunt ${finK(R.seuil-R.seuilExpl)}<br>`:''}soit ${finK(R.caSeuil)} de CA HT au taux de marge ${pct(R.tauxMoy)}</div></div>
+   <div class="card kpi" style="cursor:default"><div class="lab">Marge ${enCours?`au ${dfr(a)}`:MOIS_LONG(m)}</div><div class="val" style="color:${coul(R.mg)}">${finK(R.mg)}</div><div class="det">CA facturé ${finK(R.ca)} · ${R.mg>=R.seuil?`<b style="color:#15803D">+${finK(R.mg-R.seuil)} au-dessus du seuil</b>`:`manque <b style="color:var(--err)">${finK(R.seuil-R.mg)}</b>`}<br>marge par affaire (achats enregistrés)</div></div>
+   <div class="card kpi" style="cursor:default"><div class="lab">Marge prudente</div><div class="val" style="color:${coul(R.mgP)}">${finK(R.mgP)}</div><div class="det">CA × ${pct(R.tauxMoy)} (marge globale Sorex ${X.an})<br>${R.mgP>=R.seuil?`<b style="color:#15803D">+${finK(R.mgP-R.seuil)}</b>`:`manque <b style="color:var(--err)">${finK(R.seuil-R.mgP)}</b>`}</div></div>
+   <div class="card kpi" style="cursor:default"><div class="lab">Rentable depuis le</div><div class="val">${R.dR?dfr(R.dR).slice(0,5):'—'}</div><div class="det">${R.dR?'marge par affaire':'seuil pas encore atteint'}<br>prudent : ${R.dRP?dfr(R.dRP):'pas encore atteint'}</div></div></div>`,1);
+  if(R.sansAchat>0.5)h+=finW('se-alerte','À vérifier',12,`<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#9A3412">⚠ ${finK(R.sansAchat)} de CA facturé sur des affaires sans aucun achat enregistré (ni commande fournisseur Axonaut ni Akteev) : leur marge est comptée à 100 %. Si elles ont été sous-traitées, la marge réelle est plus proche de la marge prudente.</div>`);
+  const J=R.jours.filter(j=>!enCours||j.d<=a),ms=J.map(j=>j.d);
+  // graphique : marge cumulée par jour et seuil
+  const W=760,H=200,G=48,max=Math.max(R.seuil,...J.map(j=>Math.max(j.mg,j.mgP)),1)*1.08,x=i=>G+i*(W-G)/Math.max(R.jours.length-1,1),y=v=>H-v/max*H;
+  let s=`<svg viewBox="0 0 ${W} ${H+40}">`;for(let i=0;i<=4;i++){const v=max*i/4;s+=`<line x1="${G}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#EEF0F4"/><text x="${G-6}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="#8A93A6">${Math.round(v/1000)}k</text>`}
+  s+=`<line x1="${G}" x2="${W}" y1="${y(R.seuil)}" y2="${y(R.seuil)}" stroke="#DC2626" stroke-dasharray="6 4" stroke-width="1.5"/><text x="${W}" y="${y(R.seuil)-5}" text-anchor="end" font-size="11" fill="#DC2626">seuil ${finK(R.seuil)}</text>`;
+  const pl=(k,c,dash)=>`<polyline points="${J.map((j,i)=>`${x(i)},${y(j[k])}`).join(' ')}" fill="none" stroke="${c}" stroke-width="2.2" ${dash?'stroke-dasharray="4 3"':''}/>`;
+  s+=pl('mg','#16A34A')+pl('mgP','#2F6FED',1);
+  R.jours.forEach((j,i)=>{if(i%5===0||i===R.jours.length-1)s+=`<text x="${x(i)}" y="${H+16}" text-anchor="middle" font-size="10.5" fill="#6B7385">${+j.d.slice(8)}</text>`});
+  s+=`<g font-size="11.5" fill="#4A5366"><rect x="${G}" y="${H+26}" width="11" height="3" fill="#16A34A"/><text x="${G+16}" y="${H+31}">Marge cumulée (par affaire)</text><rect x="${G+210}" y="${H+26}" width="11" height="3" fill="#2F6FED"/><text x="${G+226}" y="${H+31}">Marge prudente</text></g></svg>`;
+  h+=finW('se-graph','Marge cumulée jour par jour et seuil',12,`<div class="graph">${s}</div>`);
+  h+=finW('se-fixes','',6,`<h3 style="font-size:14px;margin:14px 16px 6px">Charges fixes mensuelles (HT)</h3>`+finTable([{k:'l',l:'Charge',p:1},{k:'t',l:'Type',f:v=>`<span class="mut">${v==='estimé'?'variable estimée':v==='emprunt'?'remboursement':'fixe'}</span>`},{k:'m',l:'Par mois HT',n:1,f:finE}],R.fixes,{pied:(c,i)=>i===0?'Seuil de rentabilité':c.k==='m'?`<b>${finE(R.seuil)}</b>`:''}))+finW('se-fact','',6,`<h3 style="font-size:14px;margin:14px 16px 6px">Factures du mois et marge</h3>`+finTable([{k:'date',l:'Date',f:dfr},{k:'num',l:'Facture',p:1},{k:'aff',l:'Affaire'},{k:'cli',l:'Client'},{k:'ht',l:'HT',n:1,f:finE},{k:'taux',l:'Achats',n:1,f:(v,r)=>r.connu?pct(v):'<span class="mut" title="aucun achat enregistré">—</span>'},{k:'marge',l:'Marge',n:1,f:finE}],[...R.L].reverse(),
+      {pied:(c,i)=>i===0?'Total':c.k==='ht'?finE(R.ca):c.k==='marge'?finE(R.mg):''}));
+  h+=finW('se-note','Méthode',12,`<div class="plus mut" style="font-size:12.5px;text-align:left;line-height:1.6">Seuil de rentabilité (comptable) = charges fixes et prélèvements réguliers du mois (moyennes bancaires ramenées en HT, loyer, impôts et amortissements d’après les factures et les situations Sorex), hors remboursement du capital de l’emprunt. Marge = CA facturé (Axonaut) − achats de l’affaire au prorata du facturé (commandes fournisseurs Axonaut et Akteev ; le temps atelier n’est pas déduit : il est dans la masse salariale). Le mois est rentable quand la marge cumulée dépasse le seuil.</div>`);
+  return h;
+}
+function finBrancherSeuil(){
+  const s=$('fiMs');if(s)s.onchange=()=>{FINV.ms=s.value;ls.set('fin',FINV);dessinerFinance()};
+  const b=$('fiFixes');if(b)b.onclick=()=>{const X=finDonnees(),L=finFixes(X);
+    const ligne=(x,i)=>`<div style="display:grid;grid-template-columns:1fr 110px 130px 28px;gap:6px;margin-bottom:6px" data-fx="${i}"><input value="${esc(x.l)}" data-c="l"><input type="number" step="1" value="${+x.m||0}" data-c="m"><select data-c="t">${['fixe','estimé','emprunt'].map(t=>`<option value="${t}" ${t===x.t?'selected':''}>${t==='estimé'?'variable estimée':t==='emprunt'?'remboursement':'fixe'}</option>`).join('')}</select><button class="btn mini" data-sup>✕</button></div>`;
+    ouvrirModal('Charges fixes mensuelles (HT)',`<p class="mut" style="margin-top:0">Montants mensuels HT. « Variable estimée » : charge récurrente dont le montant varie (électricité, expert-comptable…).</p><div id="fxL">${L.map(ligne).join('')}</div><button class="btn" id="fxAj">${ico('plus')}Ajouter une charge</button>`,
+      `<button class="btn" onclick="fermerModal()">Annuler</button><button class="btn p" id="fxOk">Enregistrer</button>`);
+    $('modal').querySelector('.box').style.width='min(760px,96vw)';
+    const br=()=>document.querySelectorAll('#fxL [data-sup]').forEach(x=>x.onclick=()=>x.parentElement.remove());br();
+    $('fxAj').onclick=()=>{$('fxL').insertAdjacentHTML('beforeend',ligne({l:'',m:0,t:'fixe'},Date.now()));br()};
+    $('fxOk').onclick=async()=>{const fixes=[...document.querySelectorAll('#fxL [data-fx]')].map(d=>({l:d.querySelector('[data-c=l]').value.trim(),m:+d.querySelector('[data-c=m]').value||0,t:d.querySelector('[data-c=t]').value})).filter(x=>x.l);
+      try{await finEcrire('FIN-PARAM',{...finDonnees().pa,fixes});fermerModal(true);toast('Charges fixes enregistrées');dessinerFinance()}catch(e){toast('Échec : '+e.message,true)}}};
 }
 function tableAffaires(id,L,cdeAkteev,cliNom=()=>''){
   const R=L.map(x=>({...x,cliN:cliNom(x.cid)||x.cli,fourT:[...x.fours.entries()].sort((a,b)=>b[1]-a[1]).map(([f,v])=>f.replace(/(DONGGUAN|CO\.?,?LTD|PRECISION|TOOL AND DIE|METAL TOOL|INDUSTRIES?|SAS)\b/gi,'').replace(/\s+/g,' ').trim()+' '+keur(v)).join(' · '),
