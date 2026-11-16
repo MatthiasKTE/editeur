@@ -369,7 +369,7 @@ function afficher(){
   if(TYPE==='devis'&&!$('fValid').value)$('fValid').value=10;
   if(TYPE==='bl'){$('fAdrLivBL').value=cur['Adresse de livraison']||'';setTimeout(()=>auto($('fAdrLivBL')))}
   $('zComm').style.display=TYPE!=='bl'&&'Commentaires' in cur?'':'none';$('fCommEd').innerHTML=versHTML(lireComm(cur.Commentaires));majComm();
-  $('lAff').textContent=(cur.Affaire||[]).length?'Affaire : '+cur.Affaire.map(a=>a.value).join(', '):'';
+  $('lAff').textContent=(TYPE!=='arc'&&(cur.Affaire||[]).length)?'Affaire : '+cur.Affaire.map(a=>a.value).join(', '):'';
   $('lDevis').textContent=(cur.Devis||[]).length?'Notre devis : '+cur.Devis.map(a=>a.value).join(', '):'';
   $('pStatut').textContent='Statut : '+(cur.Statut?.value||'Brouillon');$('pVersion').textContent='v.'+v+(cur['Validé le']?' – validé le '+new Date(cur['Validé le']).toLocaleString('fr-FR'):'');
   dessinerLignes();
@@ -928,7 +928,7 @@ async function construirePDF(){
   const ligneT=(segs)=>{let tw=segs.reduce((s,[t,b])=>s+larg(t,9.75,b),0),cx=DR-tw;for(const [t,b] of segs){style(9.75,b);ecrire(t,cx,yt+(lt-9.75*PT)/2);cx+=larg(t,9.75,b)}yt+=lt};
   ligneT([[`Cholet, le ${frDate(val('fDate'))}`,false]]);
   if(TYPE!=='devis'){
-    if($('lAff').textContent)ligneT([[$('lAff').textContent,false]]);
+    if(TYPE!=='arc'&&$('lAff').textContent)ligneT([[$('lAff').textContent,false]]); // ARC : pas de n° d'affaire (règle du 16/11/2026, n° ARC + n° devis suffisent)
     if(val('fCde').trim())ligneT([['Votre commande : ',false],[val('fCde').trim(),true],...(TYPE==='arc'&&val('fDateCde')?[[' du '+frDate(val('fDateCde')),false]]:[])]);
     if(TYPE==='arc'&&$('lDevis').textContent)ligneT([[$('lDevis').textContent,false]]);
   }
