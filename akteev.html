@@ -643,6 +643,7 @@ function dessinerMenu(){
   h+=`<a class="it" data-m="accueil" href="#/accueil">${ico('accueil')}Tableau de bord</a>`;
   if(STATS_ACTIF&&peutVoir('stats')&&montants())h+=`<a class="it" data-m="stats" href="#/stats">${ico('stats')}Statistiques</a>`;
   if(estAdmin()&&montants())h+=`<a class="it" data-m="finance" href="#/finance">${ico('euro')}Analyse financière</a>`;
+  if(estAdmin()&&montants())h+=`<a class="it" data-m="compta" href="#/compta">${ico('cf')}Comptabilité<span class="nb" id="nb_compta"></span></a>`;
   let g='';
   if(mailVisible()){g='Boîte de réception';h+=`<div class="grp">${g}</div><a class="it" data-m="mail" href="#/mail">${ico('mail')}Mail kte@<span class="nb" id="nb_mail"></span></a>`}
   for(const k in MODS){if(!peutVoir(k))continue;const m=MODS[k];if(m.grp!==g){g=m.grp;h+=`<div class="grp">${g}</div>`}if(k==='plan'){h+=`<a class="it" data-m="charges" href="#/charges">${ico('cal')}Charges machines<span class="nb" id="nb_charges"></span></a>`;continue}h+=`<a class="it" data-m="${k}" href="#/${k}">${ico(m.ico)}${m.nom}<span class="nb" id="nb_${k}"></span></a>`;if(k==='devis'&&peutVoir('consult'))h+=`<a class="it" data-m="ddp" href="#/ddp">${ico('ddp')}DDP en cours<span class="nb" id="nb_ddp"></span></a>`;if(k==='nc')h+=`<a class="it" data-m="ncsynth" href="#/ncsynth">${ico('stats')}Synthèse NC</a>`;if(k==='utilisateurs')h+=`<a class="it" data-m="droits" href="#/droits">${ico('cle')}Droits d’accès</a>`}
@@ -662,6 +663,7 @@ function majCompteurs(){
   if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
   const eA=$('nb_amelio'),RA=S.rows[MODS.amelio.t];if(eA&&RA){const n=RA.filter(amelioAuJour).length;eA.textContent=n||'';const it=eA.parentElement,s=amelioEtatMenu();it.classList.remove('alerteO','alerteR');if(s.c)it.classList.add(s.c);it.title=[s.t,n+' amélioration(s) à l’ordre du jour'].filter(Boolean).join(' · ')}
   const eF=$('nb_ffact'),RF=S.rows[MODS.ffact.t];if(eF&&RF){const a=auj(),ech=RF.filter(r=>ffactAPayer(r)&&r['Échéance']&&r['Échéance']<a).length,ctl=RF.filter(ffactAControler).length;eF.textContent=(ech+ctl)||'';eF.title=ech+' facture(s) échue(s) non payée(s), '+ctl+' écart(s) à contrôler'}
+  const eC=$('nb_compta');if(eC&&RF){const a=auj(),n=RF.filter(r=>ffactAPayer(r)&&r['Échéance']&&r['Échéance']<a).length;eC.textContent=n||'';eC.title=n+' facture(s) fournisseur échue(s) non payée(s)'}
   const eP=$('nb_depot'),RP=MODS.depot&&S.rows[MODS.depot.t];if(eP&&RP){const n=RP.filter(r=>txt(r.Statut)==='À traiter').length;eP.textContent=n||'';eP.title=n+' mail(s) à traiter'}
   const eM=$('nb_charges');if(eM&&S.rows[T_PLAN]&&S.rows[T_MACH]&&S.rows[MODS.commandes.t]){const n=[...chmCalcul().out.values()].filter(x=>x.retard).length;eM.textContent=n||'';eM.title=n+' affaire(s) dont la fin prévue dépasse le délai'}
   const eN=$('nb_nc'),RN=S.rows[MODS.nc.t];if(eN&&RN){const n=RN.filter(ncOuverte).length;eN.textContent=n||'';eN.title=n+' non-conformité(s) à traiter'}
@@ -696,6 +698,7 @@ async function route(){
     if(k==='affecter'&&id&&peutVoir('cf')){actif('cf');return await vueAffecter(id)}
     if(k==='stats'&&STATS_ACTIF&&peutVoir('stats')&&montants())return await vueStats();
     if(k==='finance'&&estAdmin()&&montants())return await vueFinance();
+    if(k==='compta'&&estAdmin()&&montants())return await vueCompta();
     if(!MODS[k]||!peutVoir(k)){location.hash='#/accueil';return}
     if(id)return await vueFiche(k,id);
     return await vueListe(k);
@@ -2766,6 +2769,104 @@ function finWidgets(o){
 async function finSauverDispo(){
   if(!MOI)return;const pa=finDonnees().pa,dispo={...(pa.dispo||{}),[MOI]:FINV.dispo||{}};
   try{await finEcrire('FIN-PARAM',{...pa,dispo})}catch(e){toast('Disposition gardée sur ce poste seulement : '+e.message,true)}
+}
+/* ---------- Comptabilité : factures fournisseurs à payer (17/11/2026) ----------
+   Table 1318208. Filtres façon Axonaut : exercice en cours / N-1 / mois / période libre, sur la date de facture ou l'échéance. */
+let CPV=ls.get('compta',{per:'ex',base:'ech',st:'apayer',mode:'',q:'',grp:'mech',tri:'ech',sens:1,du:'',au:''});
+const CP_CHINE=/rogle|tengkoo|kingvow|ruichi|huanxing|xiang|nuocheng|dongguan|shenzhen/i;
+function cpMode(r){const c=String(r.Commentaire||''),f=String(r['Fournisseur lu']||'');
+  if(/payée par la SG|Chine/i.test(c)||CP_CHINE.test(f)||(txt(r.Devise)&&txt(r.Devise)!=='EUR'))return'SG';
+  if(r['ID Axonaut']||/^(déjà présente|créée)/i.test(txt(r['Saisie Axonaut'])))return'Swan';
+  return'Autre'}
+const CP_MODES={Swan:'Swan (Axonaut)',SG:'SG (Chine)',Autre:'Hors Axonaut'};
+function cpPeriode(){const an=+auj().slice(0,4),p=CPV.per;
+  if(p==='ex')return[`${an}-01-01`,`${an}-12-31`,`Exercice ${an}`];
+  if(p==='n1')return[`${an-1}-01-01`,`${an-1}-12-31`,`Exercice ${an-1}`];
+  if(p==='tout')return['0000','9999','Toutes périodes'];
+  if(p==='libre')return[CPV.du||'0000',CPV.au||'9999','Du '+(CPV.du?dfr(CPV.du):'…')+' au '+(CPV.au?dfr(CPV.au):'…')];
+  if(/^m\d\d$/.test(p)){const m=`${an}-${p.slice(1)}`;return[m+'-01',m+'-31',MOIS_LONG(m)]}
+  return['0000','9999','']}
+async function vueCompta(){
+  document.title='Akteev – Comptabilité';
+  if(!S.rows[MODS.ffact.t])chargement();
+  await charger(MODS.ffact.t);
+  dessinerCompta();
+}
+function dessinerCompta(){
+  ls.set('compta',CPV);
+  const a=auj(),an=+a.slice(0,4),[d1,d2,lib]=cpPeriode(),q=CPV.q.trim().toLowerCase();
+  const j7=new Date(a+'T12:00:00Z');j7.setUTCDate(j7.getUTCDate()+7);const a7=j7.toISOString().slice(0,10);
+  const toutes=(S.rows[MODS.ffact.t]||[]).map(r=>({r,mode:cpMode(r),ech:r['Échéance']||r['Date facture']||'',dt:r['Date facture']||'',ttc:+r['Montant TTC']||0,ht:+r['Montant HT']||0,st:txt(r['Statut paiement'])||'À payer'}));
+  const dansPer=x=>{const d=CPV.base==='ech'?x.ech:x.dt;return d&&d>=d1&&d<=d2+'~'};
+  const okSt=x=>CPV.st==='tout'||(CPV.st==='apayer'?x.st!=='Payée':CPV.st==='payee'?x.st==='Payée':x.st==='Litige');
+  const okQ=x=>!q||[x.r['Fournisseur lu'],x.r['N° facture'],x.r['N° affaire'],x.r.Commentaire].some(v=>String(v||'').toLowerCase().includes(q));
+  const L=toutes.filter(x=>dansPer(x)&&okSt(x)&&(!CPV.mode||x.mode===CPV.mode)&&okQ(x));
+  const NP=toutes.filter(x=>x.st!=='Payée'),som=l=>l.reduce((s,x)=>s+x.ttc,0);
+  const ech=NP.filter(x=>x.ech&&x.ech<a),sem=NP.filter(x=>x.ech>=a&&x.ech<=a7),mois=NP.filter(x=>x.ech.slice(0,7)===a.slice(0,7)&&x.ech>=a);
+  const mSuiv=(()=>{const d=new Date(Date.UTC(an,+a.slice(5,7),1));return d.toISOString().slice(0,7)})(),suiv=NP.filter(x=>x.ech.slice(0,7)===mSuiv);
+  const kpi=(l,t,lst,o)=>`<div class="card cpk" data-k="${o||''}"><div class="lab">${t}</div><div class="val">${finE(som(lst))}</div><div class="det">${lst.length} facture${lst.length>1?'s':''}${l?' · '+l:''}</div></div>`;
+  const parMode=m=>NP.filter(x=>x.mode===m);
+  const cle={ech:x=>x.ech,dt:x=>x.dt,fo:x=>String(x.r['Fournisseur lu']||'').toLowerCase(),no:x=>String(x.r['N° facture']||''),ht:x=>x.ht,ttc:x=>x.ttc,af:x=>String(x.r['N° affaire']||''),mo:x=>x.mode,st:x=>x.st};
+  const k=cle[CPV.tri]||cle.ech;L.sort((x,y)=>{const u=k(x),v=k(y);return(u<v?-1:u>v?1:0)*CPV.sens});
+  const gk={mech:x=>x.ech?x.ech.slice(0,7):'—',mdt:x=>x.dt?x.dt.slice(0,7):'—',fo:x=>x.r['Fournisseur lu']||'—',mo:x=>CP_MODES[x.mode]}[CPV.grp];
+  const lMois=s=>/^\d{4}-\d\d$/.test(s)?MOIS_LONG(s)+(CPV.grp==='mech'&&s<a.slice(0,7)?' (échu)':''):s;
+  const col=[['ech','Échéance'],['fo','Fournisseur'],['no','N° facture'],['dt','Date facture'],['ht','HT',1],['ttc','TTC',1],['af','Affaire'],['mo','Paiement'],['st','Statut']];
+  const ligne=x=>{const r=x.r,u=String(r['Chemin fichier']||''),retard=x.st!=='Payée'&&x.ech&&x.ech<a,proche=x.st!=='Payée'&&!retard&&x.ech<=a7;
+    return`<tr data-id="${r.id}"><td style="${retard?'color:var(--rouge,#C62828);font-weight:600':proche?'color:#E67E22;font-weight:600':''}">${dfr(x.ech)}${r['Échéance calculée']?' <span title="échéance estimée" style="color:var(--mut)">*</span>':''}</td>
+      <td class="prim">${esc(r['Fournisseur lu']||'')}</td><td>${esc(r['N° facture']||'')}</td><td>${dfr(x.dt)}</td>
+      <td class="n">${finE(x.ht)}</td><td class="n">${finE(x.ttc)}</td><td>${esc(r['N° affaire']||'')}</td><td>${CP_MODES[x.mode]}</td>
+      <td>${esc(x.st)}${/^à vérifier/i.test(txt(r.Rapprochement))?' <span title="à vérifier" style="color:#E67E22">●</span>':''}</td>
+      <td style="white-space:nowrap">${/^https?:/.test(u)?`<a href="${esc(u)}" target="_blank" rel="noopener" class="cpPdf" title="Ouvrir le PDF (SharePoint)">PDF</a>`:''}${x.st!=='Payée'?` <button class="btn cpPay" data-id="${r.id}" title="Marquer comme payée">Payée</button>`:''}</td></tr>`};
+  let corps='';
+  if(gk){const G=new Map();for(const x of L){const g=gk(x);if(!G.has(g))G.set(g,[]);G.get(g).push(x)}
+    const cles=[...G.keys()];if(CPV.grp==='fo')cles.sort((u,v)=>som(G.get(v))-som(G.get(u)));
+    for(const g of cles){const l=G.get(g);corps+=`<tr class="cpG"><td colspan="5">${esc(lMois(g))} <span style="color:var(--mut);font-weight:400">· ${l.length}</span></td><td class="n">${finE(som(l))}</td><td colspan="4"></td></tr>`+l.map(ligne).join('')}}
+  else corps=L.map(ligne).join('');
+  const opt=(v,t,c)=>`<option value="${v}" ${c===v?'selected':''}>${t}</option>`;
+  const moisEx=Array.from({length:12},(_,i)=>`m${String(i+1).padStart(2,'0')}`);
+  let h=`<style>.cpk{padding:14px 16px;cursor:pointer}.cpk .lab{color:var(--mut);font-size:12.5px}.cpk .val{font-size:22px;font-weight:700;margin-top:4px}.cpk .det{color:var(--mut);font-size:12px;margin-top:2px}
+   .cpf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px}.cpf select,.cpf input{border:1px solid var(--trait);border-radius:6px;padding:5px 8px;font-size:13px;background:#fff}
+   .cpf label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:2px}tr.cpG td{background:#F4F6FA;font-weight:600}
+   #cpT th{cursor:pointer;user-select:none}#cpT tbody tr[data-id]{cursor:pointer}.cpPay{padding:2px 8px;font-size:12px}.cpPdf{font-weight:600}</style>
+  <div class="entete"><h1>Comptabilité</h1><span class="sous">Factures fournisseurs · ${lib}</span>
+   <div class="act"><button class="btn" id="cpCsv">${ico('cal')}Exporter (CSV)</button><button class="btn" id="cpMaj">Recharger</button></div></div>
+  <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+   ${kpi('',`Échues non payées`,ech,'echu')}${kpi('',`Échéance ≤ 7 jours`,sem,'sem')}${kpi('',`Reste ${MOIS_LONG(a.slice(0,7))}`,mois,'mois')}${kpi('',MOIS_LONG(mSuiv),suiv,'suiv')}${kpi('',`Total à payer`,NP,'tout')}</div>
+  <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:-6px">
+   ${['Swan','SG','Autre'].map(m=>kpi('',`À payer · ${CP_MODES[m]}`,parMode(m),'mode'+m)).join('')}</div>
+  <div class="card cpf">
+   <label>Période<select id="cpPer">${opt('ex',`Exercice en cours (${an})`,CPV.per)}${opt('n1',`Exercice N-1 (${an-1})`,CPV.per)}<optgroup label="Mois de l'exercice ${an}">${moisEx.map(m=>opt(m,MOIS_LONG(`${an}-${m.slice(1)}`),CPV.per)).join('')}</optgroup>${opt('libre','Période personnalisée',CPV.per)}${opt('tout','Toutes périodes',CPV.per)}</select></label>
+   ${CPV.per==='libre'?`<label>Du<input type="date" id="cpDu" value="${CPV.du}"></label><label>Au<input type="date" id="cpAu" value="${CPV.au}"></label>`:''}
+   <label>Date de référence<select id="cpBase">${opt('ech','Échéance',CPV.base)}${opt('dt','Date de facture',CPV.base)}</select></label>
+   <label>Statut<select id="cpSt">${opt('apayer','À payer',CPV.st)}${opt('payee','Payées',CPV.st)}${opt('litige','Litige',CPV.st)}${opt('tout','Toutes',CPV.st)}</select></label>
+   <label>Paiement<select id="cpMode">${opt('','Tous',CPV.mode)}${Object.entries(CP_MODES).map(([v,t])=>opt(v,t,CPV.mode)).join('')}</select></label>
+   <label>Regrouper par<select id="cpGrp">${opt('','Aucun',CPV.grp)}${opt('mech',"Mois d'échéance",CPV.grp)}${opt('mdt','Mois de facture',CPV.grp)}${opt('fo','Fournisseur',CPV.grp)}${opt('mo','Mode de paiement',CPV.grp)}</select></label>
+   <label style="flex:1;min-width:180px">Recherche<input id="cpQ" placeholder="Fournisseur, n°, affaire…" value="${esc(CPV.q)}"></label>
+   <div style="margin-left:auto;text-align:right"><div style="font-size:12px;color:var(--mut)">${L.length} facture${L.length>1?'s':''}</div><div style="font-weight:700">${finE(som(L))} TTC</div><div style="font-size:12px;color:var(--mut)">${finE(L.reduce((s,x)=>s+x.ht,0))} HT</div></div></div>
+  <div class="card" style="padding:0"><div class="tw"><table class="l" id="cpT"><thead><tr>${col.map(([c,t,n])=>`<th data-c="${c}" class="${n?'n':''}">${t}${CPV.tri===c?(CPV.sens>0?' ▲':' ▼'):''}</th>`).join('')}<th></th></tr></thead>
+   <tbody>${corps}</tbody><tfoot><tr><td colspan="4">Total</td><td class="n">${finE(L.reduce((s,x)=>s+x.ht,0))}</td><td class="n">${finE(som(L))}</td><td colspan="4"></td></tr></tfoot></table></div>
+   ${L.length?'':'<div class="vide">Aucune facture pour ces critères</div>'}</div>
+  <div style="color:var(--mut);font-size:12px;margin:8px 2px">* échéance estimée (non fournie par Axonaut ni lue sur la facture). Paiement : Swan = factures France saisies dans Axonaut ; SG = factures Chine ; hors Axonaut = prélèvements, cartes, etc.</div>`;
+  $('main').innerHTML=h;
+  const set=(id,k,ev='onchange')=>{const e=$(id);if(e)e[ev]=()=>{CPV[k]=e.value;dessinerCompta()}};
+  set('cpPer','per');set('cpBase','base');set('cpSt','st');set('cpMode','mode');set('cpGrp','grp');set('cpDu','du');set('cpAu','au');
+  const qi=$('cpQ');let tq;qi.oninput=()=>{clearTimeout(tq);tq=setTimeout(()=>{CPV.q=qi.value;dessinerCompta();const n=$('cpQ');n.focus();n.setSelectionRange(n.value.length,n.value.length)},300)};
+  document.querySelectorAll('#cpT th[data-c]').forEach(th=>th.onclick=()=>{const c=th.dataset.c;CPV.sens=CPV.tri===c?-CPV.sens:1;CPV.tri=c;dessinerCompta()});
+  document.querySelectorAll('.cpk').forEach(e=>e.onclick=()=>{const k=e.dataset.k;CPV.st='apayer';CPV.per='tout';CPV.base='ech';CPV.mode='';CPV.q='';
+    if(k.startsWith('mode'))CPV.mode=k.slice(4);
+    else if(k==='echu'){CPV.per='libre';CPV.du='';CPV.au=new Date(Date.parse(a)-864e5).toISOString().slice(0,10)}
+    else if(k==='sem'){CPV.per='libre';CPV.du=a;CPV.au=a7}
+    else if(k==='mois'){CPV.per='libre';CPV.du=a;CPV.au=a.slice(0,7)+'-31'}
+    else if(k==='suiv'){CPV.per='libre';CPV.du=mSuiv+'-01';CPV.au=mSuiv+'-31'}
+    dessinerCompta()});
+  document.querySelectorAll('#cpT tbody tr[data-id]').forEach(tr=>tr.onclick=e=>{if(e.target.closest('a,button'))return;location.hash='#/ffact/'+tr.dataset.id});
+  document.querySelectorAll('.cpPay').forEach(b=>b.onclick=async e=>{e.stopPropagation();const id=+b.dataset.id,r=S.rows[MODS.ffact.t].find(x=>x.id===id);
+    if(!confirm(`Marquer la facture ${r['N° facture']} (${r['Fournisseur lu']}) comme payée ?`))return;b.disabled=true;
+    try{await api(`/rows/table/${MODS.ffact.t}/${id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Statut paiement':'Payée'})});await charger(MODS.ffact.t,true);toast('Facture marquée payée');dessinerCompta()}catch(x){toast('Échec : '+x.message,true);b.disabled=false}});
+  $('cpMaj').onclick=async()=>{await charger(MODS.ffact.t,true);dessinerCompta();toast('Données rechargées')};
+  $('cpCsv').onclick=()=>{const v=s=>`"${String(s??'').replace(/"/g,'""')}"`,n=x=>String((+x||0).toFixed(2)).replace('.',',');
+    const c=['Échéance;Fournisseur;N° facture;Date facture;HT;TTC;Affaire;Paiement;Statut;PDF'].concat(L.map(x=>[x.ech,v(x.r['Fournisseur lu']),v(x.r['N° facture']),x.dt,n(x.ht),n(x.ttc),v(x.r['N° affaire']),CP_MODES[x.mode],x.st,v(x.r['Chemin fichier'])].join(';'))).join('\r\n');
+    const u=URL.createObjectURL(new Blob(['﻿'+c],{type:'text/csv'})),l=document.createElement('a');l.href=u;l.download=`factures-fournisseurs-${lib.replace(/\W+/g,'-')}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(u),2000)};
 }
 async function vueFinance(){
   document.title='Akteev – Analyse financière';
