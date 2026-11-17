@@ -2770,7 +2770,7 @@ async function finSauverDispo(){
 async function vueFinance(){
   document.title='Akteev – Analyse financière';
   if(!S.rows[T_STATS])chargement();
-  await Promise.all([charger(T_STATS),charger(MODS.clients.t).catch(()=>[]),charger(MODS.commandes.t).catch(()=>[]),charger(MODS.cf.t).catch(()=>[])]);
+  await Promise.all([charger(T_STATS),charger(MODS.clients.t).catch(()=>[]),charger(MODS.commandes.t).catch(()=>[]),charger(MODS.cf.t).catch(()=>[]),charger(MODS.ffact.t).catch(()=>[])]);
   const pd=finDonnees().pa.dispo;if(MOI&&pd?.[MOI]&&!Object.keys(FINV.dispo||{}).length)FINV.dispo=pd[MOI];
   dessinerFinance();
 }
@@ -2945,11 +2945,12 @@ const FIN_FIXES_DEF=[
  ['Téléphonie, informatique (Koesio…)',255,'estimé'],['Frais bancaires, intérêts et garantie PGE',410,'fixe'],['Dotations aux amortissements (moyenne Sorex 2026)',6915,'fixe']];
 const finFixes=X=>(Array.isArray(X.pa.fixes)&&X.pa.fixes.length?X.pa.fixes:FIN_FIXES_DEF.map(([l,m,t])=>({l,m,t})));
 function finAchatsAff(X){
-  const SD=statsDonnees(),ak={};
+  const SD=statsDonnees(),ak={},ff={};
+  for(const f of S.rows[MODS.ffact?.t]||[]){const a=finCle(txt(f['N° affaire']));if(/^D\d{6}$/.test(a))ff[a]=(ff[a]||0)+(+f['Montant HT']||0)} // factures fournisseurs affectées (table 1318208)
   for(const c of S.rows[MODS.cf.t]||[]){if(/annul/i.test(txt(c.Statut))||(txt(c.Devise)&&!/EUR/i.test(txt(c.Devise))))continue;
     const affs=(c.Affaire||[]).map(x=>finCle(x.value)).filter(Boolean);if(!affs.length)continue;
     const tot=+String(txt(c.Total)).replace(/\s/g,'').replace(',','.').replace(/[^\d.-]/g,'')||0;for(const a of affs)ak[a]=(ak[a]||0)+tot/affs.length}
-  return aff=>{const af=SD.AF[aff];const ach=Math.max(af?.achats||0,ak[aff]||0),base=Math.max(af?.cde||0,af?.ca||0);return{ach,taux:base?Math.min(1,ach/base):0,connu:ach>0}};
+  return aff=>{const af=SD.AF[aff];const ach=Math.max(af?.achats||0,ak[aff]||0,ff[aff]||0),base=Math.max(af?.cde||0,af?.ca||0);return{ach,taux:base?Math.min(1,ach/base):0,connu:ach>0}};
 }
 function finSeuil(X,m){
   const fixes=finFixes(X),tot=t=>fixes.filter(x=>!t||t.includes(x.t)).reduce((s,x)=>s+(+x.m||0),0);
