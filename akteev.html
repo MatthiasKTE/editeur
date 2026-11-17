@@ -2773,24 +2773,36 @@ async function finSauverDispo(){
 /* ---------- Comptabilité : factures fournisseurs à payer (17/11/2026) ----------
    Table 1318208. Filtres façon Axonaut : exercice en cours / N-1 / mois / période libre, sur la date de facture ou l'échéance. */
 let CPV=ls.get('compta',{per:'ex',base:'ech',st:'apayer',mode:'',q:'',grp:'mech',tri:'ech',sens:1,du:'',au:''});
+if(!CPV.o)CPV.o='ff';
+let FCV=ls.get('fcli',{per:'ex',base:'dt',st:'tout',q:'',grp:'mdt',tri:'dt',sens:-1,du:'',au:''});
+let FIN_MODE='fin';
+const CP_ONGLETS=[['ff','Factures fournisseurs'],['fc','Factures clients'],['ca','CA réalisé et comparatif N-1'],['situ','Situation mensuelle']];
+function cpOnglets(){return`<div class="card" style="margin-bottom:14px"><div class="onglets">${CP_ONGLETS.map(([k,n])=>`<button data-co="${k}" class="${CPV.o===k?'on':''}">${n}</button>`).join('')}</div></div>`}
+function cpBrancherOnglets(){document.querySelectorAll('.onglets button[data-co]').forEach(b=>b.onclick=()=>{CPV.o=b.dataset.co;ls.set('compta',CPV);dessinerComptaOnglet()})}
+function dessinerComptaOnglet(){
+  if(!CP_ONGLETS.some(x=>x[0]===CPV.o))CPV.o='ff';
+  if(CPV.o==='ff')return dessinerCompta();
+  if(CPV.o==='fc')return dessinerFactCli();
+  FIN_MODE='compta';FINV.o=CPV.o;dessinerFinance();
+}
 const CP_CHINE=/rogle|tengkoo|kingvow|ruichi|huanxing|xiang|nuocheng|dongguan|shenzhen/i;
 function cpMode(r){const c=String(r.Commentaire||''),f=String(r['Fournisseur lu']||'');
   if(/payée par la SG|Chine/i.test(c)||CP_CHINE.test(f)||(txt(r.Devise)&&txt(r.Devise)!=='EUR'))return'SG';
   if(r['ID Axonaut']||/^(déjà présente|créée)/i.test(txt(r['Saisie Axonaut'])))return'Swan';
   return'Autre'}
 const CP_MODES={Swan:'Swan (Axonaut)',SG:'SG (Chine)',Autre:'Hors Axonaut'};
-function cpPeriode(){const an=+auj().slice(0,4),p=CPV.per;
+function cpPeriode(V=CPV){const an=+auj().slice(0,4),p=V.per;
   if(p==='ex')return[`${an}-01-01`,`${an}-12-31`,`Exercice ${an}`];
   if(p==='n1')return[`${an-1}-01-01`,`${an-1}-12-31`,`Exercice ${an-1}`];
   if(p==='tout')return['0000','9999','Toutes périodes'];
-  if(p==='libre')return[CPV.du||'0000',CPV.au||'9999','Du '+(CPV.du?dfr(CPV.du):'…')+' au '+(CPV.au?dfr(CPV.au):'…')];
+  if(p==='libre')return[V.du||'0000',V.au||'9999','Du '+(V.du?dfr(V.du):'…')+' au '+(V.au?dfr(V.au):'…')];
   if(/^m\d\d$/.test(p)){const m=`${an}-${p.slice(1)}`;return[m+'-01',m+'-31',MOIS_LONG(m)]}
   return['0000','9999','']}
 async function vueCompta(){
   document.title='Akteev – Comptabilité';
-  if(!S.rows[MODS.ffact.t])chargement();
-  await charger(MODS.ffact.t);
-  dessinerCompta();
+  if(!S.rows[MODS.ffact.t]||!S.rows[T_STATS])chargement();
+  await Promise.all([charger(MODS.ffact.t),charger(T_STATS),charger(MODS.clients.t).catch(()=>[]),charger(MODS.commandes.t).catch(()=>[]),charger(MODS.cf.t).catch(()=>[])]);
+  dessinerComptaOnglet();
 }
 function dessinerCompta(){
   ls.set('compta',CPV);
@@ -2830,6 +2842,7 @@ function dessinerCompta(){
    #cpT th{cursor:pointer;user-select:none}#cpT tbody tr[data-id]{cursor:pointer}.cpPay{padding:2px 8px;font-size:12px}.cpPdf{font-weight:600}</style>
   <div class="entete"><h1>Comptabilité</h1><span class="sous">Factures fournisseurs · ${lib}</span>
    <div class="act"><button class="btn" id="cpCsv">${ico('cal')}Exporter (CSV)</button><button class="btn" id="cpMaj">Recharger</button></div></div>
+  ${cpOnglets()}
   <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
    ${kpi('',`Échues non payées`,ech,'echu')}${kpi('',`Échéance ≤ 7 jours`,sem,'sem')}${kpi('',`Reste ${MOIS_LONG(a.slice(0,7))}`,mois,'mois')}${kpi('',MOIS_LONG(mSuiv),suiv,'suiv')}${kpi('',`Total à payer`,NP,'tout')}</div>
   <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:-6px">
@@ -2847,7 +2860,7 @@ function dessinerCompta(){
    <tbody>${corps}</tbody><tfoot><tr><td colspan="4">Total</td><td class="n">${finE(L.reduce((s,x)=>s+x.ht,0))}</td><td class="n">${finE(som(L))}</td><td colspan="4"></td></tr></tfoot></table></div>
    ${L.length?'':'<div class="vide">Aucune facture pour ces critères</div>'}</div>
   <div style="color:var(--mut);font-size:12px;margin:8px 2px">* échéance estimée (non fournie par Axonaut ni lue sur la facture). Paiement : Swan = factures France saisies dans Axonaut ; SG = factures Chine ; hors Axonaut = prélèvements, cartes, etc.</div>`;
-  $('main').innerHTML=h;
+  $('main').innerHTML=h;cpBrancherOnglets();
   const set=(id,k,ev='onchange')=>{const e=$(id);if(e)e[ev]=()=>{CPV[k]=e.value;dessinerCompta()}};
   set('cpPer','per');set('cpBase','base');set('cpSt','st');set('cpMode','mode');set('cpGrp','grp');set('cpDu','du');set('cpAu','au');
   const qi=$('cpQ');let tq;qi.oninput=()=>{clearTimeout(tq);tq=setTimeout(()=>{CPV.q=qi.value;dessinerCompta();const n=$('cpQ');n.focus();n.setSelectionRange(n.value.length,n.value.length)},300)};
@@ -2868,8 +2881,72 @@ function dessinerCompta(){
     const c=['Échéance;Fournisseur;N° facture;Date facture;HT;TTC;Affaire;Paiement;Statut;PDF'].concat(L.map(x=>[x.ech,v(x.r['Fournisseur lu']),v(x.r['N° facture']),x.dt,n(x.ht),n(x.ttc),v(x.r['N° affaire']),CP_MODES[x.mode],x.st,v(x.r['Chemin fichier'])].join(';'))).join('\r\n');
     const u=URL.createObjectURL(new Blob(['﻿'+c],{type:'text/csv'})),l=document.createElement('a');l.href=u;l.download=`factures-fournisseurs-${lib.replace(/\W+/g,'-')}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(u),2000)};
 }
+/* Factures clients (Axonaut via Stats Axonaut 1277595 : [n°, date, id client, client, affaire, objet, HT, TTC, reste, échéance, payée le, commercial, id]) */
+function dessinerFactCli(){
+  ls.set('fcli',FCV);
+  const a=auj(),an=+a.slice(0,4),[d1,d2,lib]=cpPeriode(FCV),q=FCV.q.trim().toLowerCase();
+  const toutes=[];for(const r of S.rows[T_STATS]||[]){const m=txt(r.Mois);if(!/^\d{4}-\d{2}$/.test(m))continue;
+    for(const x of finJ(r.Factures)||[])toutes.push({num:x[0],dt:x[1]||'',cli:x[3]||'',aff:x[4]||'',obj:x[5]||'',ht:+x[6]||0,ttc:+x[7]||0,reste:+x[8]||0,ech:x[9]||x[1]||'',paye:x[10]||'',com:x[11]||'',id:x[12]})}
+  const etat=x=>x.reste<=0.005?'Payée':x.ech&&x.ech<a?'En retard':'À échoir';
+  for(const x of toutes)x.st=etat(x);
+  const dansPer=x=>{const d=FCV.base==='ech'?x.ech:x.dt;return d&&d>=d1&&d<=d2+'~'};
+  const okSt=x=>FCV.st==='tout'||(FCV.st==='du'?x.st!=='Payée':FCV.st==='payee'?x.st==='Payée':x.st==='En retard');
+  const okQ=x=>!q||[x.num,x.cli,x.aff,x.obj,x.com].some(v=>String(v||'').toLowerCase().includes(q));
+  const L=toutes.filter(x=>dansPer(x)&&okSt(x)&&okQ(x));
+  const som=(l,k='ht')=>l.reduce((s,x)=>s+x[k],0);
+  const P=toutes.filter(dansPer),du=toutes.filter(x=>x.st!=='Payée'),ret=toutes.filter(x=>x.st==='En retard');
+  const kpi=(t,v,det,k)=>`<div class="card cpk" data-k="${k||''}"><div class="lab">${t}</div><div class="val">${finE(v)}</div><div class="det">${det}</div></div>`;
+  const cle={dt:x=>x.dt,num:x=>x.num,cli:x=>x.cli.toLowerCase(),aff:x=>x.aff,ht:x=>x.ht,ttc:x=>x.ttc,ech:x=>x.ech,reste:x=>x.reste,st:x=>x.st,com:x=>x.com};
+  const k=cle[FCV.tri]||cle.dt;L.sort((x,y)=>{const u=k(x),v=k(y);return(u<v?-1:u>v?1:0)*FCV.sens});
+  const gk={mdt:x=>x.dt.slice(0,7),mech:x=>x.ech.slice(0,7),cli:x=>x.cli||'—',com:x=>x.com||'—'}[FCV.grp];
+  const lG=s=>/^\d{4}-\d\d$/.test(s)?MOIS_LONG(s):s;
+  const col=[['dt','Date'],['num','N° facture'],['cli','Client'],['aff','Affaire'],['ht','HT',1],['ttc','TTC',1],['ech','Échéance'],['reste','Reste dû',1],['st','Statut'],['com','Commercial']];
+  const ligne=x=>`<tr><td>${dfr(x.dt)}</td><td class="prim">${esc(x.num)}</td><td>${esc(x.cli)}</td><td>${esc(x.aff)}</td><td class="n">${finE(x.ht)}</td><td class="n">${finE(x.ttc)}</td>
+    <td style="${x.st==='En retard'?'color:var(--rouge,#C62828);font-weight:600':''}">${dfr(x.ech)}</td><td class="n">${x.reste>0.005?finE(x.reste):'<span class="mut">—</span>'}</td>
+    <td>${x.st==='Payée'?`Payée${x.paye?' le '+dfr(x.paye):''}`:esc(x.st)}</td><td class="mut">${esc(x.com)}</td></tr>`;
+  let corps='';
+  if(gk){const G=new Map();for(const x of L){const g=gk(x);if(!G.has(g))G.set(g,[]);G.get(g).push(x)}
+    const cles=[...G.keys()];if(FCV.grp==='cli'||FCV.grp==='com')cles.sort((u,v)=>som(G.get(v))-som(G.get(u)));
+    for(const g of cles){const l=G.get(g);corps+=`<tr class="cpG"><td colspan="4">${esc(lG(g))} <span style="color:var(--mut);font-weight:400">· ${l.length}</span></td><td class="n">${finE(som(l))}</td><td class="n">${finE(som(l,'ttc'))}</td><td></td><td class="n">${finE(som(l,'reste'))}</td><td colspan="2"></td></tr>`+l.map(ligne).join('')}}
+  else corps=L.map(ligne).join('');
+  const opt=(v,t,c)=>`<option value="${v}" ${c===v?'selected':''}>${t}</option>`;
+  const moisEx=Array.from({length:12},(_,i)=>`m${String(i+1).padStart(2,'0')}`);
+  let h=`<style>.cpk{padding:14px 16px;cursor:pointer}.cpk .lab{color:var(--mut);font-size:12.5px}.cpk .val{font-size:22px;font-weight:700;margin-top:4px}.cpk .det{color:var(--mut);font-size:12px;margin-top:2px}
+   .cpf{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 14px}.cpf select,.cpf input{border:1px solid var(--trait);border-radius:6px;padding:5px 8px;font-size:13px;background:#fff}
+   .cpf label{font-size:12px;color:var(--mut);display:flex;flex-direction:column;gap:2px}tr.cpG td{background:#F4F6FA;font-weight:600}#fcT th{cursor:pointer;user-select:none}</style>
+  <div class="entete"><h1>Comptabilité</h1><span class="sous">Factures clients · ${lib}</span>
+   <div class="act"><button class="btn" id="fcCsv">${ico('cal')}Exporter (CSV)</button><button class="btn" id="fcMaj">Recharger</button></div></div>
+  ${cpOnglets()}
+  <div class="kpis" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+   ${kpi(`Facturé HT · ${lib}`,som(P),`${P.length} facture${P.length>1?'s':''} · ${finE(som(P,'ttc'))} TTC`,'per')}
+   ${kpi('Reste à encaisser (TTC)',som(du,'reste'),`${du.length} facture${du.length>1?'s':''} · toutes périodes`,'du')}
+   ${kpi('Échu non encaissé (TTC)',som(ret,'reste'),`${ret.length} facture${ret.length>1?'s':''} en retard`,'retard')}
+   ${kpi('À échoir (TTC)',som(du,'reste')-som(ret,'reste'),'échéance à venir','du')}</div>
+  <div class="card cpf">
+   <label>Période<select id="fcPer">${opt('ex',`Exercice en cours (${an})`,FCV.per)}${opt('n1',`Exercice N-1 (${an-1})`,FCV.per)}<optgroup label="Mois de l'exercice ${an}">${moisEx.map(m=>opt(m,MOIS_LONG(`${an}-${m.slice(1)}`),FCV.per)).join('')}</optgroup>${opt('libre','Période personnalisée',FCV.per)}${opt('tout','Toutes périodes',FCV.per)}</select></label>
+   ${FCV.per==='libre'?`<label>Du<input type="date" id="fcDu" value="${FCV.du}"></label><label>Au<input type="date" id="fcAu" value="${FCV.au}"></label>`:''}
+   <label>Date de référence<select id="fcBase">${opt('dt','Date de facture',FCV.base)}${opt('ech','Échéance',FCV.base)}</select></label>
+   <label>Statut<select id="fcSt">${opt('tout','Toutes',FCV.st)}${opt('du','Reste dû',FCV.st)}${opt('retard','En retard',FCV.st)}${opt('payee','Payées',FCV.st)}</select></label>
+   <label>Regrouper par<select id="fcGrp">${opt('','Aucun',FCV.grp)}${opt('mdt','Mois de facture',FCV.grp)}${opt('mech',"Mois d'échéance",FCV.grp)}${opt('cli','Client',FCV.grp)}${opt('com','Commercial',FCV.grp)}</select></label>
+   <label style="flex:1;min-width:180px">Recherche<input id="fcQ" placeholder="Client, n°, affaire, commercial…" value="${esc(FCV.q)}"></label>
+   <div style="margin-left:auto;text-align:right"><div style="font-size:12px;color:var(--mut)">${L.length} facture${L.length>1?'s':''}</div><div style="font-weight:700">${finE(som(L))} HT</div><div style="font-size:12px;color:var(--mut)">${finE(som(L,'ttc'))} TTC · reste ${finE(som(L,'reste'))}</div></div></div>
+  <div class="card" style="padding:0"><div class="tw"><table class="l" id="fcT"><thead><tr>${col.map(([c,t,n])=>`<th data-c="${c}" class="${n?'n':''}">${t}${FCV.tri===c?(FCV.sens>0?' ▲':' ▼'):''}</th>`).join('')}</tr></thead>
+   <tbody>${corps}</tbody><tfoot><tr><td colspan="4">Total</td><td class="n">${finE(som(L))}</td><td class="n">${finE(som(L,'ttc'))}</td><td></td><td class="n">${finE(som(L,'reste'))}</td><td colspan="2"></td></tr></tfoot></table></div>
+   ${L.length?'':'<div class="vide">Aucune facture pour ces critères</div>'}</div>
+  <div style="color:var(--mut);font-size:12px;margin:8px 2px">Source : factures Axonaut (avoirs inclus en négatif), synchronisées par la tâche « Stats Axonaut → Akteev ».</div>`;
+  $('main').innerHTML=h;cpBrancherOnglets();
+  const set=(id,k)=>{const e=$(id);if(e)e.onchange=()=>{FCV[k]=e.value;dessinerFactCli()}};
+  set('fcPer','per');set('fcBase','base');set('fcSt','st');set('fcGrp','grp');set('fcDu','du');set('fcAu','au');
+  const qi=$('fcQ');let tq;qi.oninput=()=>{clearTimeout(tq);tq=setTimeout(()=>{FCV.q=qi.value;dessinerFactCli();const n=$('fcQ');n.focus();n.setSelectionRange(n.value.length,n.value.length)},300)};
+  document.querySelectorAll('#fcT th[data-c]').forEach(th=>th.onclick=()=>{const c=th.dataset.c;FCV.sens=FCV.tri===c?-FCV.sens:1;FCV.tri=c;dessinerFactCli()});
+  document.querySelectorAll('.cpk').forEach(e=>e.onclick=()=>{const k=e.dataset.k;FCV.q='';if(k==='du'){FCV.st='du';FCV.per='tout'}else if(k==='retard'){FCV.st='retard';FCV.per='tout'}else FCV.st='tout';dessinerFactCli()});
+  $('fcMaj').onclick=async()=>{await charger(T_STATS,true);dessinerFactCli();toast('Données rechargées')};
+  $('fcCsv').onclick=()=>{const v=s=>`"${String(s??'').replace(/"/g,'""')}"`,n=x=>String((+x||0).toFixed(2)).replace('.',',');
+    const c=['Date;N° facture;Client;Affaire;Objet;HT;TTC;Échéance;Reste dû;Statut;Payée le;Commercial'].concat(L.map(x=>[x.dt,v(x.num),v(x.cli),v(x.aff),v(x.obj),n(x.ht),n(x.ttc),x.ech,n(x.reste),x.st,x.paye,v(x.com)].join(';'))).join('\r\n');
+    const u=URL.createObjectURL(new Blob(['﻿'+c],{type:'text/csv'})),l=document.createElement('a');l.href=u;l.download=`factures-clients-${lib.replace(/\W+/g,'-')}.csv`;l.click();setTimeout(()=>URL.revokeObjectURL(u),2000)};
+}
 async function vueFinance(){
-  document.title='Akteev – Analyse financière';
+  document.title='Akteev – Analyse financière';FIN_MODE='fin';
   if(!S.rows[T_STATS])chargement();
   await Promise.all([charger(T_STATS),charger(MODS.clients.t).catch(()=>[]),charger(MODS.commandes.t).catch(()=>[]),charger(MODS.cf.t).catch(()=>[]),charger(MODS.ffact.t).catch(()=>[])]);
   const pd=finDonnees().pa.dispo;if(MOI&&pd?.[MOI]&&!Object.keys(FINV.dispo||{}).length)FINV.dispo=pd[MOI];
@@ -2893,9 +2970,12 @@ function dessinerFinance(){
   const aFact=m=>CM.L.filter(o=>o.mFact===m).reduce((s,o)=>s+o.reste,0);
   const resteAn=CM.L.filter(o=>o.mFact<=`${an}-12`).reduce((s,o)=>s+o.reste,0),prevAn=ytd+resteAn;
   const TR=finTreso(X,CM,FF);
-  const ong=[['ca','CA et comparatif N-1'],['prev','CA prévisionnel'],['situ','Situation mensuelle'],['treso','Trésorerie prévisionnelle'],['seuil','Seuil de rentabilité']];
-  const o=ong.some(x=>x[0]===FINV.o)?FINV.o:'ca';
-  let h=`<div class="entete"><h1>Analyse financière ${an}</h1><span class="sous">Axonaut mis à jour le ${dtfr(X.maj)||'—'}${X.sx?` · dernière situation Sorex : fin ${MOIS_LONG(X.sx.dernier)}`:''}</span>
+  const CPT=FIN_MODE==='compta';
+  const ong=CPT?[['ca','CA réalisé et comparatif N-1'],['situ','Situation mensuelle']]:[['prev','CA prévisionnel'],['treso','Trésorerie prévisionnelle'],['seuil','Seuil de rentabilité']];
+  const o=ong.some(x=>x[0]===FINV.o)?FINV.o:ong[0][0];
+  let h=CPT?`<div class="entete"><h1>Comptabilité</h1><span class="sous">${o==='ca'?'CA réalisé et comparatif N-1':'Situation mensuelle'} · Axonaut mis à jour le ${dtfr(X.maj)||'—'}${X.sx?` · dernière situation Sorex : fin ${MOIS_LONG(X.sx.dernier)}`:''}</span>
+    <div class="act"><button class="btn ${FINV.perso?'p':''}" id="fiPerso">${FINV.perso?'✓ Terminer':ico('crayon')+'Personnaliser la page'}</button><button class="btn" id="fiMaj">${ico('cal')}Recharger</button></div></div>
+  ${cpOnglets()}<div id="fiG">`:`<div class="entete"><h1>Analyse financière ${an}</h1><span class="sous">Axonaut mis à jour le ${dtfr(X.maj)||'—'}${X.sx?` · dernière situation Sorex : fin ${MOIS_LONG(X.sx.dernier)}`:''}</span>
     <div class="act"><button class="btn ${FINV.perso?'p':''}" id="fiPerso">${FINV.perso?'✓ Terminer':ico('crayon')+'Personnaliser la page'}</button><button class="btn" id="fiMaj">${ico('cal')}Recharger</button></div></div>
   <div class="kpis">
    <div class="card kpi" data-o="ca"><div class="lab">${ico('euro')}CA ${MOIS_LONG(mc)} (au ${jour})</div><div class="val">${finK(caMc)}</div><div class="det">N-1 au même jour ${finK(caMcN1J)} · ${finEcart(caMc,caMcN1J)}<br>N-1 mois complet ${finK(caMcN1)}</div></div>
@@ -2905,6 +2985,7 @@ function dessinerFinance(){
    <div class="card kpi" data-o="treso"><div class="lab">${ico('cle')}Trésorerie</div><div class="val">${TR?finK(TR.comptes):'—'}</div><div class="det">${TR?`sur les comptes · + compte à terme ${finK(TR.cat)}<br>comptes prévus fin ${MOIS_LONG(finMoisPlus(mc,1)).split(' ')[0]} : <b>${finK((TR.auMois(finMoisPlus(mc,1))??TR.soldes[TR.NS-1].fin)-TR.cat)}</b>`:'en attente de la synchronisation'}</div></div>
   </div>
   <div class="card"><div class="onglets">${ong.map(([k,n])=>`<button data-o="${k}" class="${o===k?'on':''}">${n}</button>`).join('')}</div></div><div id="fiG">`;
+  if(CPT)FINV.o=o;
   // ----- CA et comparatif N-1
   if(o==='ca'){
     const L=moisAn.map(m=>{const ca=m<=mc?X.caM(m):0,ca1=X.caM(n1(m)),pr=m>=mc?aFact(m):0;return{m,ca,ca1,pr,fut:m>mc}});
@@ -3001,7 +3082,10 @@ function dessinerFinance(){
   $('fiPerso').onclick=()=>{const fin=FINV.perso;FINV.perso=!fin;ls.set('fin',FINV);dessinerFinance();if(fin)finSauverDispo()};
   if(o==='seuil')finBrancherSeuil();
   document.querySelectorAll('#main tr[data-h]').forEach(tr=>tr.onclick=()=>location.hash=tr.dataset.h);
-  document.querySelectorAll('.onglets button[data-o],.kpi[data-o]').forEach(b=>b.onclick=()=>{FINV.o=b.dataset.o;ls.set('fin',FINV);dessinerFinance()});
+  if(CPT)cpBrancherOnglets();
+  document.querySelectorAll('.onglets button[data-o],.kpi[data-o]').forEach(b=>b.onclick=()=>{const k=b.dataset.o;
+    if(!CPT&&(k==='ca'||k==='situ')){CPV.o=k;ls.set('compta',CPV);location.hash='#/compta';return}
+    FINV.o=k;ls.set('fin',FINV);dessinerFinance()});
   const sel=$('fiSm');if(sel)sel.onchange=()=>{FINV.sm=sel.value;ls.set('fin',FINV);dessinerFinance()};
   const bF=$('fiFiger');if(bF)bF.onclick=async()=>{const m=$('fiSm').value;if(!confirm(`Figer la situation de ${MOIS_LONG(m)} avec les données actuelles ?`))return;bF.disabled=true;
     try{await finFiger(m);toast('Situation de '+MOIS_LONG(m)+' figée');dessinerFinance()}catch(e){toast('Échec : '+e.message,true);bF.disabled=false}};
