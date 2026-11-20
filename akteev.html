@@ -3015,7 +3015,7 @@ function dessinerFactEditeur(){
    @media print{body *{visibility:hidden}.feP,.feP *{visibility:visible}.feP{position:absolute;left:0;top:0;box-shadow:none;padding:12mm}.ecran{display:none}.feP input,.feP textarea{border:0;background:none}}
   </style>
   <div class="entete ecran"><h1>Édition des factures</h1><span class="sous">Facture ${FEV.i+1} / ${n} · ${esc(b.aff)} · ${esc(b.client)}</span>
-   <div class="act"><button class="btn" id="feRet">← Liste</button><button class="btn" id="fePrec" ${FEV.i?'':'disabled'}>Précédente</button><button class="btn" id="feIgn">Ignorer</button><button class="btn p" id="feVal">${ico('arc')}Valider pour Axonaut${FEV.i<n-1?' et suivante →':''}</button></div></div>
+   <div class="act"><button class="btn" id="feRet">← Liste</button><button class="btn" id="fePrec" ${FEV.i?'':'disabled'}>Précédente</button><button class="btn" id="feIgn">Ignorer</button><button class="btn p" id="feVal">${ico('arc')}Créer dans Axonaut${FEV.i<n-1?' et suivante →':''}</button></div></div>
   ${avert.length?`<div class="ecran" style="max-width:794px;margin:0 auto 10px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#9A3412">${avert.map(esc).join('<br>')}</div>`:''}
   ${ec.length?`<div class="ecran" style="max-width:794px;margin:0 auto 10px;background:#FEF2F2;border:1px solid #FCA5A5;border-radius:8px;padding:8px 12px;font-size:12.5px;color:#991B1B"><b>Prix à valider (ARC / commande)</b><br>${ec.map(esc).join('<br>')}<label style="display:block;margin-top:6px;font-weight:600"><input type="checkbox" id="feEcOk" ${b.ecartValide?'checked':''}> Je valide ces écarts</label></div>`:''}
   <div class="ecran" style="max-width:794px;margin:0 auto 6px;font-size:12px;color:var(--mut)">Conditions de paiement : ${esc(b.condSrc||'')}</div>
@@ -3051,7 +3051,7 @@ function dessinerFactEditeur(){
     const T2=feTot(b);if(!confirm(`Valider la facture ${b.aff} – ${b.client} : ${eur(T2.ht)} HT (${eur(T2.ttc)} TTC), échéance ${dfr(b.due)} ?\nElle sera créée dans Axonaut (numéro définitif).`))return;
     $('feVal').disabled=true;
     try{await finEcrire('FACT-'+b.aff,{statut:'À créer',prepare_le:new Date().toISOString(),par:MOI||null,brouillon:b,axonaut:fePayload(b),total:T2});
-      toast(`Facture ${b.aff} validée`);FEV.i++;if(FEV.i>=n){FEV.mode='';FEV.sel=[];return dessinerFactEdit()}dessinerFactEditeur()}
+      let num='';try{const v=await fePasserelle('/axonaut/facture/',{method:'POST',body:JSON.stringify({cle:'FACT-'+b.aff})});num=v.numero;toast(`Facture ${v.numero} créée dans Axonaut (${b.aff})${v.ecart?' – ATTENTION : '+v.ecart:''}`,!!v.ecart)}catch(e){toast(`Facture ${b.aff} validée mais non créée dans Axonaut : ${e.message} – utilisez « Créer dans Axonaut » dans la liste`,true)}await charger(T_STATS,true);FEV.i++;if(FEV.i>=n){FEV.mode='';FEV.sel=[];return dessinerFactEdit()}dessinerFactEditeur()}
     catch(e){toast('Échec : '+e.message,true);$('feVal').disabled=false}};
 }
 
