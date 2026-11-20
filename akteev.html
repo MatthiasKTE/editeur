@@ -2946,8 +2946,9 @@ function feBrouillon(x){
   const totArc=la.reduce((s,l)=>s+(+l['Quantité']||0)*(+l['Prix unitaire HT']||0),0);
   const pays=txt(x.cli?.Pays),tva=!pays||/france/i.test(pays)?20:0;
   const condArc=arcs.map(a=>String(a['Conditions de règlement']||'').trim()).find(Boolean);
-  const cond=condArc?'<p>'+esc(condArc).replace(/\n/g,'<br>')+'</p>':pa.pt||'<p>100% à la livraison<br>Par virement bancaire à 30 jours nets</p>';
-  const condSrc=condArc?'conditions de l\'ARC / commande':pa.pt?'dernière facture Axonaut du client (pas de conditions sur l\'ARC)':'par défaut (aucune condition trouvée)';
+  const rg=(feParam().regles||{})[cid];
+  const cond=rg?'<p>'+esc(rg.conditions).replace(/\n/g,'<br>')+'</p>':condArc?'<p>'+esc(condArc).replace(/\n/g,'<br>')+'</p>':pa.pt||'<p>100% à la livraison<br>Par virement bancaire à 30 jours nets</p>';
+  const condSrc=rg?'règle enregistrée pour ce client'+(rg.par?' – '+rg.par:''):condArc?'conditions de l\'ARC / commande':pa.pt?'dernière facture Axonaut du client (pas de conditions sur l\'ARC)':'par défaut (aucune condition trouvée)';
   const ech=feEcheance(date,cond);
   const cde=String(x.c['N° Cde Client']||x.bls.map(b=>b['N° commande client']).find(Boolean)||'').trim();
   const blTxt=x.bls.map(b=>`${b['N° BL']}${b.Date?' du '+dfr(b.Date):''}`).join(', ');
@@ -3030,6 +3031,7 @@ function dessinerFactEditeur(){
    <div class="ecran" style="margin:6px 0"><button class="btn" id="feAj">+ Ligne</button></div>
    <table class="tot" style="width:46%;margin-left:54%;margin-top:8px"><tr><td>Total HT</td><td class="n" style="text-align:right">${eur(T.ht)}</td></tr><tr><td>TVA ${b.tva} %</td><td style="text-align:right">${eur(T.tva)}</td></tr><tr style="font-weight:700;border-top:1px solid #CCC"><td>Total TTC</td><td style="text-align:right">${eur(T.ttc)}</td></tr></table>
    <div style="margin-top:14px"><b>Conditions de paiement</b><textarea id="feCond" rows="2" style="width:100%;margin-top:3px">${esc(String(b.cond).replace(/<br\s*\/?>/g,'\n').replace(/<[^>]+>/g,'').replace(/&agrave;/g,'à').replace(/&nbsp;/g,' ').trim())}</textarea></div>
+   <div class="ecran" style="margin-top:4px"><button class="btn" id="feMem" title="Ces conditions seront reprises pour toutes les prochaines factures de ce client, à la place de celles de l'ARC">Mémoriser ces conditions pour ce client</button></div>
    <div class="mut" style="margin-top:10px;font-size:10px">Aperçu Akteev : la facture définitive est mise en page par Axonaut (modèle habituel ${FE_THEME}).</div>
   </div>`;
   $('main').innerHTML=h;
@@ -3039,6 +3041,7 @@ function dessinerFactEditeur(){
   $('feDate').onchange=()=>{lire();const r=feEcheance(b.date,b.cond);b.due=r.d;b.regle=r.regle;dessinerFactEditeur()};
   $('feCond').onchange=()=>{lire();const r=feEcheance(b.date,b.cond);b.due=r.d;b.regle=r.regle;dessinerFactEditeur()};
   document.querySelectorAll('.feSup').forEach(e=>e.onclick=()=>{lire();b.lignes.splice(+e.dataset.i,1);dessinerFactEditeur()});
+  $('feMem').onclick=async()=>{lire();if(!b.company_id)return toast('Client sans ID Axonaut',true);const txtc=$('feCond').value.trim();if(!confirm(`Mémoriser pour ${b.client} les conditions :\n${txtc}\n(prioritaires sur l'ARC pour les prochaines factures)`))return;const P=feParam();P.regles=P.regles||{};P.regles[b.company_id]={nom:b.client,conditions:txtc,le:new Date().toISOString(),par:'Akteev'};await finEcrire('FACT-PARAM',P);b.condSrc='règle enregistrée pour ce client';toast('Conditions mémorisées pour '+b.client);dessinerFactEditeur()};
   $('feAj').onclick=()=>{lire();b.lignes.push({nom:'',qte:1,pu:0});dessinerFactEditeur()};
   $('feRet').onclick=()=>{lire();FEV.mode='';dessinerFactEdit()};
   $('fePrec').onclick=()=>{lire();FEV.i--;dessinerFactEditeur()};
