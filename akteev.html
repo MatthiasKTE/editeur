@@ -2914,6 +2914,17 @@ async function feCharger(){
   if(!S.rows[T_LARC])S.rows[T_LARC]=await tout(T_LARC);
   if(!S.rows[1261171])S.rows[1261171]=await tout(1261171);
 }
+/* Livraison totale : chaque ligne d'ARC est entièrement livrée par les BL validés / expédiés (quantités cumulées, par Rep puis désignation).
+   Sans ARC : mêmes contrôles sur les lignes du devis ; sans devis : toutes les lignes des BL ont un reste à livrer nul. Sans aucune ligne de BL : statut « Livrée » de la commande. */
+function feLivreeTotale(c,bls){
+  const n=s=>String(s||'').trim().toLowerCase();
+  const lb=(S.rows[T_LBL]||[]).filter(l=>ids(l.BL).some(i=>bls.some(b=>b.id===i)));
+  if(!lb.length)return txt(c.Statut)==='Livrée';
+  const arcs=ids(c.ARC);let la=(S.rows[T_LARC]||[]).filter(l=>ids(l.ARC).some(i=>arcs.includes(i)));
+  if(!la.length){const dv=ids(c.Devis);la=(S.rows[1261171]||[]).filter(l=>ids(l.Devis).some(i=>dv.includes(i)))}
+  if(la.length)return la.every(a=>{const liv=lb.filter(l=>(a.Rep!=null&&l.Rep!=null)?+l.Rep===+a.Rep:n(l.Description)===n(a.Description)).reduce((s,l)=>s+(+l['Quantité livrée']||0),0);return liv>=(+a['Quantité']||0)-1e-9});
+  return lb.every(l=>(+l.Reste||0)<=0);
+}
 /* Affaires livrées non facturées */
 function feListe(){
   const X=finDonnees(),file=feFile(),out=[];
@@ -2924,6 +2935,7 @@ function feListe(){
     if(st!=='Livrée'&&!bls.length)continue;
     const k=feAff(c),mt=+c['Montant HT (€)']||0,fa=X.factAff[k]||0;
     if(mt?mt-fa<=1:fa>0)continue;
+    if(!feLivreeTotale(c,bls))continue; // 23/11/2026 (Matthias) : pas de facturation des livraisons partielles pour le moment
     const cli=(S.rows[MODS.clients.t]||[]).find(x=>x.id===ids(c.Client)[0]);
     out.push({c,k,cli,bls,mt,fa,reste:mt-fa,ctr:contrats[k],livr:bls.map(b=>b.Date).filter(Boolean).sort().pop()||feMois(c['Date Livraison']),q:file[k]});
   }
