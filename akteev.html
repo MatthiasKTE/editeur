@@ -448,7 +448,7 @@ const MODS={
  devis:{t:1261170,nom:'Devis',un:'devis',ico:'devis',grp:'Ventes',cols:['N° devis','Client','Objet','Référent KTE','Date','Total HT','Statut','Réponses SST','PDF'],statut:'Statut',date:'Date',ref:'Référent KTE',editeur:'devis',num:'N° devis',
    liees:[{nom:'Lignes',t:1261171,lien:'Devis',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'},{nom:'Consultations SST',mod:'consult',lien:'Devis',ajout:true},{nom:'Commande',mod:'commandes',lien:'Devis'}],cacheStatuts:['Accepté','Refusé','Annulé'],solde:['Accepté','Refusé','Annulé'],soldeVerbe:'clôturer'},
  commandes:{t:1260240,nom:'Commandes',un:'commande',fem:true,ico:'commandes',grp:'Ventes',cols:['N° affaire','Client','Objet','N° Cde Client','Référent KTE','Date Livraison','Montant HT (€)','Statut'],statut:'Statut',date:'Date Livraison',ref:'Référent KTE',num:'N° affaire',
-   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Charges machines',mod:'plan',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'Factures fournisseurs',mod:'ffact',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Soldée','Annulée']},
+   liees:[{nom:'Tâches',mod:'taches',lien:'Commande',ajout:true},{nom:'Synthèse pièces',mod:'synthese',lien:'Affaire',ajout:true},{nom:'Charges machines',mod:'plan',lien:'Affaire',ajout:true},{nom:'Commandes fournisseurs',mod:'cf',lien:'Affaire'},{nom:'Factures fournisseurs',mod:'ffact',lien:'Affaire'},{nom:'ARC',mod:'arc',lien:'Affaire'},{nom:'BL',mod:'bl',lien:'Affaire'},{nom:'Non-conformités',mod:'nc',lien:'Affaire',ajout:true},{nom:'Devis',mod:'devis',lien:'Commande'}],cacheStatuts:['Livrée','Soldée','Annulée'],libCache:'livrées / soldées / annulées / facturées'},
  arc:{t:1261374,nom:'ARC',un:'ARC',ico:'arc',grp:'Ventes',cols:['N° ARC','Client','Affaire','Objet','Date','Total HT','Statut','PDF'],statut:'Statut',date:'Date',editeur:'arc',num:'N° ARC',
    liees:[{nom:'Lignes',t:1261373,lien:'ARC',cols:['Description','Quantité','Prix unitaire HT'],ordre:'Ordre'}]},
  bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut','PDF'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
@@ -658,7 +658,7 @@ function dessinerMenu(){
 function majMoi(){const R=S.rows[MODS.referents.t];if(!R)return;const s=$('moi');s.innerHTML='<option value="">— choisir —</option>'+R.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('');s.value=MOI||''}
 function majCompteurs(){
   for(const k of ['devis','commandes','taches']){const m=MODS[k],R=S.rows[m.t],e=$('nb_'+k);if(!R||!e)continue;
-    const n=k==='taches'?R.filter(r=>tacheOuverte(r)&&r['Échéance']&&r['Échéance']<auj()).length:k==='devis'?R.filter(devisEnCours).length:R.filter(r=>txt(r.Statut)==='Commandé').length;
+    const n=k==='taches'?R.filter(r=>tacheOuverte(r)&&r['Échéance']&&r['Échéance']<auj()).length:k==='devis'?R.filter(devisEnCours).length:R.filter(cmdOuverte).length;
     e.textContent=n||'';e.title=k==='taches'?'tâches en retard':'en cours'}
   const eD=$('nb_ddp'),RD=S.rows[MODS.devis.t],RC=S.rows[MODS.consult.t];
   if(eD&&RD&&RC){const L=ddpListe(RD,RC),n=L.filter(x=>x.etat==='complet').length;eD.textContent=L.length||'';eD.title=n?n+' DDP avec toutes les réponses sur '+L.length+' en cours':L.length+' DDP en cours'}
@@ -712,12 +712,13 @@ async function vueAccueil(){
   document.title='Akteev – Tableau de bord';
   if(!S.rows[MODS.devis.t])chargement();
   const ch=k=>peutVoir(k)?charger(MODS[k].t).catch(()=>[]):Promise.resolve([]);
-  const [D,C,T,CS,NC]=await Promise.all([ch('devis'),ch('commandes'),ch('taches'),ch('consult'),ch('nc')]);
+  const [D,C,T,CS,NC]=await Promise.all([ch('devis'),ch('commandes'),ch('taches'),ch('consult'),ch('nc'),peutVoir('commandes')?charger(T_STATS).catch(()=>[]):0]);
+  devisAnnulerEchus().catch(e=>console.warn(e));
   const ncO=NC.filter(ncOuverte),ncAn=NC.filter(r=>!/annul/i.test(txt(r.Statut))&&String(r['Date de détection']||'').startsWith(auj().slice(0,4)));
   const DDP=peutVoir('consult')?ddpListe(D,CS):[],dPr=DDP.filter(x=>x.etat==='complet').length,dPa=DDP.filter(x=>x.etat==='partiel').length;
   const vD=peutVoir('devis')&&montants(),vC=peutVoir('commandes'),vM=montants();
   const a=auj(),an=a.slice(0,4),mois=a.slice(0,7);
-  const dEC=D.filter(devisEnCours),cEC=C.filter(r=>txt(r.Statut)==='Commandé');
+  const dEC=D.filter(devisEnCours),cEC=C.filter(cmdOuverte);
   const mesT=T.filter(r=>tacheOuverte(r)&&(!MOI||ids(r['Référent']).includes(MOI)));
   const tRet=mesT.filter(r=>r['Échéance']&&r['Échéance']<a);
   const dateCde=r=>(r['Date cde client']||r['Date réception']||'').slice(0,10);
@@ -851,6 +852,48 @@ async function ddpDetecterEnvois(){
       toast(`${num} envoyé le ${new Date(trouve.sentDateTime).toLocaleDateString('fr-FR')} (« ${trouve.subject} ») : statut « Envoyé »`)}
     catch(e){console.warn('statut',num,e.message)}}
   return n}
+/* ---------- Règles de sortie des listes (Matthias, 23/11/2026) ----------
+   Commandes : sortent de la liste (comme Soldée / Annulée) dès qu'elles sont Livrée ou Soldée, ou facturées en totalité
+   dans Axonaut (factures de la table Stats Axonaut T_STATS dont le n° d'affaire = N° affaire, cumul HT ≥ Montant HT − 1 €).
+   Elles restent trouvables par la recherche, les filtres et « Afficher livrées / soldées / annulées / facturées ».
+   Devis : un devis Envoyé sans commande ni ARC passe à Annulé après 4 semaines (< 10 000 € HT) ou 8 semaines
+   (≥ 10 000 € HT), comptées depuis la plus récente des dates Date / Validé le / « Réactivé le jj/mm/aaaa » du
+   Commentaire interne. Fait dans Akteev à l'ouverture (tableau de bord, liste des devis) par une personne qui peut
+   écrire les devis, au plus toutes les 10 min ; aucune tâche planifiée. Rien n'est supprimé : puce « Annulé » de la
+   liste des devis, bouton « Réactiver le devis » de la fiche (statut Envoyé, ligne « Réactivé le … », délai reparti). */
+let CMD_FACT=null,CMD_FACT_SRC=null;
+function cmdFactures(){const R=S.rows[T_STATS];if(!R)return null;if(CMD_FACT_SRC===R)return CMD_FACT;const F={};
+  for(const r of R){if(!/^(\d{4}-\d{2}$|Avant )/.test(txt(r.Mois)))continue;let L=[];try{L=JSON.parse(r.Factures||'[]')}catch(e){}
+    if(Array.isArray(L))for(const l of L){const a=String(l?.[4]||'').toUpperCase();if(a)F[a]=(F[a]||0)+(+l[6]||0)}}
+  CMD_FACT_SRC=R;CMD_FACT=F;return F}
+function cmdFacturee(r){const F=cmdFactures(),mt=+r['Montant HT (€)']||0;if(!F||mt<=0)return false;
+  const f=F[String(txt(r['N° affaire'])).trim().split(/\s+/)[0].toUpperCase()];return f!=null&&f>=mt-1}
+function cmdOuverte(r){return txt(r.Statut)==='Commandé'&&!cmdFacturee(r)}
+const DEV_EXP={seuil:10000,petit:28,grand:56};
+function devisRefExp(r){const re=[...String(txt(r['Commentaire interne'])||'').matchAll(/Réactivé le (\d{2})\/(\d{2})\/(\d{4})/g)].map(x=>`${x[3]}-${x[2]}-${x[1]}`);
+  return [String(txt(r.Date)).slice(0,10),String(txt(r['Validé le'])).slice(0,10),...re].filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)).sort().pop()||''}
+function devisEchu(r){if(txt(r.Statut)!=='Envoyé'||ids(r.Commande).length||ids(r.ARC).length)return null;const d=devisRefExp(r);if(!d)return null;
+  const ht=+r['Total HT']||0,lim=ht>=DEV_EXP.seuil?DEV_EXP.grand:DEV_EXP.petit,age=Math.floor((Date.now()-new Date(d+'T12:00:00Z'))/864e5);
+  return age>lim?{d,age,lim,ht}:null}
+let DEV_EXP_FAIT=0;
+async function devisAnnulerEchus(){
+  if(!peutEcrire('devis')||Date.now()-DEV_EXP_FAIT<600e3)return 0;
+  const t=MODS.devis.t,R=S.rows[t];if(!R)return 0;DEV_EXP_FAIT=Date.now();
+  const oA=(sch(t).par.Statut?.select_options||[]).find(o=>o.value==='Annulé');if(!oA)return 0;
+  const L=R.map(r=>[r,devisEchu(r)]).filter(x=>x[1]);let n=0;
+  for(const [r,e] of L){try{const ok=/^✔/.test(txt(r['Contrôle version']));
+      const ligne=`${new Date().toLocaleDateString('fr-FR')} : annulé automatiquement par Akteev (devis du ${dfr(e.d)}, sans réponse depuis plus de ${e.lim/7} semaines, ${e.ht>=DEV_EXP.seuil?'10 000 € HT ou plus':'moins de 10 000 € HT'}). Bouton « Réactiver le devis » si le client rouvre le dossier.`;
+      let x=await api(`/rows/table/${t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({Statut:oA.id,'Commentaire interne':[txt(r['Commentaire interne']),ligne].filter(Boolean).join('\n')})});
+      if(ok){await new Promise(z=>setTimeout(z,1500));x=await api(`/rows/table/${t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Validé le':new Date().toISOString()})})}
+      majRow(t,x);n++}catch(er){console.warn('annulation auto',txt(r['N° devis']),er.message)}}
+  if(n){majCompteurs();toast(`${n} devis envoyé${n>1?'s':''} sans réponse passé${n>1?'s':''} à « Annulé » (4 semaines sous 10 000 € HT, 8 semaines au-delà) : puce « Annulé » de la liste des devis`)}
+  return n}
+async function devisReactiver(r){
+  const t=MODS.devis.t,o=(sch(t).par.Statut?.select_options||[]).find(x=>x.value==='Envoyé');if(!o)throw new Error('statut « Envoyé » introuvable');
+  if(!confirm(`Réactiver ${txt(r['N° devis'])} ? Il repasse au statut « Envoyé » et le délai d’annulation automatique repart d’aujourd’hui.`))return null;
+  const ok=/^✔/.test(txt(r['Contrôle version']));let x=await changerStatut('devis',r,o.id,'Envoyé');
+  if(ok){await new Promise(z=>setTimeout(z,1500));x=await api(`/rows/table/${t}/${r.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({'Validé le':new Date().toISOString()})});majRow(t,x)}
+  toast(`${txt(r['N° devis'])} réactivé : statut « Envoyé »`);return x}
 function dessinerDDP(){
   const T=ddpListe(S.rows[MODS.devis.t],S.rows[MODS.consult.t]),cpt={};T.forEach(x=>cpt[x.etat]=(cpt[x.etat]||0)+1);
   const q=norm($('dq')?.value||'').split(/\s+/).filter(Boolean),ordre={complet:0,partiel:1,aucune:2,sans:3};
@@ -3496,6 +3539,8 @@ async function vueListe(k){
   await charger(m.t);
   if(m.virt&&k!=='depot')await Promise.all([MODS.commandes.t,MODS.synthese.t,MODS.devis.t,1261171].map(t=>charger(t).catch(()=>{})));
   if(m.ref)charger(MODS.referents.t).catch(()=>{});
+  if(k==='commandes')await charger(T_STATS).catch(()=>{});
+  if(k==='devis')devisAnnulerEchus().then(n=>{if(n&&location.hash.replace(/\?.*/,'')==='#/devis')dessinerListe('devis')}).catch(e=>console.warn(e));
   if(k==='amelio')await charger(T_REUNIONS).catch(()=>{});
   dessinerListe(k);
 }
@@ -3511,6 +3556,8 @@ function filtrer(k){
     const st=m.statut?txt(r[m.statut]):'';
     if(E.st.length&&!E.st.includes(st))return false;
     if(!E.st.length&&!E.tout&&!recherche&&m.cacheStatuts?.includes(st))return false;
+    // commande facturée en totalité dans Axonaut (23/11/2026) : sortie de la liste comme une commande livrée / soldée
+    if(k==='commandes'&&!E.tout&&!recherche&&cmdFacturee(r))return false;
     // statut soldé (tâche « Fait ») : retiré du tableau, même pendant une recherche, sauf demande explicite
     if(estSolde(m,st)&&!E.st.includes(st)&&!E.tout&&(E.cf||{})[m.statut]!==st)return false;
     if(E.retard&&!(tacheOuverte(r)&&r[m.date]&&r[m.date]<auj()))return false;
@@ -3550,7 +3597,7 @@ function dessinerListe(k){
     <div class="rech">${ico('loupe')}<input id="lq" placeholder="Filtrer…" value="${esc(E.q)}"></div>
     ${nbCf(E)?`<button class="puce on" data-cfclear title="Effacer les filtres de colonnes">${nbCf(E)} filtre(s) de colonne ✕</button>`:''}
     ${m.ref&&sc.par[m.ref]?`<select id="lref"><option value="">Tous les référents</option>${MOI?`<option value="${MOI}">Moi</option>`:''}${refs.map(r=>`<option value="${r.id}">${esc(titre(MODS.referents.t,r))}</option>`).join('')}</select>`:''}
-    ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout&&!(E.q.trim()||nbCf(E))?(m.libOuverts||'En cours'):'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
+    ${opts.length?`<div class="puces"><button class="puce ${!E.st.length&&!E.retard&&!E.encours?'on':''}" data-s="">${m.cacheStatuts?.length&&!E.tout&&!(E.q.trim()||nbCf(E))?(m.libOuverts||'En cours'):'Tous'}</button>${E.retard?'<button class="puce on" data-s="">En retard ✕</button>':''}${E.encours?'<button class="puce on" data-s="">En cours ✕</button>':''}${opts.map(o=>`<button class="puce ${E.st.includes(o.value)?'on':''}" data-s="${esc(o.value)}">${esc(o.value)}<b>${cpt[o.value]||0}</b></button>`).join('')}${m.cacheStatuts?.length?`<button class="puce ${E.tout?'on':''}" data-tout>Afficher ${m.libCache||m.cacheStatuts.join(' / ').toLowerCase()}</button>`:''}</div>`:''}
     ${stF?`<div class="bascule"><button data-v="liste" class="${E.vue==='liste'?'on':''}">${ico('liste')}Liste</button><button data-v="kanban" class="${E.vue==='kanban'?'on':''}">${ico('kanban')}Tableau</button></div>`:''}
   </div>`;
   if(E.vue==='kanban'&&stF){h+=`</div><div style="margin-top:14px">${kanban(k,L,opts)}</div>`}
@@ -3673,6 +3720,8 @@ function brancherKanban(k){
 async function changerStatut(k,row,oid,val){
   const m=MODS[k],corps={[m.statut]:oid>0?oid:val};
   if(m.faitLe&&sch(m.t).par[m.faitLe]&&faitRe(m).test(val)&&(m.faitMaj||!row[m.faitLe]))corps[m.faitLe]=auj();
+  // devis annulé remis en Envoyé : « Réactivé le » dans le Commentaire interne, le délai d'annulation automatique repart (23/11/2026)
+  if(k==='devis'&&txt(row[m.statut])==='Annulé'&&!/^annul/i.test(val))corps['Commentaire interne']=[txt(row['Commentaire interne']),`Réactivé le ${new Date().toLocaleDateString('fr-FR')}${MOI?' par '+titre(MODS.referents.t,(S.rows[MODS.referents.t]||[]).find(x=>x.id===MOI)||{}):''} (statut ${val}) : délai d’annulation automatique reparti de ce jour.`].filter(Boolean).join('\n');
   const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
   majRow(m.t,r);majCompteurs();toast(estSolde(m,val)?`${titre(m.t,r)} → ${val} : ${m.un} ${soldeMots(m).pp}, retiré${m.fem?'e':''} de la liste`:`${titre(m.t,r)} → ${val}`);return r;
 }
@@ -3730,6 +3779,7 @@ function dessinerFiche(){
     ${k==='commandes'&&!nouveau&&peutEcrire('plan')?`<button class="btn" id="bPlan" title="Heures prévues par machine et machine de repli">${ico('cal')}Planifier l’usinage</button>`:''}
     ${k==='commandes'&&!nouveau&&chmRentab()?`<button class="btn" id="bRev" title="Achats affectés + heures prévues au planning × taux horaires">${ico('euro')}Coût de revient</button>`:''}
     ${k==='devis'&&!nouveau&&peutVoir('consult')&&montants()?(()=>{const n=(S.rows[MODS.consult.t]||[]).filter(c=>ids(c.Devis).includes(row.id)&&txt(c['Réponse'])==='Offre reçue').length;return`<button class="btn dg1" id="bCmp" title="Tableau comparatif des offres des sous-traitants, ligne par ligne">${ico('ddp')}Comparer les SST${n?` <b>(${n})</b>`:''}</button>`})():''}
+    ${k==='devis'&&!nouveau&&peutEcrire('devis')&&txt(row.Statut)==='Annulé'?`<button class="btn vert" id="bReact" title="Le client rouvre le dossier : le devis repasse « Envoyé » et le délai d’annulation automatique repart d’aujourd’hui">${ico('plus')}Réactiver le devis</button>`:''}
     ${k==='devis'&&lienEditeur?`<a class="btn dg2" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn dg3" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
     ${k==='utilisateurs'&&!nouveau&&peutVoir('droits')&&row['E-mail']?`<a class="btn p" href="#/droits?u=${encodeURIComponent(String(row['E-mail']).trim().toLowerCase())}">${ico('cle')}Droits d’accès</a>`:''}
@@ -3751,6 +3801,7 @@ function dessinerFiche(){
   if($('bRep')){$('bRep').onclick=()=>repondreClient(SALE.row);prechargerMSAL()}
   if($('bPlan'))$('bPlan').onclick=async()=>{try{await Promise.all([charger(T_PLAN),charger(T_MACH),charger(MODS.commandes.t),peutVoir('taches')?charger(MODS.taches.t).catch(()=>[]):null]);chmFormAffaire(SALE.row.id)}catch(e){toast('Erreur : '+e.message,true)}};
   if($('bRev'))$('bRev').onclick=()=>chmAfficherRevient(SALE.row.id);
+  if($('bReact'))$('bReact').onclick=()=>devisReactiver(SALE.row).then(r=>{if(r){SALE.row=r;dessinerFiche()}}).catch(e=>toast('Échec : '+e.message,true));
   if($('bCmp'))$('bCmp').onclick=()=>comparerSST(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if(k==='devis'&&!nouveau&&peutVoir('consult')&&!S.rows[MODS.consult.t])charger(MODS.consult.t).then(()=>{if(SALE&&SALE.k==='devis'&&SALE.id===row.id&&!Object.keys(SALE.draft).length)dessinerFiche()}).catch(()=>{});
   if($('bCfPdf')){$('bCfPdf').onclick=()=>cfEditer(SALE.row);prechargerMSAL()}
