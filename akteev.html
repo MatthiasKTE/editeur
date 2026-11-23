@@ -2237,21 +2237,22 @@ function dessinerComparatif(dv){
     const min=pe.length?Math.min(...pe):null,max=pe.length>1?Math.max(...pe):null;
     const cout=x.l?x.l['Coût unitaire (interne)']:null,pv=x.l?x.l['Prix unitaire HT']:null;
     const vb=x.l&&String(x.l['Vignette PDF']||''),vs=x.l&&cmpVigSP(dv,x.l.Rep),vg=vs||(vb&&/^data:image\//.test(vb)?vb:'');
-    h+=`<tr style="cursor:default"><td class="cmpVig" ${x.l&&!vide(x.l.Rep)?`data-rep="${+x.l.Rep}"`:''}>${vg?`<img src="${esc(vg)}" alt="" title="${esc(txt(x.l.Description))}">`:'<div class="vv"></div>'}</td><td>${esc(x.l?txt(x.l.Rep):txt(x.rep))}</td><td style="white-space:normal;max-width:340px">${x.l?esc(txt(x.l.Description))+techHTML(x.l,ecr):`<i class="mut">${esc(x.des||'Hors devis')}</i> <span class="badge" style="background:#FFEDD5;color:#C2410C" title="Repère absent des lignes du devis">hors devis</span>`}</td><td class="n">${x.l?nb(q(x)):'—'}</td>`;
+    h+=`<tr style="cursor:default"><td class="cmpVig" ${x.l&&!vide(x.l.Rep)?`data-rep="${+x.l.Rep}"`:''}>${vg?`<img src="${esc(vg)}" alt="" title="${esc(txt(x.l.Description))}">`:'<div class="vv"></div>'}</td><td>${esc(x.l?txt(x.l.Rep):txt(x.rep))}</td><td style="white-space:normal;max-width:340px">${x.l?esc(txt(x.l.Description))+techHTML(x.l,ecr):`<i class="mut">${esc(x.des||'Hors devis')}</i> <span class="badge" style="background:#FFEDD5;color:#C2410C" title="Repère absent des lignes du devis">hors devis</span>${ecr?` <button class="btn mini" data-hors="${i}" title="Crée ce repère comme ligne du devis (Précisions et PV à compléter)">Créer la ligne</button>`:''}`}</td><td class="n">${x.l?nb(q(x)):'—'}</td>`;
     for(const c of cols){const p=x.par[c.c.id];
       if(!p||p['PU HT']==null||p['PU HT']===''){h+=`<td class="n mut">${p?'<span title="'+esc(txt(p.Commentaire)||'Prix non lu')+'">à saisir</span>':'—'}</td>`;continue}
       const pu=+p['PU HT'],dev=p.Devise||c.c.Devise,eu=estEUR(dev),best=eu&&min!=null&&pu===min&&pe.length>1,pire=eu&&max!=null&&pu===max&&max>min;
       if(eu&&x.l){tot[c.c.id]+=pu*(q(x)||+p['Quantité']||0);nbL[c.c.id]++}
       const tip=[p['Quantité']!=null&&p['Quantité']!==''?'Qté offre : '+nb(p['Quantité']):'',p['Délai']?'Délai : '+p['Délai']:'',txt(p.Source)?'Source : '+txt(p.Source):'',txt(p['Désignation SST'])?'Désignation SST : '+txt(p['Désignation SST']):'',txt(p.Commentaire)].filter(Boolean).join('\n');
       h+=`<td class="n ${best?'cmpMin':pire?'cmpMax':''} ${p.Retenu?'cmpRet':''}" title="${esc(tip)}">${eu?eur(pu):nb(pu)+' '+esc(dev)}${txt(p.Source)==='À vérifier'?' <span style="color:#C2410C" title="Prix à vérifier">●</span>':''}
-        ${eu&&min&&pu>min?`<div class="cmpEc">+${Math.round((pu-min)/min*100)} %</div>`:''}${p.Retenu?'<div class="cmpEc" style="color:#15803D;font-weight:700">✓ retenu</div>':ecr&&x.l&&eu?`<button class="btn mini" data-ret="${p.id}" data-l="${x.l.id}">Retenir</button>`:''}</td>`}
+        ${eu&&min&&pu>min?`<div class="cmpEc">+${Math.round((pu-min)/min*100)} %</div>`:''}${p.Retenu?'<div class="cmpEc" style="color:#15803D;font-weight:700">✓ retenu</div>':ecr&&x.l&&eu?`<button class="btn mini" data-ret="${p.id}" data-l="${x.l.id}">Retenir</button>`:ecr&&!x.l&&eu?`<button class="btn mini" data-hors="${i}" data-hp="${p.id}" title="Crée la ligne du devis et retient ce prix">Créer et retenir</button>`:''}</td>`}
     h+=`<td class="n">${!vide(cout)?eur(cout):'<span class="mut">—</span>'}</td><td class="n cmpDHL" ${x.l?`data-dhl="${x.l.id}"`:''}></td><td class="n cmpPV">${x.l&&ecr?`<input type="number" step="0.01" min="0" data-pv="${x.l.id}" value="${vide(pv)?'':+pv}">`:x.l&&!vide(pv)?eur(pv):'<span class="mut">—</span>'}${x.l?`<div class="cmpEc" data-pvm="${x.l.id}"></div>`:''}</td><td class="n cmpPV" ${x.l?`data-pvt="${x.l.id}"`:''}>${x.l?'':'<span class="mut">—</span>'}</td></tr>`});
   const nL=lignes.filter(x=>x.l).length,tv=cols.filter(c=>nbL[c.c.id]===nL).map(c=>tot[c.c.id]),tmin=tv.length>1?Math.min(...tv):null;
   h+=`</tbody><tfoot><tr><td></td><td></td><td><b>Total HT</b> <span class="mut" style="font-size:11.5px">(PU × quantité du devis)</span></td><td></td>${cols.map(c=>{const t=tot[c.c.id],cplt=nbL[c.c.id]===nL;
     return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}<td></td><td class="n cmpDHL" id="cTotD"></td><td class="n cmpPV" id="cTotU"></td><td class="n cmpPV" id="cTotT"></td></tr></tfoot></table></div>
-  <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »).</div>`;
+  <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »). « Hors devis » : repère chiffré par un SST mais absent des lignes du devis → « Créer la ligne » ou « Créer et retenir ».</div>`;
   $('mCorps').innerHTML=h;
   $('mCorps').querySelectorAll('button[data-ret]').forEach(b=>b.onclick=()=>retenirSST(dv,[[+b.dataset.l,+b.dataset.ret]]));
+  $('mCorps').querySelectorAll('button[data-hors]').forEach(b=>b.onclick=()=>creerLigneHors(dv,lignes[+b.dataset.hors],b.dataset.hp?+b.dataset.hp:null));
   let zm=document.getElementById('cmpZoom');if(!zm){zm=document.createElement('img');zm.id='cmpZoom';document.body.appendChild(zm)}zm.style.display='none';
   $('mCorps').onmouseover=e=>{const im=e.target.closest&&e.target.closest('td.cmpVig img');if(!im)return;const r=im.getBoundingClientRect();zm.src=im.src;zm.style.left=(r.right+8)+'px';zm.style.top=Math.max(8,Math.min(innerHeight-330,r.top+r.height/2-160))+'px';zm.style.display='block'};
   $('mCorps').onmouseout=e=>{if(e.target.closest&&e.target.closest('td.cmpVig img'))zm.style.display='none'};
@@ -2327,6 +2328,27 @@ async function enregistrerPV(dv,items,leger){
   try{const r=await api(`/rows/table/${T_LDV}/batch/?user_field_names=true`,{method:'PATCH',body:JSON.stringify({items})});(r.items||[]).forEach(x=>majRow(T_LDV,x));
     toast(items.length>1?items.length+' prix de vente enregistrés':'Prix de vente enregistré')}
   catch(e){toast('Échec : '+e.message,true)}
+  dessinerComparatif(dv);
+}
+/* Prix SST sans ligne de devis (« hors devis », ex. D265150 : devis créé sans lignes, rien ne pouvait être retenu) :
+   crée la ligne de devis (Rep, désignation SST sans la parenthèse finale, quantité de l'offre), y relie tous les prix
+   du repère et, si pid, retient ce prix (coût unitaire interne = PU). Précisions et PV restent à compléter. */
+async function creerLigneHors(dv,x,pid){
+  if(!x||x.l)return;
+  if(dv['Validé le']&&!confirm('Ce devis est validé : ajouter une ligne le marquera « Modifié depuis la validation » (nouvelle version à éditer). Continuer ?'))return;
+  const P=Object.values(x.par||{}),p=pid?P.find(o=>o.id===pid):null,ref=p||P.find(o=>!vide(o['Quantité']))||P[0];
+  const L=(S.rows[T_LDV]||[]).filter(l=>ids(l.Devis).includes(dv.id));
+  const des=String(x.des||'').replace(/\s*\([^()]*\)\s*$/,'').trim()||('Repère '+(vide(x.rep)?'':x.rep)).trim();
+  const c={Devis:[dv.id],Ordre:L.reduce((m,l)=>Math.max(m,+l.Ordre||0),0)+1,Description:des,'Quantité':ref&&!vide(ref['Quantité'])?+ref['Quantité']:1};
+  if(!vide(x.rep)&&!isNaN(+x.rep))c.Rep=+x.rep;
+  if(p&&!vide(p['PU HT']))c['Coût unitaire (interne)']=+p['PU HT'];
+  $('mCorps').querySelectorAll('input,button.mini').forEach(b=>b.disabled=true);
+  try{
+    const l=await api(`/rows/table/${T_LDV}/?user_field_names=true`,{method:'POST',body:JSON.stringify(c)});majRow(T_LDV,l);
+    for(const o of P){const it={'Ligne de devis':[l.id]};if(p&&!!o.Retenu!==(o.id===p.id))it.Retenu=o.id===p.id;
+      const r=await api(`/rows/table/${T_PSST}/${o.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(it)});majRow(T_PSST,r)}
+    toast(p?'Ligne créée et prix retenu – Précisions et PV à compléter':'Ligne de devis créée – Précisions et PV à compléter');
+  }catch(e){toast('Échec : '+e.message,true)}
   dessinerComparatif(dv);
 }
 async function retenirSST(dv,paires){
