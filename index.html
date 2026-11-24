@@ -254,6 +254,11 @@ const PASSERELLE='https://akteev5ytqabln-passerelle.functions.fnc.fr-par.scw.clo
 const API=PASSERELLE?PASSERELLE.replace(/\/+$/,'')+'/api/database':'https://api.baserow.io/api/database';
 const T_CLIENTS=1260239,T_REF=1260243,T_AFF=1260240,T_TACHES=1261119,T_TC=1261600;
 const COND_DEF="100% à la livraison\nPar virement bancaire à 30 jours nets";
+/* Conditions de règlement propres au client (24/11/2026) : règles « FACT-PARAM » de la table Stats (1277595), clé = ID Axonaut.
+   Même source que les factures d'Akteev : priorité sur COND_DEF pour les nouveaux devis / ARC et au changement de client. */
+let REGLES=null;
+async function chargerRegles(){try{const r=(await tout(1277595,'&filter__Mois__equal=FACT-PARAM'))[0];REGLES=(JSON.parse(r?.Factures||'{}').regles)||{}}catch(e){console.warn('règles clients',e);REGLES={}}return REGLES}
+function condClient(ids){const R=REGLES||{};for(const id of [].concat(ids||[])){const c=clients.find(x=>x.id==(id?.id??id));const k=String(c?.['ID Axonaut']||'');if(k&&R[k]?.conditions)return R[k].conditions}return null}
 const DOCS={
   devis:{table:1261170,lt:1261171,num:'N° devis',lien:'Lignes de devis',retour:'Devis',titre:'Devis',court:'Devis',valider:"Valider l'offre",prix:true},
   arc:{table:1261374,lt:1261373,num:'N° ARC',lien:'Lignes ARC',retour:'ARC',titre:'Accusé de réception de commande',court:'ARC',valider:"Valider l'ARC",prix:true},
@@ -299,7 +304,7 @@ async function init(){
   else if(!JETON){$('cfg').style.display='block';return}
   try{
     msg('Chargement…');
-    [clients,refs]=await Promise.all([tout(T_CLIENTS),tout(T_REF)]);
+    [clients,refs]=await Promise.all([tout(T_CLIENTS),tout(T_REF),chargerRegles()]);
     clients.sort((a,b)=>(a.Entreprise||'').localeCompare(b.Entreprise||''));
     $('fClient').innerHTML='<option value="">— Client —</option>'+clients.map(c=>`<option value="${c.id}">${c.Entreprise||c['Code client']}</option>`).join('');
     const refsAff=refs.some(r=>"Référent d'affaire" in r)?refs.filter(r=>r["Référent d'affaire"]):refs;
@@ -365,7 +370,7 @@ function afficher(){
   $('fClient').value=(cur.Client||[])[0]?.id||'';majClient();
   $('fRef').value=(cur['Référent KTE']||[])[0]?.id||refs[0]?.id;majRef();
   champs().forEach(e=>{let x=cur[e.dataset.f];if(x&&typeof x==='object')x=x.value;e.value=x??'';if(e.type==='date'&&e.value)e.value=e.value.slice(0,10);if(e.tagName==='TEXTAREA')setTimeout(()=>auto(e))});
-  if(TYPE!=='bl'&&!$(TYPE==='devis'?'fCond':'fCondArc').value)$(TYPE==='devis'?'fCond':'fCondArc').value=COND_DEF;
+  if(TYPE!=='bl'&&!$(TYPE==='devis'?'fCond':'fCondArc').value)$(TYPE==='devis'?'fCond':'fCondArc').value=condClient(cur.Client)||COND_DEF;
   if(TYPE==='devis'&&!$('fValid').value)$('fValid').value=10;
   if(TYPE==='bl'){$('fAdrLivBL').value=cur['Adresse de livraison']||'';setTimeout(()=>auto($('fAdrLivBL')))}
   $('zComm').style.display=TYPE!=='bl'&&'Commentaires' in cur?'':'none';$('fCommEd').innerHTML=versHTML(lireComm(cur.Commentaires));majComm();
@@ -481,7 +486,7 @@ function totaux(){
 }
 $('fDate').addEventListener('input',()=>{$('fDate').dataset.manuel='1'});
 document.querySelectorAll('.page [data-f], #fDate, #fAdrLivBL').forEach(e=>e.addEventListener('input',()=>{if(e.tagName==='TEXTAREA')auto(e);if(e.id==='fAdrLivBL')majAdrBL();totaux();marquer()}));
-$('fClient').onchange=()=>{majClient();marquer()};
+$('fClient').onchange=()=>{majClient();if(TYPE!=='bl'&&!estValide()){const f=$(TYPE==='devis'?'fCond':'fCondArc'),c=condClient($('fClient').value);if(c&&(!f.value.trim()||f.value.trim()===COND_DEF)){f.value=c;auto(f)}}marquer()};
 $('fCommEd').addEventListener('input',()=>{majComm();marquer()});
 $('fCommEd').addEventListener('paste',e=>{e.preventDefault();document.execCommand('insertText',false,(e.clipboardData||window.clipboardData).getData('text/plain'))});
 $('btc').querySelectorAll('button').forEach(b=>{b.addEventListener('mousedown',e=>e.preventDefault());b.onclick=()=>commande(b.dataset.col?'color':b.dataset.c,b.dataset.col)});
@@ -548,12 +553,12 @@ async function nouveau(){
   let corps,nouvLignes=[];
   if(TYPE==='devis'){
     if(liste.some(d=>d['N° devis']===n)){alert('Ce devis existe déjà : ouvrez-le dans la liste.');msg('');return}
-    corps={...base,'N° devis':n,'Source':'KTE','Date réception':aujourd(),'Validité (jours)':10,'Conditions de règlement':COND_DEF,Objet:aff?.Objet||''};
+    corps={...base,'N° devis':n,'Source':'KTE','Date réception':aujourd(),'Validité (jours)':10,'Conditions de règlement':condClient(base.Client)||COND_DEF,Objet:aff?.Objet||''};
   }else{
     const devis=(await tout(DOCS.devis.table,`&filter__N° devis__equal=${encodeURIComponent(n)}`))[0];
     if(TYPE==='arc'){
       if(liste.some(d=>d['N° ARC']==='ARC-'+n)){alert('Cet ARC existe déjà : ouvrez-le dans la liste.');msg('');return}
-      corps={...base,'N° ARC':'ARC-'+n,'Conditions de règlement':devis?.['Conditions de règlement']||COND_DEF,'Délai':devis?.['Délai']||'',
+      corps={...base,'N° ARC':'ARC-'+n,'Conditions de règlement':condClient(base.Client?.length?base.Client:ids(devis?.Client))||devis?.['Conditions de règlement']||COND_DEF,'Délai':devis?.['Délai']||'',
         'N° commande client':aff?.['N° Cde Client']||'','Date commande':aff?.['Date cde client']||null,'Date de livraison':aff?.['Date Livraison']||null};
       if(devis){corps.Devis=[devis.id];if(!corps.Client?.length)corps.Client=ids(devis.Client);if(!corps['Référent KTE']?.length)corps['Référent KTE']=ids(devis['Référent KTE']);
         nouvLignes=(await lignesDe(DOCS.devis.lt,'Lignes de devis',devis)).map(l=>({Description:l.Description,'Précisions':l['Précisions']||'','Quantité':l['Quantité'],'Prix unitaire HT':l['Prix unitaire HT'],Rep:l.Rep,Vignette:fic(l.Vignette),'Vignette PDF':l['Vignette PDF']||''}))}
