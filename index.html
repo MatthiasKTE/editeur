@@ -228,9 +228,10 @@ input.ed.num{text-align:right}
     <div class="tot" data-docs="devis arc">
       <table>
         <tr><td>Total HT</td><td id="totHT"></td></tr>
-        <tr><td>TVA 20,00%</td><td id="totTVA"></td></tr>
+        <tr><td id="libTVA">TVA 20,00%</td><td id="totTVA"></td></tr>
         <tr class="ttc"><td>Total TTC</td><td id="totTTC"></td></tr>
       </table>
+      <div id="mentTVA" style="font-size:9pt;margin-top:2mm;max-width:80mm"></div>
       <div data-docs="devis">
         <div style="text-align:center;margin-top:4mm" id="jusqua"></div>
         <div class="bpa">Bon pour accord<br>et signature</div>
@@ -379,10 +380,18 @@ function afficher(){
   $('pStatut').textContent='Statut : '+(cur.Statut?.value||'Brouillon');$('pVersion').textContent='v.'+v+(cur['Validé le']?' – validé le '+new Date(cur['Validé le']).toLocaleString('fr-FR'):'');
   dessinerLignes();
 }
+/* TVA selon le pays du client (25/11/2026) : France / vide = 20 % ; UE avec n° TVA = 0 % autoliquidation intracom ; hors UE = 0 % export */
+const PAYS_UE=['allemagne','germany','deutschland','de','autriche','austria','at','belgique','belgium','be','bulgarie','bulgaria','bg','chypre','cyprus','cy','croatie','croatia','hr','danemark','denmark','dk','espagne','spain','es','estonie','estonia','ee','finlande','finland','fi','grece','greece','gr','el','hongrie','hungary','hu','irlande','ireland','ie','italie','italy','it','lettonie','latvia','lv','lituanie','lithuania','lt','luxembourg','lu','malte','malta','mt','pays-bas','pays bas','netherlands','nederland','nl','pologne','poland','pl','portugal','pt','republique tcheque','tchequie','czech republic','czechia','cz','roumanie','romania','ro','slovaquie','slovakia','sk','slovenie','slovenia','si','suede','sweden','se'];
+function tvaDoc(c){const sans=t=>String(t||'').normalize('NFD').replace(/[̀-ͯ]/g,'').trim().toLowerCase();
+  const pays=sans(c&&c.Pays),num=String((c&&c['N° TVA'])||'').trim();
+  if(!pays||['france','fr','fra'].includes(pays))return{taux:0.2,lib:'TVA 20,00%',mention:'',alerte:''};
+  if(PAYS_UE.includes(pays)){if(!num)return{taux:0.2,lib:'TVA 20,00%',mention:'',alerte:'Client UE sans n° TVA intracommunautaire : TVA 20 % appliquée. Renseignez « N° TVA » dans la fiche client pour l’exonération.'};
+    return{taux:0,lib:'TVA 0,00%',mention:'Exonération de TVA – livraison intracommunautaire (art. 262 ter I du CGI) – n° TVA client '+num,alerte:''}}
+  return{taux:0,lib:'TVA 0,00%',mention:'Exonération de TVA – exportation (art. 262 I du CGI)',alerte:''}}
 function majClient(){
   const c=clients.find(x=>x.id==$('fClient').value);
   $('cliAdr').innerHTML=c?[c['Raison sociale (Axonaut)']&&c['Raison sociale (Axonaut)']!==c.Entreprise?c['Raison sociale (Axonaut)']:'',...(c.Adresse||'').split(', '),`${c['Code postal']||''} ${c.Ville||''}`,c.Pays&&c.Pays!=='France'?c.Pays:''].filter(x=>x&&x.trim()).join('<br>'):'';
-  if(TYPE==='bl')majAdrBL();
+  if(TYPE==='bl')majAdrBL();else if(typeof totaux==='function')totaux();
 }
 function majAdrBL(){const autre=$('fAdrLivBL').value.trim();$('cliAdr').style.display=autre?'none':'';$('fClient').classList.toggle('masque-print',!!autre)}
 /* ---- Commentaires mis en forme (devis, ARC) ----
@@ -480,7 +489,8 @@ function totaux(){
   }
   let ht=0;
   lignes.forEach((l,i)=>{const m=(+l['Prix unitaire HT']||0)*(+l['Quantité']||0);ht+=m;if(mts[i])mts[i].textContent=eur(m)});
-  ht=Math.round(ht*100)/100;$('totHT').textContent=eur(ht);$('totTVA').textContent=eur(ht*0.2);$('totTTC').textContent=eur(ht*1.2);
+  ht=Math.round(ht*100)/100;const tv=tvaDoc(clients.find(x=>x.id==$('fClient').value));$('totHT').textContent=eur(ht);$('libTVA').textContent=tv.lib;$('totTVA').textContent=eur(ht*tv.taux);$('totTTC').textContent=eur(ht*(1+tv.taux));
+  $('mentTVA').textContent=tv.mention||tv.alerte;$('mentTVA').style.color=tv.alerte?'#C0392B':'';
   const d=new Date($('fDate').value||Date.now());d.setDate(d.getDate()+(+$('fValid').value||10));
   $('jusqua').textContent="Offre valable jusqu'au "+d.toLocaleDateString('fr-FR');
 }
@@ -1038,6 +1048,7 @@ async function construirePDF(){
     if(val('fSuivi').trim())blocs.push(['N° de suivi : '+val('fSuivi').trim(),false]);
     if(val('fObsBL').trim())blocs.push(['',false],['Observations :',true],[val('fObsBL').trim(),false]);
   }
+  if(TYPE!=='bl'){const tv=tvaDoc(cli);if(tv.mention)blocs.push(['',false],[tv.mention,false])}
   const hCond=8+blocs.reduce((s,[t,b])=>s+(t?hauteurTexte(t,wc,tc,b,lhc):lgc),0);
   const lhT=9.75*PT*1.2+3.7;
   const hRec=3+lgc+lgc+0.5*lgc+lgc+2*lgc+3,ecRec=3; // BL : cadre « Réception client » (reçu le, par, réserves) au-dessus du colisage
@@ -1052,7 +1063,7 @@ async function construirePDF(){
   if(TYPE!=='bl'){
     const ht=lignes.reduce((s,l)=>s+(+l['Prix unitaire HT']||0)*(+l['Quantité']||0),0),htr=Math.round(ht*100)/100;
     let yt2=yb;
-    [['Total HT',eur(htr)],['TVA 20,00%',eur(htr*0.2)],['Total TTC',eur(htr*1.2)]].forEach(([a,b],k)=>{
+    [['Total HT',eur(htr)],[tvaDoc(cli).lib,eur(htr*tvaDoc(cli).taux)],['Total TTC',eur(htr*(1+tvaDoc(cli).taux))]].forEach(([a,b],k)=>{
       const c=k===2?BLEU:NOIR,g=k===2;style(9.75,g,c);
       ecrire(a,xt+38,yt2+(lhT-9.75*PT)/2,{align:'right'});ecrire(b,DR-1,yt2+(lhT-9.75*PT)/2,{align:'right'});
       yt2+=lhT;trait(xt,yt2,DR,yt2)});
