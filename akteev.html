@@ -5466,13 +5466,16 @@ async function faConstruirePDF(a,f,opt={}){
     y=tab.dessiner(part,y)}
   // 5. Cadre « Observations » toujours présent : vide (24 mm, réduit jusqu'à 14 mm en bas de page) pour une remarque
   //    manuscrite du référent ; texte éventuel en 13 pt
+  // Règle du 25/11/2026 : dès qu'un RC est enregistré pour la commande ("rc": true dans le JSON de la fiche ou de l'affaire),
+  // « RC à compléter et sauvegarder dans Sharepoint » en rouge, en tête des observations (fiches de fabrication)
   const obs=(f.observations||[]).filter(Boolean);
+  if(!ach&&(f.rc||a.rc)&&!obs.some(o=>String(o).startsWith('RC à compléter')))obs.unshift('RC à compléter et sauvegarder dans Sharepoint');
   y+=ach?6:4;
   { const tH=6.5,bord=[154,154,154];
     const titreObs=(yy,hh)=>{doc.setFillColor(...FOND);doc.rect(FX,yy,FW,tH,'F');doc.setDrawColor(...bord);doc.setLineWidth(.6*pt);doc.rect(FX,yy,FW,hh,'S');
       doc.setDrawColor(...TRAIT);doc.setLineWidth(.5*pt);doc.line(FX,yy+tH,FX+FW,yy+tH);fnt(10,true);doc.setTextColor(...NOIR);doc.text('Observations',FX+6*pt,yy+tH-2)};
     if(!obs.length){const dispo=BOT-y;let hh=24;if(dispo<24){if(dispo>=14)hh=dispo;else y=nouvellePage()}titreObs(y,hh);y+=hh}
-    else{const O={size:13,lead:16.5},w=FW-12*pt,ps=obs.map(o=>para(faLisible(o),O,w)),hh=tH+5*pt+ps.reduce((s,p)=>s+p.h,0)+6*pt;
+    else{const O={size:13,lead:16.5},w=FW-12*pt,ps=obs.map(o=>para(String(o).startsWith('RC à compléter')?[{t:faLisible(o),bold:true,color:[192,0,0]}]:faLisible(o),O,w)),hh=tH+5*pt+ps.reduce((s,p)=>s+p.h,0)+6*pt;
       if(y+hh>BOT)y=nouvellePage();titreObs(y,hh);let yy=y+tH+5*pt;for(const p of ps){p.draw(FX+6*pt,yy);yy+=p.h}y+=hh}}
   // Pied de chaque page : « Page x/N » en bas au centre, flèche « Suite au verso » sauf sur la dernière ;
   // page 1 des fiches de fabrication (sauf Contrôle) : tableaux Appro matière (2 lignes) / Appro outillage (1 ligne),
