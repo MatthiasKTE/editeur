@@ -3804,6 +3804,7 @@ function dessinerFiche(){
     ${k==='devis'&&!nouveau&&peutEcrire('devis')&&txt(row.Statut)==='Annulé'?`<button class="btn vert" id="bReact" title="Le client rouvre le dossier : le devis repasse « Envoyé » et le délai d’annulation automatique repart d’aujourd’hui">${ico('plus')}Réactiver le devis</button>`:''}
     ${k==='devis'&&lienEditeur?`<a class="btn dg2" href="${lienEditeur}" target="_blank">${ico('ext')}Ouvrir dans l’éditeur</a>`:''}
     ${k==='devis'&&!nouveau&&peutEcrire('devis')?`<button class="btn dg3" id="bRep" title="Prépare dans Outlook la réponse au mail du client, avec le PDF du devis en pièce jointe (rien n’est envoyé)">${ico('mail')}Répondre au client</button>`:''}
+    ${k==='arc'&&!nouveau&&peutEcrire('arc')?`<button class="btn dg3" id="bRepArc" title="Prépare dans Outlook la réponse au mail de commande du client, avec le PDF de l’ARC en pièce jointe (rien n’est envoyé)">${ico('mail')}Envoyer l’ARC au client</button>`:''}
     ${k==='utilisateurs'&&!nouveau&&peutVoir('droits')&&row['E-mail']?`<a class="btn p" href="#/droits?u=${encodeURIComponent(String(row['E-mail']).trim().toLowerCase())}">${ico('cle')}Droits d’accès</a>`:''}
     ${k==='cf'&&!nouveau?`<a class="btn" href="#/affecter/${row.id}" title="Affecter la commande à une affaire, au stock, à la maintenance, aux investissements, aux consommables, ou ligne par ligne">Affecter les lignes</a>`:''}
     ${k==='cf'&&!nouveau&&peutEcrire('cf')?`<button class="btn" id="bCfPdf" title="Crée le PDF de la commande et l’enregistre dans SharePoint (registre + dossier de chaque affaire)">${ico('pdf')}Éditer la commande</button><button class="btn p" id="bCfEnv" title="${row.PDF?'Mail au fournisseur avec la commande en pièce jointe':'Éditez d’abord la commande (PDF)'}" ${row.PDF?'':'disabled'}>${ico('mail')}Envoyer au fournisseur</button>`:''}
@@ -3821,6 +3822,7 @@ function dessinerFiche(){
   $('main').innerHTML=h;
   brancherChamps();
   if($('bRep')){$('bRep').onclick=()=>repondreClient(SALE.row);prechargerMSAL()}
+  if($('bRepArc')){$('bRepArc').onclick=()=>repondreArc(SALE.row);prechargerMSAL()}
   if($('bPlan'))$('bPlan').onclick=async()=>{try{await Promise.all([charger(T_PLAN),charger(T_MACH),charger(MODS.commandes.t),peutVoir('taches')?charger(MODS.taches.t).catch(()=>[]):null]);chmFormAffaire(SALE.row.id)}catch(e){toast('Erreur : '+e.message,true)}};
   if($('bRev'))$('bRev').onclick=()=>chmAfficherRevient(SALE.row.id);
   if($('bReact'))$('bReact').onclick=()=>devisReactiver(SALE.row).then(r=>{if(r){SALE.row=r;dessinerFiche()}}).catch(e=>toast('Échec : '+e.message,true));
@@ -4612,21 +4614,33 @@ function boutonsDepot(r,grand){if(!MODS.depot)return'';
   const b=(a,lib,p,titre)=>`<button class="btn${p?' p':''}" ${pad} data-dep="${r.id}" data-a="${a}" title="${esc(titre||lib)}">${lib}</button>`;
   let h='';
   if(!fini&&peutEcrire('depot')){
-    if(ty==='Commande client')h+=b('cde',grand?(dv?'Passer '+esc(dv)+' en commande':'Trouver le devis'):'Passer en commande',true,dv?'Ouvre le devis '+dv+' pour le passer en commande':'Aucun devis cité : ouvre la liste des devis');
+    if(ty==='Commande client')h+=b('cde',grand?(dv?'Passer '+esc(dv)+' en commande':'Trouver le devis'):'Passer en commande',true,dv?'Ouvre une fenêtre : éditeur sur '+dv+' (« Commande reçue ») ou consigne pour Claude':'Aucun devis cité : ouvre une fenêtre avec la consigne pour Claude (devis a posteriori)');
     else if(ty==='Offre fournisseur')h+=b('cf','Rédiger la CF',true,'Ouvre une nouvelle commande fournisseur');
     else if(ty==='DDP client'&&st!=='À lancer')h+=b('ddp','Lancer le chiffrage',true,'Marque la DDP « À lancer » : Claude la traite quand vous lui dites « lance les DDP à traiter » dans Cowork');
     if(grand)h+=b('ok','Traité',false,'Classer ce mail comme traité');h+=b('ign','Ignorer',false,'Ce mail ne demande rien')}
   const fd=txt(r['Fichier déposé']);if(/^https?:/i.test(fd))h+=`<a class="btn" ${pad} href="${esc(fd)}" target="_blank" data-dep="${r.id}" data-a="out">Fichiers ↗</a>`;
   const l=txt(r['Lien Outlook']);if(/^https?:/i.test(l))h+=`<a class="btn" ${pad} href="${esc(l)}" target="_blank" data-dep="${r.id}" data-a="out">Outlook ↗</a>`;
   return grand?h:`<span style="display:inline-flex;gap:4px;white-space:nowrap">${h}</span>`}
+/* « Passer en commande » (25/11/2026) : fenêtre qui dit ce qui se passe et la suite à donner */
+function fenetreCommandeDepot(row,d,dv){
+  const nd=d?txt(d['N° devis']):'',obj=txt(row.Objet),exp=txt(row['Expéditeur']),cli=txt(row['Client / fournisseur']);
+  const cons=nd?`Lance la commande ${nd} (demande À traiter n° ${row.id} : « ${obj} », ${exp}). Suis la compétence akteev-lancement-commande : contrôle commande / devis, où fabriquer chaque repère, plans bons pour exécution, contrôle, puis ARC, tâches, fiches atelier et CF après validation.`
+    :`Lance la commande de la demande À traiter n° ${row.id} : « ${obj} » (${exp}${cli?', '+cli:''}). Aucun devis KTE n'est cité${dv?' (« '+dv+' » introuvable)':''} : vérifie dans Devis et Commandes qu'elle n'est pas déjà enregistrée, sinon crée le devis a posteriori depuis la commande (n° suivant du registre), puis suis la compétence akteev-lancement-commande (commande, ARC, tâches, fiches atelier, CF après validation).`;
+  const etapes=nd?`<ol style="margin:6px 0 0 18px;padding:0;line-height:1.6"><li>La demande passe « En cours ».</li><li><b>Ouvrir l'éditeur</b> sur ${esc(nd)} puis cliquer <b>« Commande reçue »</b> : crée la commande, les tâches et propose l'ARC.</li><li>Ou laisser Claude tout préparer : copier la consigne ci-dessous dans Cowork (projet Akteev).</li></ol>`
+    :`<p style="margin:6px 0"><b>Aucun devis KTE n'est cité${dv?' (« '+esc(dv)+' » introuvable)':''}.</b> La demande passe « À lancer » : rien d'autre n'est créé tant que vous ne lancez pas la suite.</p><ol style="margin:6px 0 0 18px;padding:0;line-height:1.6"><li><b>Copier la consigne</b> et la coller dans Cowork (projet Akteev) : Claude crée le devis a posteriori, la commande, l'ARC et les tâches, avec votre validation.</li><li>Ou <b>chercher le devis</b> s'il existe sous un autre numéro.</li></ol>`;
+  ouvrirModal('Passer en commande',`<div style="font-size:13.5px"><div class="mut" style="margin-bottom:6px">${esc(exp)} — ${esc(obj)}</div>${etapes}
+    <label style="display:block;margin-top:10px">Consigne pour Claude<textarea id="cdeCons" style="width:100%;min-height:110px;margin-top:3px;font:12.5px/1.5 inherit">${esc(cons)}</textarea></label></div>`,
+    `<button class="btn" onclick="fermerModal()">Fermer</button>${nd?'':'<button class="btn" id="cdeCher">Chercher le devis</button>'}<button class="btn${nd?'':' p'}" id="cdeCop">Copier la consigne</button>${nd?`<a class="btn" href="#/devis/${d.id}" id="cdeFiche">Fiche du devis</a><a class="btn p" href="./?devis=${encodeURIComponent(nd)}" target="_blank" id="cdeEd">Ouvrir l'éditeur (Commande reçue)</a>`:''}`);
+  $('cdeCop').onclick=async()=>{try{await navigator.clipboard.writeText($('cdeCons').value)}catch(e){$('cdeCons').select();document.execCommand('copy')}toast('Consigne copiée : collez-la dans Cowork')};
+  if($('cdeCher'))$('cdeCher').onclick=()=>{fermerModal(true);location.hash='#/devis'};
+  if($('cdeFiche'))$('cdeFiche').onclick=()=>fermerModal(true)}
 async function actionDepot(id,a){const m=MODS.depot;if(!m)return;const row=(S.rows[m.t]||[]).find(x=>x.id==id);if(!row)return;
   const opt=v=>(sch(m.t).par.Statut?.select_options||[]).find(o=>o.value===v);
   const passer=async v=>{const o=opt(v);if(o&&txt(row.Statut)!==v)await changerStatut('depot',row,o.id,o.value)};
   try{
     if(a==='cde'){const dv=String(txt(row['Devis cité'])||'').trim().toUpperCase();await charger(MODS.devis.t);
       const d=dv&&(S.rows[MODS.devis.t]||[]).find(x=>String(txt(x['N° devis'])).toUpperCase().startsWith(dv));
-      await passer('En cours');
-      if(d)location.hash='#/devis/'+d.id;else{toast(dv?'Devis '+dv+' introuvable : cherchez-le dans la liste':'Aucun devis cité : cherchez-le dans la liste',true);location.hash='#/devis'}}
+      await passer(d?'En cours':'À lancer');if(location.hash.startsWith('#/depot'))await route();fenetreCommandeDepot(row,d,dv);return}
     else if(a==='cf'){await passer('En cours');location.hash='#/cf/nouveau'}
     else if(a==='ddp'){await passer('À lancer');toast('DDP marquée « À lancer » : dites « lance les DDP à traiter » à Claude dans Cowork')}
     else if(a==='ok')await passer('Traité');
@@ -4912,6 +4926,80 @@ async function repondreClient(row,forcer){
     finBouton();
     toast(`Brouillon ${mode==='réponse'?'de réponse ':''}prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}.${ouvert?'':' Recliquez sur « Répondre au client » pour l’ouvrir.'} Une fois le mail envoyé, le devis passe à « Envoyé » tout seul (contrôle des Éléments envoyés toutes les heures, 8 h – 19 h).`);
   }catch(e){console.error(e);toast('Réponse au client : '+e.message,true);finBouton()}
+}
+/* ---------- Envoyer l'ARC au client (25/11/2026) : réponse à tous au mail de COMMANDE, PDF de l'ARC joint, rien n'est envoyé.
+   Mail de commande : ligne « À traiter » (Dépôts) Commande client du même n° d'affaire ou n° de commande client, sinon
+   « Mail source » du devis, sinon recherche autour de la date de commande et choix de l'utilisateur. ---------- */
+function texteArc(row,cli,ref,contact){
+  const num=txt(row['N° ARC']),cde=txt(row['N° commande client']),liv=row['Date de livraison']?dfr(row['Date de livraison']):'',ton=tonClient(cli,contact,row.Client);
+  const L=[`<p>${esc(ton.salut)}</p>`,
+    ton.tu?`<p>Merci pour ta commande${cde?' <b>'+esc(cde)+'</b>':''}. Tu trouveras ci-joint notre accusé de réception <b>${esc(num)}</b>.${liv?`<br>Livraison confirmée le ${esc(liv)}.`:''}</p>`
+      :`<p>Nous vous remercions pour votre commande${cde?' <b>'+esc(cde)+'</b>':''}. Veuillez trouver ci-joint notre accusé de réception <b>${esc(num)}</b>.${liv?`<br>Livraison confirmée le ${esc(liv)}.`:''}</p>`,
+    (f=>`<p>${esc(f.dispo)}</p><p>${esc(f.sal)}</p>`)(finMail(ton.tu,num)),
+    `<p>${esc(ref?txt(ref.Nom):'')}${ref?'<br>':''}<b>KTE</b><br>6 rue de la gatine – 49300 Cholet<br>${esc(txt(ref?.['Téléphone'])||'02-41-62-27-71')}${ref&&txt(ref['E-mail'])?' – '+esc(txt(ref['E-mail'])):''}<br>www.kte-fr.com</p>`];
+  return `<div style="font-family:Calibri,Arial,sans-serif;font-size:11pt">${L.join('')}</div>`}
+function sourceCommande(row){
+  const aff=String(txt(row.Affaire)||'').trim().toUpperCase(),cde=String(txt(row['N° commande client'])||'').trim(),dvn=String(txt(row.Devis)||'').trim().toUpperCase();
+  const D=MODS.depot?(S.rows[MODS.depot.t]||[]):[];
+  const d=D.filter(x=>txt(x.Type)==='Commande client'&&txt(x['Message-ID'])&&/@$/.test(txt(x['Boîte']))&&(
+      (aff&&String(txt(x['Devis cité'])).toUpperCase()===aff)||(dvn&&String(txt(x['Devis cité'])).toUpperCase()===dvn)||(cde&&txt(x.Objet).includes(cde))))
+    .sort((a,b)=>String(b['Reçu le']||'').localeCompare(String(a['Reçu le']||'')))[0];
+  if(d)return txt(d['Boîte'])+' | '+txt(d['Message-ID']);
+  const dv=(S.rows[MODS.devis.t]||[]).find(x=>x.id===row.Devis?.[0]?.id);return dv?dv['Mail source']:''}
+async function repondreArc(row){
+  const num=txt(row['N° ARC']);
+  const b=$('bRepArc');const finBouton=()=>{if(b){b.disabled=false;b.innerHTML=`${ico('mail')}Envoyer l’ARC au client`}};
+  try{const p=await api(`/rows/table/${MODS.arc.t}/${row.id}/?user_field_names=true`);if(p?.id){majRow(MODS.arc.t,p);row=p;if(SALE?.k==='arc'&&SALE.id===p.id)SALE.row=p}}catch(e){console.warn('Relecture de l’ARC',e)}
+  if(!row.PDF){toast(`Pas de PDF pour ${num} : validez l’ARC dans l’éditeur (le PDF est alors rangé dans 05_Commande).`,true);return}
+  if(String(txt(row['Contrôle version'])).startsWith('⚠')){toast(`${num} a été modifié depuis sa validation : validez la nouvelle version dans l’éditeur avant de l’envoyer.`,true);return}
+  if(b){b.disabled=true;b.textContent='Préparation du mail…'}
+  try{
+    const j=await jetonGraph(['Mail.ReadWrite','Files.ReadWrite.All']);
+    await Promise.all([charger(MODS.clients.t).catch(()=>[]),charger(MODS.referents.t).catch(()=>[]),charger(MODS.devis.t).catch(()=>[]),MODS.depot?charger(MODS.depot.t).catch(()=>[]):null]);
+    const cli=(S.rows[MODS.clients.t]||[]).find(r=>r.id===row.Client?.[0]?.id);
+    const ref=(S.rows[MODS.referents.t]||[]).find(r=>r.id===row['Référent KTE']?.[0]?.id);
+    const mailCli=txt(cli?.['E-mail']).split(/[;, ]+/).filter(x=>/@/.test(x));
+    let orig=null,partage=null;const src=srcMail(sourceCommande(row));
+    if(src){try{orig=await mailParId(j,'/me',src.id)}catch(e){console.warn('Mail de commande',e)}
+      if(!orig&&src.box&&src.box.toLowerCase()!==String(MSAL?.getActiveAccount()?.username||'').toLowerCase()){
+        try{const j2=await jetonGraph(['Mail.Read.Shared']);const base=`/users/${encodeURIComponent(src.box)}`;const o=await mailParId(j2,base,src.id);
+          if(o)partage=await graph(j2,`${base}/messages/${encodeURIComponent(o.id)}?$select=subject,from,toRecipients,ccRecipients,body,receivedDateTime`)}
+        catch(e){console.warn('Mail de commande (boîte '+src.box+')',e)}}}
+    if(!orig&&!partage){
+      if(b)b.textContent='Recherche du mail de commande…';
+      const L=await chercherDemandes(j,{'Date réception':row['Date commande']||row.Date,Objet:txt(row['N° commande client'])+' commande','Commentaire interne':'',Client:row.Client},cli);finBouton();
+      const c=await choisirDemande(num,L);if(!c||c==='nouveau'){if(c==='nouveau')toast('Un ARC se joint à la réponse au mail de commande : choisissez ce mail.',true);return}
+      if(b){b.disabled=true;b.textContent='Préparation du mail…'}
+      if(!c.boite)orig=await graph(j,`/me/messages/${encodeURIComponent(c.id)}?$select=id,subject,from,toRecipients`);
+      else partage=await graph(c.jj,`${c.base}/messages/${encodeURIComponent(c.id)}?$select=subject,from,toRecipients,ccRecipients,body,receivedDateTime`)}
+    const contact=(orig||partage)?.from?.emailAddress||null;
+    const it=await graph(j,'/shares/u!'+b64url(txt(row.PDF))+'/driveItem');
+    const dl=it['@microsoft.graph.downloadUrl'];if(!dl)throw new Error('PDF de l’ARC introuvable dans SharePoint');
+    const pdf=await (await fetch(dl)).blob();
+    let brouillon;
+    if(orig){
+      brouillon=await graph(j,`/me/messages/${encodeURIComponent(orig.id)}/createReplyAll`,{method:'POST',body:'{}'});
+      const d=await graph(j,`/me/messages/${brouillon.id}?$select=body,subject,toRecipients`);
+      const html=d.body.contentType==='html'?d.body.content:`<pre>${esc(d.body.content)}</pre>`;
+      const corps=/<body[^>]*>/i.test(html)?html.replace(/<body[^>]*>/i,m=>m+texteArc(row,cli,ref,contact)):texteArc(row,cli,ref,contact)+html;
+      const maj={body:{contentType:'HTML',content:corps}};if(!(d.subject||'').includes(num))maj.subject=`${d.subject||'RE:'} – ${num}`;
+      const internes=(d.toRecipients||[]).every(r=>/@kte-fr\.com$/i.test(r.emailAddress?.address||''));if(internes&&mailCli.length)maj.toRecipients=mailCli.map(a=>({emailAddress:{address:a}}));
+      await graph(j,`/me/messages/${brouillon.id}`,{method:'PATCH',body:JSON.stringify(maj)});
+    }else{
+      const de=partage.from?.emailAddress||{},adr=a=>(a||[]).map(r=>esc(r.emailAddress?.name||r.emailAddress?.address||'')).join('; ');
+      const obj=(partage.subject||'').replace(/^\s*(re|tr|fw|fwd)\s*:\s*/i,'');
+      const cite=`<hr style="border:none;border-top:1px solid #E1E1E1"><div style="font-family:Calibri,Arial,sans-serif;font-size:11pt"><b>De :</b> ${esc(de.name||'')} &lt;${esc(de.address||'')}&gt;<br><b>Envoyé :</b> ${esc(new Date(partage.receivedDateTime).toLocaleString('fr-FR'))}<br><b>À :</b> ${adr(partage.toRecipients)}${(partage.ccRecipients||[]).length?'<br><b>Cc :</b> '+adr(partage.ccRecipients):''}<br><b>Objet :</b> ${esc(partage.subject||'')}</div><br>`;
+      const og=partage.body?.contentType==='html'?(partage.body.content.match(/<body[^>]*>([\s\S]*)<\/body>/i)?.[1]??partage.body.content):`<pre>${esc(partage.body?.content||'')}</pre>`;
+      const ext=r=>(r||[]).map(x=>x.emailAddress?.address).filter(a=>a&&!/@kte-fr\.com$/i.test(a));
+      const a=de.address&&!/@kte-fr\.com$/i.test(de.address)?[de.address]:mailCli,cc=[...new Set([...ext(partage.toRecipients),...ext(partage.ccRecipients)])].filter(x=>!a.includes(x));
+      brouillon=await graph(j,'/me/messages',{method:'POST',body:JSON.stringify({subject:`RE: ${obj}${obj.includes(num)?'':' – '+num}`,
+        body:{contentType:'HTML',content:texteArc(row,cli,ref,contact)+cite+og},toRecipients:a.map(x=>({emailAddress:{address:x}})),ccRecipients:cc.map(x=>({emailAddress:{address:x}}))})})}
+    await graph(j,`/me/messages/${brouillon.id}/attachments`,{method:'POST',body:JSON.stringify({'@odata.type':'#microsoft.graph.fileAttachment',name:it.name||`${num}.pdf`,contentType:'application/pdf',contentBytes:await versB64(pdf)})});
+    const w=await graph(j,`/me/messages/${brouillon.id}?$select=webLink,toRecipients`);
+    const dest=(w.toRecipients||[]).map(r=>r.emailAddress?.address).filter(Boolean).join(', ')||'(destinataire à compléter)';
+    const ouvert=window.open(w.webLink,'_blank');finBouton();
+    toast(`Brouillon de réponse prêt dans Outlook (Brouillons) pour ${dest}, avec ${it.name}. Rien n’est envoyé : relisez puis envoyez depuis Outlook.${ouvert?'':' Autorisez les fenêtres surgissantes pour l’ouvrir.'}`);
+  }catch(e){console.error(e);toast('Envoi de l’ARC : '+e.message,true);finBouton()}
 }
 async function pdfTaches(cde,TT){
   if(!JSPDF){await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');await chargerScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');JSPDF=window.jspdf.jsPDF}
