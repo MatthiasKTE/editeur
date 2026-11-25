@@ -200,13 +200,29 @@ class CadreObs(Flowable):
         c.setFillColor(colors.black); c.setFont(FB, 10); c.drawString(6, h - t + 2*mm, self.TITRE); c.restoreState()
 
 
+RC_OBS = 'RC à compléter et sauvegarder dans Sharepoint'   # règle du 25/11/2026 : en rouge dès qu'un RC existe pour la commande
+
+
+def rc_present(a, json_path=None):
+    """Vrai si un RC est enregistré pour la commande : "rc": true dans le JSON (affaire ou fiche), ou fichier
+    RC_<affaire>*.xlsx dans ../Contrôle (à côté du dossier Fiches atelier)."""
+    if a.get('rc'):
+        return True
+    if json_path:
+        d = os.path.join(os.path.dirname(os.path.abspath(json_path)), '..', 'Contrôle')
+        return bool(glob.glob(os.path.join(d, f"RC_{a.get('affaire', '')}*.xlsx")))
+    return False
+
+
 def _observations(obs):
     """Cadre Observations toujours présent (28/10/2026) : réservé à une remarque manuelle du référent de l'affaire.
     Aucune observation automatique ; si le JSON en contient une, elle est écrite plus grand (13 pt)."""
     if not obs:
         return CadreObs()
     O = st(fontSize=13, leading=16.5)
-    t = Table([[Paragraph(CadreObs.TITRE, B)], [[Paragraph(rl(o), O) for o in obs]]], colWidths=[182*mm])
+    ORC = st(fontName=FB, fontSize=13, leading=16.5, textColor=colors.HexColor('#C00000'))
+    t = Table([[Paragraph(CadreObs.TITRE, B)], [[Paragraph(rl(o), ORC if str(o).startswith('RC à compléter') else O) for o in obs]]],
+              colWidths=[182*mm])
     t.setStyle(TableStyle([('BOX', (0, 0), (-1, -1), .6, colors.HexColor('#9A9A9A')),
                            ('LINEBELOW', (0, 0), (-1, 0), .5, TRAIT), ('BACKGROUND', (0, 0), (-1, 0), FOND),
                            ('VALIGN', (0, 0), (-1, -1), 'TOP'), ('TOPPADDING', (0, 1), (-1, 1), 5),
@@ -266,7 +282,10 @@ def fabrication(a, f, logo, out):
                            ('BACKGROUND', (0, -1), (-1, -1), FOND), ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
                            ('ALIGN', (0, 1), (0, -2), 'CENTER'), ('TOPPADDING', (0, 1), (-1, -2), 3),
                            ('BOTTOMPADDING', (0, 1), (-1, -2), 3)]))
-    obs = _observations(f.get('observations'))
+    ob = list(f.get('observations') or [])
+    if (f.get('rc') or a.get('_rc')) and m != 'Achats' and not any(str(o).startswith('RC à compléter') for o in ob):
+        ob.insert(0, RC_OBS)
+    obs = _observations(ob)
     def story():
         import copy as _c
         return [_haut(a, logo, m, K), Spacer(1, 6*mm), _c.deepcopy(info), Spacer(1, 4*mm), _gravure(f.get('gravure'), K),
@@ -305,6 +324,7 @@ def main():
     if len(sys.argv) < 4:
         sys.exit(__doc__)
     a = json.load(open(sys.argv[1], encoding='utf-8')); logo = sys.argv[2]; dos = sys.argv[3]
+    a['_rc'] = rc_present(a, sys.argv[1])
     os.makedirs(dos, exist_ok=True)
     for f in a['fiches']:
         # JSON écrits par Akteev : délais / référent parfois dans la fiche plutôt qu'au niveau de l'affaire
