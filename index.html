@@ -726,6 +726,24 @@ async function imageData(url){
       return {d:c.toDataURL('image/png'),w:c.width,h:c.height}}catch(e2){return null}}
 }
 const frDate=v=>v?new Date(String(v).slice(0,10)+'T12:00:00').toLocaleDateString('fr-FR'):'';
+/* Règle du 25/11/2026 (ARC-D265210, NLC) : pas de doublon sur l'ARC.
+   - adresse de livraison identique à l'adresse du client (même code postal + même rue) → non imprimée ;
+   - « Délai de livraison confirmé » qui ne fait que répéter la date de livraison → non imprimé. */
+const normAdr=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+function memeAdresse(liv,lignesCli){
+  const L=' '+normAdr(liv)+' ';if(!L.trim()||!lignesCli?.length)return false;
+  const C=lignesCli.map(normAdr).filter(Boolean);
+  const cp=C.join(' ').match(/\b\d{4,5}\b/g)||[];
+  const rue=C.find(x=>/\d/.test(x)&&/[a-z]{3,}/.test(x)&&!/^\d{4,5}\b/.test(x));
+  return !!rue&&L.includes(' '+rue+' ')&&cp.some(c=>L.includes(' '+c+' '));
+}
+function delaiRedondant(delai,dateLiv){
+  const d=String(delai||'').trim();if(!d)return true;if(!dateLiv)return false;
+  const f=frDate(dateLiv),iso=String(dateLiv).slice(0,10);
+  if(!d.includes(f)&&!d.includes(iso))return false;
+  const reste=normAdr(d.replace(f,' ').replace(iso,' ')).replace(/\b(livraison|livre|livrees?|le|au|pour|date|prevue?|confirmee?|disponibles?|pieces?|expedition|delai)\b/g,' ').trim();
+  return !reste;
+}
 
 /* ---- Vignettes du PDF ----
    Source principale : champ texte « Vignette PDF » de la ligne (image en data:…;base64, ~3 Ko), indépendant de S3.
@@ -958,7 +976,7 @@ async function construirePDF(){
   const autreAdr=TYPE==='bl'&&val('fAdrLivBL').trim();
   if(!autreAdr){lc(cli?(cli.Entreprise||cli['Code client']):'',true);adrCli.forEach(t=>lc(t))}
   else lc(val('fAdrLivBL').trim());
-  if(TYPE==='arc'&&val('fAdrLiv').trim()){yc+=2;yc=para('Livraison : '+val('fAdrLiv').trim(),cx0+4,yc,cw,{taille:9,lh:1.45})}
+  if(TYPE==='arc'&&val('fAdrLiv').trim()&&!memeAdresse(val('fAdrLiv'),[cli?.Entreprise,...adrCli])){yc+=2;yc=para('Livraison : '+val('fAdrLiv').trim(),cx0+4,yc,cw,{taille:9,lh:1.45})}
   yc+=4;cadre(cx0,y,85,yc-y);
   y=Math.max(ya,yc);
 
@@ -1037,7 +1055,7 @@ async function construirePDF(){
   if(TYPE==='devis'){blocs.push(['Délai: '+val('fDelai'),false],['',false],['Modalités et conditions de règlement :',true],[val('fCond'),false],[`Ce devis est valable ${val('fValid')||10} jours.`,false])}
   else if(TYPE==='arc'){
     if(val('fDateLiv'))blocs.push(['Date de livraison confirmée : '+frDate(val('fDateLiv')),true]);
-    if(val('fDelaiArc').trim())blocs.push(['Délai de livraison confirmé : '+val('fDelaiArc').trim(),true]);
+    if(!delaiRedondant(val('fDelaiArc'),val('fDateLiv')))blocs.push(['Délai de livraison confirmé : '+val('fDelaiArc').trim(),true]);
     if(val('fCondLiv').trim())blocs.push(['Livraison : '+val('fCondLiv').trim(),false]);
     blocs.push(['',false],['Modalités et conditions de règlement :',true],[val('fCondArc'),false]);
     if(val('fObsArc').trim())blocs.push(['Observations :',true],[val('fObsArc').trim(),false]);
