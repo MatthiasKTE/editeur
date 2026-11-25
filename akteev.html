@@ -5207,6 +5207,7 @@ async function faOuvrirExistante(nom){
     if(ach){const da=iso(fi.delai_atelier||G.delai_atelier);if(da)E.ch.faDelaiAt=da}
     const ex=iso(fi.expedition||G.expedition);if(ex)E.ch.faExp=ex;
     if(!t){const rn=norm(fi.referent_achat||fi.referent||G.referent||'').trim();const rr=rn&&E.REF.find(r=>[r['Nom complet'],r.Nom].some(x=>x&&norm(txt(x)).trim()===rn));if(rr)E.ch.faRef=String(rr.id)}
+    if(!ach&&fi.autres_pieces&&typeof fi.autres_pieces==='object'){const ap=fi.autres_pieces;E.ch.faApK=!!ap.kte;E.ch.faApS=!!ap.sst;E.ch.faApA=!!ap.aucune&&!ap.kte&&!ap.sst}
     if(!ach&&fi.gravure&&typeof fi.gravure==='object'){E.ch.faGrav=fi.gravure.oui?'oui':'non';if(fi.gravure.oui){E.ch.faGravTxt=fi.gravure.texte||'';E.ch.faGravProc=/laser/i.test(fi.gravure.procede||'')?'Laser':'Machine'}}
     E.ch.faObs=(Array.isArray(fi.observations)?fi.observations:[fi.observations]).filter(Boolean).join('\n');
     const reste=E.aff.map(faCopie),pris=new Set();
@@ -5271,6 +5272,15 @@ function faDessiner(){
       ${faChamp('Expédition client',faDate('faExp',v('faExp',cde['Date Livraison']||'')))}
       ${faChamp((ach?'Référent achat':'Référent')+' <span style="color:var(--err)">*</span>',faSel('faRef',optRef,v('faRef','')))}
     </div>`;
+    if(!ach){const apA=!!v('faApA',false),apK=!!v('faApK',false),apS=!!v('faApS',false),apOk=apA||apK||apS;
+      // Règle du 25/11/2026 : autres pièces sur la commande ? Aucune / KTE / Sous-traitance (KTE + SST possibles ensemble)
+      h+=`<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:8px 10px;border:1px solid ${apOk?'var(--trait)':'#F5D58A'};border-radius:8px;background:${apOk?'#fff':'#FFF8E6'}">
+        <b>Autres pièces de la commande <span style="color:var(--err)">*</span></b>
+        <label><input type="checkbox" id="faApA" ${apA?'checked':''}> Aucune</label>
+        <label><input type="checkbox" id="faApK" ${apK?'checked':''}> KTE</label>
+        <label><input type="checkbox" id="faApS" ${apS?'checked':''}> Sous-traitance</label>
+        <span class="mut" style="font-size:12px">KTE et Sous-traitance peuvent être cochées ensemble</span>
+      </div>`}
     if(!ach){const g=v('faGrav','');
       h+=`<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px;padding:8px 10px;border:1px solid ${g?'var(--trait)':'#F5D58A'};border-radius:8px;background:${g?'#fff':'#FFF8E6'}">
         <b>Gravure <span style="color:var(--err)">*</span></b>
@@ -5311,6 +5321,7 @@ function faDessiner(){
   if($('faMet'))$('faMet').onchange=()=>{faLire();faMetier(FT.ch.faMet);faDessiner()};
   if($('faTache'))$('faTache').onchange=()=>{faLire();const t=FT.TT.find(r=>String(r.id)===FT.ch.faTache);if(t){if(t['Échéance'])FT.ch.faDelai=t['Échéance'];const r=ids(t['Référent'])[0];if(r)FT.ch.faRef=String(r)}faDessiner()};
   $('mCorps').querySelectorAll('input[name=faGrav]').forEach(e=>e.onchange=()=>{faLire();faDessiner()});
+  ['faApA','faApK','faApS'].forEach(k=>{const e=$(k);if(e)e.onchange=()=>{if(e.checked){if(k==='faApA'){$('faApK').checked=false;$('faApS').checked=false}else $('faApA').checked=false}faLire();faDessiner()}});
   $('mCorps').querySelectorAll('input[type=checkbox][data-li]').forEach(e=>e.onchange=()=>{e.closest('tr').style.background=e.checked?'#F0FDF4':'';faTotal()});
   $('mCorps').querySelectorAll('input[data-c=qte]').forEach(e=>e.oninput=faTotal);
   const cocher=f=>{faLire();FT.lignes.forEach(l=>l.coche=f(l));faDessiner()};
@@ -5431,8 +5442,13 @@ async function faConstruirePDF(a,f,opt={}){
     :[['Délai atelier',rouge(a.delai_atelier)],['Expédition client',noir(a.expedition)],['Référent affaire',P_(a.referent||'',N)]];
   const info=TAB({w:[40,142],grille:true,bg:(i,j)=>j===0?FOND:null,pad:()=>({l:6*pt,r:6*pt,t:4*pt,b:4*pt}),rows:infos.map(([k,v])=>[P_(k,B),v])});
   y=info.dessiner(info.rows,y);
-  // 3. Gravure (fabrication)
-  if(!ach){y+=4;const g=f.gravure,rens=g!=null,oui=rens&&typeof g==='object'?!!g.oui:(rens?!!g:null);
+  // 3. Autres pièces de la commande (25/11/2026) : Aucune / KTE / Sous-traitance (cases vides si non renseigné), puis Gravure
+  if(!ach){y+=4;const ap=f.autres_pieces&&typeof f.autres_pieces==='object'?f.autres_pieces:{},apK=!!ap.kte,apS=!!ap.sst,apA=!!ap.aucune&&!apK&&!apS;
+    const au=TAB({w:[50,5,17,5,13,5,27,60],pad:()=>({l:2*pt,r:2*pt,t:5*pt,b:5*pt}),cadre:{w:.8,c:TRAIT},rows:[[
+      P_('Autres pièces de la commande :',B),caseC(apA),P_('Aucune',N),caseC(apK),P_('KTE',N),caseC(apS),P_('Sous-traitance',N),null]]});
+    y=au.dessiner(au.rows,y);y+=3}
+  // Gravure (fabrication)
+  if(!ach){const g=f.gravure,rens=g!=null,oui=rens&&typeof g==='object'?!!g.oui:(rens?!!g:null);
     const tg=rens&&typeof g==='object'?String(g.texte||g.precision||'').trim():'',pro=rens&&typeof g==='object'?String(g.procede||'').trim().toLowerCase():'';
     const gr=TAB({w:[17,5,9,5,9,72,17,5,16,5,22],pad:()=>({l:2*pt,r:2*pt,t:5*pt,b:5*pt}),cadre:{w:oui?1.2:.8,c:oui?K:TRAIT},rows:[[
       P_('Gravure :',B),caseC(rens&&oui===false),P_('Non',N),caseC(!!oui),P_('Oui',N),
@@ -5499,6 +5515,7 @@ async function faCreerFiche(){
   const c=FT.ch,M=FA_METIERS[FT.metier],ach=!!M.achats,{cde,n}=FT,ED=FT.edit,manque=[];
   const L=FT.lignes.filter(l=>l.coche&&(String(l.des).trim()||String(l.rep).trim()));
   if(!L.length)manque.push('au moins une ligne cochée');if(!c.faDelai)manque.push((ach?'Réception au plus tard':'Délai atelier')+' (jj/mm/aaaa)');if(!c.faRef)manque.push('Référent');
+  if(!ach&&!c.faApA&&!c.faApK&&!c.faApS)manque.push('Autres pièces de la commande (Aucune / KTE / Sous-traitance)');
   if(!ach&&!c.faGrav)manque.push('Gravure (Non / Oui)');if(!ach&&c.faGrav==='oui'&&!String(c.faGravTxt||'').trim())manque.push('texte à graver');
   if(manque.length)return toast('À renseigner : '+manque.join(', '),true);
   const b=$('ftOk');b.disabled=true;b.textContent='Création du PDF…';
@@ -5514,7 +5531,7 @@ async function faCreerFiche(){
   const aff={affaire:n,client:txt(cli?.Entreprise)||txt(cde.Client),edition:ED?(ED.src?.data?.edition||ED.edition||jour):jour,
     delai_atelier:frD(ach?c.faDelaiAt:c.faDelai),expedition:frD(c.faExp),referent:nomRef(refAff)||nomRef(refR),dossier_nom:dosNom,dossier_url:url,vignettes:'Vignettes'};
   const num=q=>q===''||q==null?0:(+String(q).replace(',','.')||0);
-  const fe={metier:FT.metier,...(ach?{reception:frD(c.faDelai),referent_achat:nomRef(refR)}:{gravure:c.faGrav==='oui'?{oui:true,texte:String(c.faGravTxt||'').trim(),procede:c.faGravProc||'Machine'}:{oui:false}}),
+  const fe={metier:FT.metier,...(ach?{reception:frD(c.faDelai),referent_achat:nomRef(refR)}:{autres_pieces:{aucune:!!c.faApA&&!c.faApK&&!c.faApS,kte:!!c.faApK,sst:!!c.faApS},gravure:c.faGrav==='oui'?{oui:true,texte:String(c.faGravTxt||'').trim(),procede:c.faGravProc||'Machine'}:{oui:false}}),
     lignes:L.map(l=>{const v=l.vigNom?{vignette:l.vigNom}:{},x={rep:String(l.rep).trim(),designation:String(l.des).trim()};
       return ach?{...v,...x,ref:String(l.reff||'').trim(),fournisseur:l.four||'',dimensions:l.dim||'',qte:num(l.qte),pour:l.pour||''}
         :{...v,...x,ref:String(l.ref||'').trim(),qte:num(l.qte),matiere:l.mat||'',traitement:l.trait||'',dimensions:l.dim||''}}),
