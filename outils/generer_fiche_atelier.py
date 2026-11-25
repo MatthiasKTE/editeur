@@ -16,6 +16,7 @@ Le JSON décrit l'affaire et une ou plusieurs fiches :
                  "ref": "Réf. <n° de plan>", "qte": 1, "matiere": "C45E", "traitement": "—",
                  "dimensions": "395 × 370 × 20"}],
      "gravure": {"oui": true, "texte": "N° de rep. + D26xxxx", "procede": "Laser"},   # ou {"oui": false}
+     "autres_pieces": {"aucune": false, "kte": true, "sst": true},   # absent = cases vides (à cocher à la main)
      "observations": ["…"]},
     {"metier": "Achats",                                # fiche d'achats des éléments standards
      "reception": "03/11/2026", "referent_achat": "Prénom Nom",
@@ -41,6 +42,8 @@ Mise en page du 28/10/2026 :
 - Expédition client en 15 pt gras noir ; plus de ligne « Dossier / plans » ;
 - cadre « Observations » toujours présent, vide pour une remarque manuelle ; une observation
   du JSON (rare) y est écrite en 13 pt ;
+- ligne « Autres pièces de la commande : ☐ Aucune ☐ KTE ☐ Sous-traitance » (25/11/2026) sous l'encadré des délais,
+  sur toutes les fiches de fabrication (KTE et Sous-traitance peuvent être cochées ensemble) ;
 - fiches de fabrication (sauf Contrôle) : en bas de la page 1, tableaux Appro matière (2 lignes) et Appro outillage
   (1 ligne), colonnes Fournisseur / ARC (croix à réception de l'ARC) / Date de livraison, remplis à la main par l'opérateur.
 """
@@ -258,6 +261,21 @@ def _gravure(g, K):
     return t
 
 
+def _autres(ap):
+    """Ligne « Autres pièces de la commande » (25/11/2026) : Aucune / KTE / Sous-traitance (KTE + SST possibles ensemble).
+    ap = {"aucune": bool, "kte": bool, "sst": bool} ; None = cases vides (à cocher à la main)."""
+    ap = ap if isinstance(ap, dict) else {}
+    kte, sst = bool(ap.get('kte')), bool(ap.get('sst'))
+    aucune = bool(ap.get('aucune')) and not (kte or sst)
+    row = [Paragraph('Autres pièces de la commande :', B), Case(aucune), Paragraph('Aucune', N),
+           Case(kte), Paragraph('KTE', N), Case(sst), Paragraph('Sous-traitance', N), '']
+    t = Table([row], colWidths=[50*mm, 5*mm, 17*mm, 5*mm, 13*mm, 5*mm, 27*mm, 60*mm])
+    t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('LEFTPADDING', (0, 0), (-1, -1), 2),
+                           ('RIGHTPADDING', (0, 0), (-1, -1), 2), ('TOPPADDING', (0, 0), (-1, -1), 5),
+                           ('BOTTOMPADDING', (0, 0), (-1, -1), 5), ('BOX', (0, 0), (-1, -1), .8, TRAIT)]))
+    return t
+
+
 def _rouge(d): return Paragraph(f'<font color="#B0002A" size="15"><b>{d}</b></font>', N)
 def _noir(d): return Paragraph(f'<font size="15"><b>{d}</b></font>', N)
 
@@ -288,7 +306,8 @@ def fabrication(a, f, logo, out):
     obs = _observations(ob)
     def story():
         import copy as _c
-        return [_haut(a, logo, m, K), Spacer(1, 6*mm), _c.deepcopy(info), Spacer(1, 4*mm), _gravure(f.get('gravure'), K),
+        return [_haut(a, logo, m, K), Spacer(1, 6*mm), _c.deepcopy(info), Spacer(1, 4*mm), _autres(f.get('autres_pieces')),
+                Spacer(1, 3*mm), _gravure(f.get('gravure'), K),
                 Spacer(1, 5*mm), _c.deepcopy(t), Spacer(1, 4*mm), _c.deepcopy(obs)]
     _construire(out, f"Fiche atelier {m} {a['affaire']}", story, a['affaire'], appro, K)
 
