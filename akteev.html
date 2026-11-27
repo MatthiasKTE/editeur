@@ -457,7 +457,7 @@ const MODS={
  bl:{t:1261382,nom:'Bons de livraison',un:'BL',ico:'bl',grp:'Ventes',cols:['N° BL','Client','Affaire','Date','Statut','PDF'],statut:'Statut',date:'Date',editeur:'bl',num:'N° BL',
    liees:[{nom:'Lignes',t:1261381,lien:'BL',cols:['Description','Quantité commandée','Quantité livrée'],ordre:'Ordre'}]},
  clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
-   liees:[{nom:'Contacts',t:T_CONTACTS,lien:'Client',cols:['Nom','Fonction','E-mail','Téléphone','Mobile','Facturation'],ajout:true,contacts:true},{nom:'Devis',mod:'devis',lien:'Client'},{nom:'Commandes',mod:'commandes',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
+   liees:[{nom:'Affaires',mod:'commandes',lien:'Client',affaires:true},{nom:'Contacts',t:T_CONTACTS,lien:'Client',cols:['Nom','Fonction','E-mail','Téléphone','Mobile','Facturation'],ajout:true,contacts:true},{nom:'Devis',mod:'devis',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
  taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Fiche','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
    requis:['Libellé','Échéance','Référent'],cacheStatuts:['Fait','Annulée'],solde:'Fait',faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
@@ -4132,6 +4132,7 @@ async function dessinerLiees(i){
   // compteurs de tous les onglets (en arrière-plan)
   L.forEach((x,j)=>{const t=x.t||MODS[x.mod].t;charger(t).then(R=>{const e=$('on_'+j);if(e)e.textContent=R.filter(r=>ids(r[x.lien]).includes(row.id)).length}).catch(()=>{})});
   const x=L[i],t=x.t||MODS[x.mod].t;
+  if(x.affaires){await dessinerAffairesClient(row,i);return}
   let R;try{R=await charger(t)}catch(e){$('lCorps').innerHTML=`<div class="vide">Table inaccessible : ${esc(e.message)}</div>`;return}
   if(SALE?.row!==row||ONG!==i)return;
   const sc=sch(t);
@@ -4189,6 +4190,52 @@ async function importerContactsAxonaut(cli){
     .map(a=>({Nom:[a.firstname,a.lastname].filter(Boolean).join(' ')||a.email,Client:[cli.id],Fonction:a.job||'','E-mail':ctMel(a.email),'Téléphone':ctTel(a.phone_number),Mobile:ctTel(a.cellphone_number),Facturation:!!a.is_billing_contact,Actif:true,'ID Axonaut':String(a.id)}));
   if(items.length)await api(`/rows/table/${T_CONTACTS}/batch/?user_field_names=true`,{method:'POST',body:JSON.stringify({items})});
   await charger(T_CONTACTS,true);return items.length;
+}
+
+/* ---------- Fiche client : tableau des affaires (27/11/2026) ----------
+   Une ligne par commande du client : n°, date de commande, montant HT, statut, livraison (date de livraison réelle
+   si livrée, sinon date prévue en vert ; en rouge si dépassée). Filtres : du / au sur la date de commande, n° d'affaire,
+   raccourcis Exercice en cours / Exercices passés / Tout. */
+const ACV={};
+async function dessinerAffairesClient(row,i){
+  const box=$('lCorps');if(!box)return;
+  let C;try{[C]=await Promise.all([charger(MODS.commandes.t),charger(MODS.bl.t).catch(()=>[])])}catch(e){box.innerHTML=`<div class="vide">Table inaccessible : ${esc(e.message)}</div>`;return}
+  if(SALE?.row!==row||ONG!==i)return;
+  const BL=S.rows[MODS.bl.t]||[],a=auj(),an=a.slice(0,4);
+  const dc=r=>String(r['Date cde client']||r['Date réception']||'').slice(0,10);
+  const L=C.filter(r=>ids(r.Client).includes(row.id)).map(r=>{
+    const st=txt(r.Statut),bls=BL.filter(b=>ids(b.Affaire).includes(r.id)||ids(r.BL).includes(b.id)),dBL=bls.map(b=>String(b.Date||'').slice(0,10)).filter(Boolean).sort().pop()||'';
+    const livree=/^(Livrée|Soldée)$/.test(st),prev=String(r['Date Livraison']||'').slice(0,10);
+    return{r,aff:txt(r['N° affaire']),dc:dc(r),mt:+r['Montant HT (€)']||0,st,livree,dLiv:livree?(dBL||prev):prev,annule:/^(Annulée|Perdu)$/.test(st)}});
+  // Affaires connues seulement d'Axonaut (avant Akteev) : commandes Axonaut de l'exercice, puis factures (date de 1re facture)
+  const cid=String(row['ID Axonaut']||'').trim(),vus=new Set(L.map(x=>x.aff));
+  if(cid)try{await charger(T_STATS);const SD=statsDonnees(),X=finDonnees(),G={};
+    for(const c of SD.C)if(String(c.cid)===cid&&c.aff&&!vus.has(c.aff)){const g=G[c.aff]||(G[c.aff]={aff:c.aff,dc:'',mt:0,fa:0,dF:''});g.mt+=c.ht;if(!g.dc||c.date<g.dc)g.dc=String(c.date).slice(0,10);if(c.livr)g.livr=String(c.livr).slice(0,10)}
+    for(const f of X.toutesF)if(String(f.cid)===cid&&f.aff&&!vus.has(f.aff)){const g=G[f.aff]||(G[f.aff]={aff:f.aff,dc:'',mt:0,fa:0,dF:''});g.fa+=f.ht;if(!g.dF||f.date>g.dF)g.dF=f.date;if(!g.dc1||f.date<g.dc1)g.dc1=f.date}
+    for(const g of Object.values(G)){const sold=g.fa>0&&(!g.mt||g.fa>=g.mt-1);
+      L.push({r:null,ax:true,aff:g.aff,dc:g.dc||g.dc1||'',dcFact:!g.dc,mt:g.mt||g.fa,st:sold?'Facturée (Axonaut)':g.fa?'Facturée en partie (Axonaut)':'Commandée (Axonaut)',livree:sold,dLiv:sold?'':(g.livr||''),dFact:g.dF,annule:false})}
+  }catch(e){}
+  const f=ACV[row.id]||(ACV[row.id]={du:'',au:'',aff:''});
+  const V=L.filter(x=>(!f.aff||x.aff===f.aff)&&(!f.du||x.dc>=f.du)&&(!f.au||(x.dc&&x.dc<=f.au))).sort((p,q)=>(q.dc||'').localeCompare(p.dc||'')||q.aff.localeCompare(p.aff));
+  const tot=V.filter(x=>!x.annule).reduce((s,x)=>s+x.mt,0),enCours=V.filter(x=>!x.livree&&!x.annule);
+  const raccourci=(k,l,on)=>`<button class="btn ${on?'p':''}" data-acr="${k}">${l}</button>`;
+  const exo=f.du===`${an}-01-01`&&!f.au,passe=!f.du&&f.au===`${+an-1}-12-31`,tout=!f.du&&!f.au;
+  let h=`<div class="outils" style="flex-wrap:wrap;gap:6px;margin-bottom:8px">
+    ${raccourci('exo','Exercice '+an,exo)}${raccourci('passe','Exercices passés',passe)}${raccourci('tout','Toutes',tout&&!f.aff)}
+    <span class="mut" style="margin-left:8px">Commande du</span><input type="date" id="acDu" value="${esc(f.du)}"><span class="mut">au</span><input type="date" id="acAu" value="${esc(f.au)}">
+    <span class="mut" style="margin-left:8px">Affaire</span><select id="acAff"><option value="">Toutes (${L.length})</option>${[...L].sort((p,q)=>q.aff.localeCompare(p.aff)).map(x=>`<option ${x.aff===f.aff?'selected':''}>${esc(x.aff)}</option>`).join('')}</select></div>`;
+  h+=`<div class="tw"><table class="l" id="clAff"><thead><tr><th>N° affaire</th><th>Date de commande</th><th class="n">Montant HT</th><th>Statut</th><th>Livraison</th></tr></thead><tbody>`+
+    V.map(x=>{const retard=!x.livree&&!x.annule&&x.dLiv&&x.dLiv<a;
+      const liv=x.annule?'<span class="mut">—</span>':x.livree?(x.dLiv?dfr(x.dLiv):x.dFact?`<span class="mut">facturée le ${dfr(x.dFact)}</span>`:'<span class="mut">livrée</span>'):x.dLiv?`<b style="color:${retard?'var(--err)':'#15803D'}">${dfr(x.dLiv)}</b> <span style="font-size:11.5px;color:${retard?'var(--err)':'#15803D'}">${retard?'prévue, dépassée':'prévue'}</span>`:'<span style="color:#15803D;font-size:12px">à planifier</span>';
+      return`<tr ${x.r?`data-h="#/commandes/${x.r.id}"`:'style="cursor:default"'}${x.annule?' style="opacity:.55"':''}><td class="prim">${esc(x.aff)}${x.r&&txt(x.r.Objet)?`<div class="mut" style="font-size:11.5px;font-weight:400">${esc(txt(x.r.Objet).slice(0,50))}</div>`:''}</td><td>${x.dc?dfr(x.dc)+(x.dcFact?' <span class="mut" style="font-size:11.5px" title="date de commande inconnue : date de la 1re facture Axonaut">(fact.)</span>':''):'<span class="mut">—</span>'}</td><td class="n">${x.mt?eur(x.mt):'<span class="mut">—</span>'}</td><td>${esc(x.st)||'—'}</td><td>${liv}</td></tr>`}).join('')+
+    `</tbody><tfoot><tr><td colspan="2">${V.length} affaire${V.length>1?'s':''} · ${enCours.length} non livrée${enCours.length>1?'s':''}</td><td class="n">${eur(tot)}</td><td colspan="2" class="mut" style="font-size:12px">hors annulées / perdues${L.some(x=>x.ax)?' · affaires antérieures à Akteev reprises d’Axonaut':''}</td></tr></tfoot></table></div>`;
+  if(!V.length)h+='<div class="vide">Aucune affaire sur cette sélection</div>';
+  box.innerHTML=h;
+  const maj=()=>dessinerAffairesClient(row,i);
+  box.querySelectorAll('[data-acr]').forEach(b=>b.onclick=()=>{const k=b.dataset.acr;f.aff='';
+    if(k==='exo'){f.du=`${an}-01-01`;f.au=''}else if(k==='passe'){f.du='';f.au=`${+an-1}-12-31`}else{f.du='';f.au=''}maj()});
+  $('acDu').onchange=e=>{f.du=e.target.value;maj()};$('acAu').onchange=e=>{f.au=e.target.value;maj()};$('acAff').onchange=e=>{f.aff=e.target.value;maj()};
+  box.querySelectorAll('tbody tr[data-h]').forEach(tr=>tr.onclick=()=>location.hash=tr.dataset.h);
 }
 /* Petite fenêtre d'édition pour les lignes sans module propre (ex. lignes de commande fournisseur). */
 async function editerLigne(t,x,r){
