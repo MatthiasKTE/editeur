@@ -244,6 +244,9 @@ table.cmp td.cmpPV input{width:96px;text-align:right;border:1px solid #F3C98B;bo
 table.cmp td.cmpPV input.prop::placeholder{color:#9A6B2F;font-style:italic}
 table.cmp th.cmpDHL,table.cmp td.cmpDHL{background:#F5F1FC;color:#5B4A86}
 table.cmp th.cmpDHL{color:#6D5A9C}
+table.cmp th.cmpEst,table.cmp td.cmpEst{background:#F3F4F6;color:#6B7280;font-style:italic}
+table.cmp td.cmpEst .cmpEc{font-style:italic}
+table.cmp th.cmpEst .mode{display:inline-block;font-style:normal;font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:9px;background:#E5E7EB;color:#374151;margin-top:2px}
 .cmpOutils .cmpDhlOut{background:#F5F1FC;color:#5B4A86;border:1px solid #DCD0F2;border-radius:6px;padding:2px 6px}
 .cmpOutils .cmpDhlOut input{border-color:#DCD0F2}
 table.cmp .cmpProp{color:#9A6B2F;font-style:italic}
@@ -2191,8 +2194,16 @@ function comparatifDonnees(dv){
   const lignes=L.map(l=>{const par={};for(const x of cols){const p=prixDe(x).find(p=>lie(p,l));if(p){par[x.c.id]=p;pris.add(p.id)}}return{l,par}});
   /* Prix sans ligne de devis correspondante (repère inconnu) : lignes « hors devis » regroupées par repère / désignation */
   const hors={};for(const x of cols)for(const p of prixDe(x)){if(pris.has(p.id))continue;const k=p.Rep!=null&&p.Rep!==''?'r'+p.Rep:'d'+norm(txt(p['Désignation SST']));(hors[k]||(hors[k]={l:null,rep:p.Rep,des:txt(p['Désignation SST']),par:{}})).par[x.c.id]=p}
-  return{L,C,cols,autres,lignes:lignes.concat(Object.values(hors))};
+  /* Estimations de Claude (27/11/2026) : lignes Prix SST du devis sans consultation, Réf « D26xxxx – Estimation Claude KTE|Chine – Rep n ».
+     Une colonne grise par mode (KTE / Chine) ; jamais « retenables », hors vert/rouge et hors totaux des SST. */
+  const E=(S.rows[T_PSST]||[]).filter(p=>estEstim(p)&&ids(p.Devis).includes(dv.id)&&!ids(p.Consultation).length);
+  const ests=['KTE','Chine'].filter(m=>E.some(p=>estMode(p)===m)).map(m=>({mode:m,P:E.filter(p=>estMode(p)===m)}));
+  const tout=lignes.concat(Object.values(hors));let estHors=0;
+  for(const e of ests)for(const p of e.P){const x=tout.find(x=>x.l&&lie(p,x.l));if(x)(x.est||(x.est={}))[e.mode]=p;else estHors++}
+  return{L,C,cols,autres,ests,estHors,lignes:tout};
 }
+const estEstim=p=>/estimation claude/i.test(String(txt(p&&p['Réf'])||''));
+const estMode=p=>/chine|china/i.test(String(txt(p['Réf'])||''))?'Chine':'KTE';
 /* Vignettes couleur du dossier SharePoint (02_Chiffrage/Vignettes/<n°>_RepXX_….png, rendu 3D) : bien plus lisibles que
    « Vignette PDF » (souvent 160 px noir et blanc). Lecture Graph silencieuse (jamais de fenêtre de connexion) ; à défaut,
    « Vignette PDF ». Liens de téléchargement Graph valables ~1 h : cache 30 min par devis. */
@@ -2214,10 +2225,10 @@ async function cmpChargerVigSP(dv){
   catch(e){CMP_VIG[dv.id]={t:Date.now(),map:{}};console.warn('vignettes SharePoint',e.message)}
 }
 function dessinerComparatif(dv){
-  const {cols,autres,lignes}=comparatifDonnees(dv),ecr=peutEcrire('devis');
+  const {cols,autres,lignes,ests,estHors}=comparatifDonnees(dv),ecr=peutEcrire('devis');
   const q=x=>x.l?+x.l['Quantité']||0:0;
   let h=`<div class="mut" style="margin-bottom:10px">${esc(txt(dv.Client))} · ${esc(String(txt(dv.Objet)).slice(0,90))}${autres.length?` · <span title="Consultés sans offre">${autres.map(x=>`${x.rep==='Refus'?'✕':x.rep==='Question'?'?':'⏳'} ${esc(x.four)}`).join(' · ')}</span>`:''}</div>`;
-  if(!cols.length){$('mCorps').innerHTML=h+'<div class="vide">Aucune offre reçue pour ce devis pour l’instant.</div>';return}
+  if(!cols.length&&!ests.length){$('mCorps').innerHTML=h+'<div class="vide">Aucune offre reçue pour ce devis pour l’instant.</div>';return}
   if(!lignes.length){$('mCorps').innerHTML=h+'<div class="vide">Ce devis n’a pas encore de lignes (à créer dans l’éditeur).</div>';return}
   const tot={},nbL={};cols.forEach(x=>{tot[x.c.id]=0;nbL[x.c.id]=0});
   let cible=CMP_CIBLE[dv.id]||'vide';if(cible.startsWith('c')&&!cols.some(c=>'c'+c.c.id===cible))cible='vide';
@@ -2231,6 +2242,7 @@ function dessinerComparatif(dv){
     <button class="btn mini p" id="cApp" title="Écrit le PV proposé (gris) dans les lignes choisies">Appliquer</button><span class="mut" style="font-size:12px">Les propositions grises comptent déjà dans le total ; un PV saisi à la main est toujours prioritaire.</span></div>`;
   h+=`<div class="tw"><table class="l cmp"><thead><tr><th style="cursor:default"></th><th style="cursor:default">Rep</th><th style="cursor:default">Désignation</th><th class="n" style="cursor:default">Qté</th>
    ${cols.map(x=>`<th class="n" style="cursor:default;min-width:118px"><a href="#/consult/${x.c.id}" onclick="fermerModal()" style="color:inherit">${esc(x.four)}</a>${x.c['Délai']?`<div class="mut" style="font-weight:400;font-size:11px">${esc(x.c['Délai'])}</div>`:''}${ecr?`<button class="btn mini" data-tout="${x.c.id}" title="Retenir ${esc(x.four)} pour toutes ses lignes chiffrées">Tout retenir</button>`:''}</th>`).join('')}
+   ${ests.map(e=>`<th class="n cmpEst" style="cursor:default;min-width:118px" title="Estimation de Claude (connaissances + prix d’achat et de vente KTE) : ordre de grandeur pour comparer, jamais un prix officiel – ne peut pas être retenue">Estimation Claude<br><span class="mode">${e.mode==='Chine'?'réalisation Chine':'réalisation KTE'}</span></th>`).join('')}
    <th class="n" style="cursor:default" title="Coût unitaire (interne) de la ligne de devis">Coût retenu</th><th class="n cmpDHL" style="cursor:default" title="Transport DHL estimé, pièces retenues chez un fournisseur chinois : poids × ${esc(CMPC.dhl)} €/kg × quantité (ajouté au coût de revient)">DHL</th><th class="n cmpPV" style="cursor:default" title="Prix unitaire HT de vente (lignes du devis) ; en gris : proposition coût × coef, pas encore enregistrée">PV unitaire</th><th class="n cmpPV" style="cursor:default" title="PV unitaire × quantité du devis">PV total</th></tr></thead><tbody>`;
   lignes.forEach((x,i)=>{
     const pe=cols.map(c=>[x.par[c.c.id],c]).filter(([p,c])=>p&&p['PU HT']!=null&&p['PU HT']!==''&&estEUR(p.Devise||c.c.Devise)).map(([p])=>+p['PU HT']);
@@ -2245,11 +2257,18 @@ function dessinerComparatif(dv){
       const tip=[p['Quantité']!=null&&p['Quantité']!==''?'Qté offre : '+nb(p['Quantité']):'',p['Délai']?'Délai : '+p['Délai']:'',txt(p.Source)?'Source : '+txt(p.Source):'',txt(p['Désignation SST'])?'Désignation SST : '+txt(p['Désignation SST']):'',txt(p.Commentaire)].filter(Boolean).join('\n');
       h+=`<td class="n ${best?'cmpMin':pire?'cmpMax':''} ${p.Retenu?'cmpRet':''}" title="${esc(tip)}">${eu?eur(pu):nb(pu)+' '+esc(dev)}${txt(p.Source)==='À vérifier'?' <span style="color:#C2410C" title="Prix à vérifier">●</span>':''}
         ${eu&&min&&pu>min?`<div class="cmpEc">+${Math.round((pu-min)/min*100)} %</div>`:''}${p.Retenu?'<div class="cmpEc" style="color:#15803D;font-weight:700">✓ retenu</div>':ecr&&x.l&&eu?`<button class="btn mini" data-ret="${p.id}" data-l="${x.l.id}">Retenir</button>`:ecr&&!x.l&&eu?`<button class="btn mini" data-hors="${i}" data-hp="${p.id}" title="Crée la ligne du devis et retient ce prix">Créer et retenir</button>`:''}</td>`}
+    for(const e of ests){const p=x.est&&x.est[e.mode];
+      if(!p||vide(p['PU HT'])){h+=`<td class="n cmpEst">—</td>`;continue}
+      const pu=+p['PU HT'],qq=q(x)||+p['Quantité']||0;if(x.l)e.tot=(e.tot||0)+pu*qq,e.n=(e.n||0)+1;
+      let dh='';if(e.mode==='Chine'&&x.l){const t=techLigne(x.l),kg=t.kg!=null?+t.kg:t.est;if(kg>0){const d=kg*(+CMPC.dhl||0);e.dhl=(e.dhl||0)+d*qq;dh=`<div class="cmpEc" title="Transport DHL estimé : ${nb(Math.round(kg*1000)/1000)} kg${t.kg==null?' (estimé)':''} × ${nb(CMPC.dhl)} €/kg">+ DHL ≈ ${eur(d)}/pce</div>`}}
+      const ec=min!=null&&min>0?Math.round((pu-min)/min*100):null;
+      const tip=['Estimation Claude – réalisation '+e.mode,p['Quantité']!=null&&p['Quantité']!==''?'Qté estimée : '+nb(p['Quantité']):'',p['Délai']?'Délai estimé : '+p['Délai']:'',txt(p.Commentaire)].filter(Boolean).join('\n');
+      h+=`<td class="n cmpEst" title="${esc(tip)}">${eur(pu)}${dh}${ec!=null?`<div class="cmpEc" title="Écart avec la meilleure offre SST de la ligne">${ec>0?'+':ec<0?'−':''}${Math.abs(ec)} % / meilleure offre</div>`:''}</td>`}
     h+=`<td class="n">${!vide(cout)?eur(cout):'<span class="mut">—</span>'}</td><td class="n cmpDHL" ${x.l?`data-dhl="${x.l.id}"`:''}></td><td class="n cmpPV">${x.l&&ecr?`<input type="number" step="0.01" min="0" data-pv="${x.l.id}" value="${vide(pv)?'':+pv}">`:x.l&&!vide(pv)?eur(pv):'<span class="mut">—</span>'}${x.l?`<div class="cmpEc" data-pvm="${x.l.id}"></div>`:''}</td><td class="n cmpPV" ${x.l?`data-pvt="${x.l.id}"`:''}>${x.l?'':'<span class="mut">—</span>'}</td></tr>`});
   const nL=lignes.filter(x=>x.l).length,tv=cols.filter(c=>nbL[c.c.id]===nL).map(c=>tot[c.c.id]),tmin=tv.length>1?Math.min(...tv):null;
   h+=`</tbody><tfoot><tr><td></td><td></td><td><b>Total HT</b> <span class="mut" style="font-size:11.5px">(PU × quantité du devis)</span></td><td></td>${cols.map(c=>{const t=tot[c.c.id],cplt=nbL[c.c.id]===nL;
-    return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}<td></td><td class="n cmpDHL" id="cTotD"></td><td class="n cmpPV" id="cTotU"></td><td class="n cmpPV" id="cTotT"></td></tr></tfoot></table></div>
-  <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »). « Hors devis » : repère chiffré par un SST mais absent des lignes du devis → « Créer la ligne » ou « Créer et retenir ».</div>`;
+    return`<td class="n ${cplt&&tmin!=null&&t===tmin?'cmpMin':''}"><b>${nbL[c.c.id]?eur(t):'—'}</b><div class="cmpEc">${cplt?'toutes lignes':nbL[c.c.id]+'/'+nL+' lignes'}</div>${c.c.Montant!=null&&c.c.Montant!==''?`<div class="cmpEc" title="Montant global de l’offre (Consultations SST)">offre : ${estEUR(c.c.Devise)?eur(c.c.Montant):nb(c.c.Montant)+' '+esc(c.c.Devise)}</div>`:''}</td>`}).join('')}${ests.map(e=>`<td class="n cmpEst"><b>${e.n?eur(e.tot):'—'}</b><div class="cmpEc">${e.n===nL?'toutes lignes':(e.n||0)+'/'+nL+' lignes'}</div>${e.dhl?`<div class="cmpEc">+ DHL ≈ ${eur(e.dhl)}</div>`:''}</td>`).join('')}<td></td><td class="n cmpDHL" id="cTotD"></td><td class="n cmpPV" id="cTotU"></td><td class="n cmpPV" id="cTotT"></td></tr></tfoot></table></div>
+  <div class="mut" style="font-size:12px;margin-top:8px">Vert : moins cher de la ligne · rouge : plus cher · encadré vert : retenu · <span style="color:#C2410C">●</span> prix à vérifier. « Retenir » écrit le PU dans le coût unitaire (interne) de la ligne de devis ; la colonne orange est le prix de vente du devis. Prix par ligne remplis automatiquement à la réception des offres (tâche « Suivi des offres SST »). « Hors devis » : repère chiffré par un SST mais absent des lignes du devis → « Créer la ligne » ou « Créer et retenir ».${ests.length?` <span style="color:#6B7280;font-style:italic">Colonnes grises : estimations de Claude (réalisation KTE ou Chine), pour comparaison seulement – jamais retenues ; détail des hypothèses au survol.${estHors?` ${estHors} estimation${estHors>1?'s':''} sans ligne de devis correspondante (non affichée${estHors>1?'s':''}).`:''}</span>`:''}</div>`;
   $('mCorps').innerHTML=h;
   $('mCorps').querySelectorAll('button[data-ret]').forEach(b=>b.onclick=()=>retenirSST(dv,[[+b.dataset.l,+b.dataset.ret]]));
   $('mCorps').querySelectorAll('button[data-hors]').forEach(b=>b.onclick=()=>creerLigneHors(dv,lignes[+b.dataset.hors],b.dataset.hp?+b.dataset.hp:null));
