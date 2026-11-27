@@ -15,6 +15,7 @@ Le JSON décrit l'affaire et une ou plusieurs fiches :
      "lignes": [{"vignette": "D26xxxx_Rep01_Plaque_base.png", "rep": "1", "designation": "Plaque base",
                  "ref": "Réf. <n° de plan>", "qte": 1, "matiere": "C45E", "traitement": "—",
                  "dimensions": "395 × 370 × 20"}],
+     "plans_verso": ["../Contrôle/PC_D26xxxx_<réf>.pdf"],   # option (à proposer, validée par qui enregistre la commande)
      "gravure": {"oui": true, "texte": "N° de rep. + D26xxxx", "procede": "Laser"},   # ou {"oui": false}
      "autres_pieces": {"aucune": false, "kte": true, "sst": true},   # absent = cases vides (à cocher à la main)
      "observations": ["…"]},
@@ -44,6 +45,11 @@ Mise en page du 28/10/2026 :
   du JSON (rare) y est écrite en 13 pt ;
 - ligne « Autres pièces de la commande : ☐ Aucune ☐ KTE ☐ Sous-traitance » (25/11/2026) sous l'encadré des délais,
   sur toutes les fiches de fabrication (KTE et Sous-traitance peuvent être cochées ensemble) ;
+- encadré des délais sur 2 lignes de même hauteur (27/11/2026) : Délai atelier / Expédition client, avec à droite
+  « Référent » puis ses initiales (MK, SD, WB) ; plus de ligne « Référent affaire » ;
+- option plans de contrôle au verso (27/11/2026) : "plans_verso" (PDF bullés, relatifs au JSON) → mention en gras
+  « Plan de contrôle au verso → » sous le cadre Observations, alignée à droite, et plans ramenés en A4 au verso ;
+  à proposer à chaque fiche, ajoutée seulement si la personne qui enregistre la commande l'accepte ;
 - fiches de fabrication (sauf Contrôle) : en bas de la page 1, tableaux Appro matière (2 lignes) et Appro outillage
   (1 ligne), colonnes Fournisseur / ARC (croix à réception de l'ARC) / Date de livraison, remplis à la main par l'opérateur.
 """
@@ -90,14 +96,14 @@ def st(**k):
 N = st(); B = st(fontName=FB); P = st(fontSize=8.5, leading=10.5)
 
 
-def _pied(aff, total=None, appro=False, K=None):
+def _pied(aff, total=None, appro=False, K=None, nfiche=None):
     """Pied de page (28/10/2026) : plus de ligne d'en-tête ; « Page x/N » en bas au centre, flèche « Suite au verso »
     en bas à droite sauf sur la dernière page, et tableaux Appro matière / Appro outillage en bas de la page 1."""
     def f(c, doc):
         c.saveState(); c.setFont(FR, 9); c.setFillColor(GRIS)
         c.drawCentredString(105*mm, 7*mm, f'Page {doc.page}' + (f'/{total}' if total else ''))
         c.restoreState()
-        if total and doc.page < total:
+        if total and doc.page < (nfiche or total):
             _verso(c)
         if appro and doc.page == 1:
             t1, t2 = _appro(K)
@@ -147,16 +153,37 @@ def _doc(o, titre, appro):
     return d
 
 
-def _construire(out, titre, story, aff, appro=False, K=None):
-    """Deux passes : nombre de pages, puis « Page x/N » et flèche « Suite au verso » sur toutes les pages sauf la dernière."""
+def _construire(out, titre, story, aff, appro=False, K=None, versos=None):
+    """Deux passes : nombre de pages, puis « Page x/N » et flèche « Suite au verso » sur toutes les pages sauf la dernière.
+    versos = PDF des plans de contrôle bullés ajoutés au verso (option validée à l'enregistrement de la commande,
+    27/11/2026) : pages ramenées au format A4 (paysage si le plan est en paysage), comptées dans « Page x/N »."""
     import io
     tmp = _doc(io.BytesIO(), titre, appro); e = _pied(aff, None, appro, K)
     for pt in tmp.pageTemplates: pt.onPage = e
     tmp.build(story()); n = tmp.page
-    doc = _doc(out, titre, appro); e = _pied(aff, n, appro, K)
+    nv = 0
+    if versos:
+        import pymupdf
+        for v in versos:
+            with pymupdf.open(v) as d:
+                nv += d.page_count
+    doc = _doc(out, titre, appro); e = _pied(aff, n + nv, appro, K, nfiche=n)
     for pt in doc.pageTemplates: pt.onPage = e
     doc.build(story())
-    return n
+    if versos:
+        import pymupdf
+        fa = pymupdf.open(out); W, H = A4
+        for v in versos:
+            with pymupdf.open(v) as src:
+                for i, pg in enumerate(src):
+                    pay = pg.rect.width > pg.rect.height
+                    w, h = (H, W) if pay else (W, H)
+                    np_ = fa.new_page(width=w, height=h)
+                    np_.show_pdf_page(pymupdf.Rect(14, 14, w - 14, h - 9*mm), src, i)
+                    np_.insert_text((w/2 - 15, h - 5*mm), f'Page {n + i + 1}/{n + nv}', fontsize=9,
+                                    color=(0.42, 0.42, 0.42))
+        tmp_out = out + '.tmp'; fa.save(tmp_out); fa.close(); os.replace(tmp_out, out)
+    return n + nv
 
 
 def _client(c):
@@ -178,7 +205,34 @@ def _haut(a, logo, titre, K):
     return t
 
 
-def _info(lignes):
+INITIALES = {'matthias': 'MK', 'sébastien': 'SD', 'sebastien': 'SD', 'william': 'WB'}
+
+
+def _initiales(nom):
+    """Référent en initiales (27/11/2026) : Matthias Kielwasser → MK, Sébastien → SD, William → WB."""
+    nom = (nom or '').strip()
+    if not nom:
+        return ''
+    if nom.split()[0].lower() in INITIALES:
+        return INITIALES[nom.split()[0].lower()]
+    m = [w for w in re.split(r'[\s-]+', nom) if w]
+    return ''.join(w[0].upper() for w in m[:2]) if len(m) > 1 else nom
+
+
+def _info(lignes, ref=None):
+    """Encadré des délais. ref = initiales du référent (27/11/2026) : colonne de droite « Référent » sur la ligne
+    Délai atelier et initiales (MK, SD, WB) sur la ligne Expédition client, à la place de la ligne Référent affaire."""
+    if ref is not None:
+        R = st(fontName=FB, fontSize=15, leading=18, alignment=1)
+        rows = [[Paragraph(k, B), v, ''] for k, v in lignes]
+        rows[0][2] = Paragraph('Référent', st(fontName=FB, alignment=1))
+        rows[1][2] = Paragraph(ref, R)
+        t = Table(rows, colWidths=[40*mm, 117*mm, 25*mm], rowHeights=[9*mm] * len(rows))
+        t.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), .5, TRAIT), ('BACKGROUND', (0, 0), (0, -1), FOND),
+                               ('BACKGROUND', (2, 0), (2, 0), FOND),
+                               ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('TOPPADDING', (0, 0), (-1, -1), 4),
+                               ('BOTTOMPADDING', (0, 0), (-1, -1), 4)]))
+        return t
     t = Table([[Paragraph(k, B), v] for k, v in lignes], colWidths=[40*mm, 142*mm])
     t.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), .5, TRAIT), ('BACKGROUND', (0, 0), (0, -1), FOND),
                            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'), ('TOPPADDING', (0, 0), (-1, -1), 4),
@@ -283,7 +337,7 @@ def _noir(d): return Paragraph(f'<font size="15"><b>{d}</b></font>', N)
 def fabrication(a, f, logo, out):
     m = f['metier']; K = colors.HexColor(COUL[m]); appro = m != 'Contrôle'
     info = _info([('Délai atelier', _rouge(a['delai_atelier'])), ('Expédition client', _noir(a['expedition'])),
-                  ('Référent affaire', Paragraph(a['referent'], N))])
+                  ], ref=_initiales(a.get('referent', '')))
     H = st(fontName=FB, textColor=colors.white)
     rows = [[Paragraph(x, H) for x in ['Visuel', 'Rep.', 'Désignation / réf.', 'Qté', 'Matière', 'Traitement', 'Dimensions finies']]]
     tot = 0
@@ -304,12 +358,17 @@ def fabrication(a, f, logo, out):
     if (f.get('rc') or a.get('_rc')) and m != 'Achats' and not any(str(o).startswith('RC à compléter') for o in ob):
         ob.insert(0, RC_OBS)
     obs = _observations(ob)
+    base = a.get('_json_dir', '.')
+    versos = [x if os.path.isabs(x) else os.path.join(base, x) for x in (f.get('plans_verso') or [])]
+    versos = [x for x in versos if os.path.exists(x)]
+    mention = [Spacer(1, 2*mm), Paragraph('Plan de contrôle au verso →' if versos else '',
+                                          st(fontName=FB, fontSize=12, leading=14, alignment=2))] if versos else []
     def story():
         import copy as _c
         return [_haut(a, logo, m, K), Spacer(1, 6*mm), _c.deepcopy(info), Spacer(1, 4*mm), _autres(f.get('autres_pieces')),
                 Spacer(1, 3*mm), _gravure(f.get('gravure'), K),
-                Spacer(1, 5*mm), _c.deepcopy(t), Spacer(1, 4*mm), _c.deepcopy(obs)]
-    _construire(out, f"Fiche atelier {m} {a['affaire']}", story, a['affaire'], appro, K)
+                Spacer(1, 5*mm), _c.deepcopy(t), Spacer(1, 4*mm), _c.deepcopy(obs)] + _c.deepcopy(mention)
+    _construire(out, f"Fiche atelier {m} {a['affaire']}", story, a['affaire'], appro, K, versos)
 
 
 def achats(a, f, logo, out):
@@ -343,7 +402,7 @@ def main():
     if len(sys.argv) < 4:
         sys.exit(__doc__)
     a = json.load(open(sys.argv[1], encoding='utf-8')); logo = sys.argv[2]; dos = sys.argv[3]
-    a['_rc'] = rc_present(a, sys.argv[1])
+    a['_rc'] = rc_present(a, sys.argv[1]); a['_json_dir'] = os.path.dirname(os.path.abspath(sys.argv[1]))
     os.makedirs(dos, exist_ok=True)
     for f in a['fiches']:
         # JSON écrits par Akteev : délais / référent parfois dans la fiche plutôt qu'au niveau de l'affaire
