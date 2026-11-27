@@ -492,6 +492,42 @@ const LIENS_SECOURS={'Client':1260239,'Référent KTE':1260243,'Référent':1260
  'Fournisseur':1260241,'Intervenant':1260241,'Type de tâche':1261119,'Devis':1261170,'ARC':1261374,'BL':1261382,'Commande fournisseur':1263348,'Tâche':1261600,
  'Lignes de devis':1261171,'Consultations SST':1274941,'Non-conformités':1284881,'Responsable':1260243,'Lignes ARC':1261373,'Lignes BL':1261381,'Lignes':1263349,'Proposée par':1260243,'Lue par':1260243,'Machine':T_MACH,'Machine de repli':T_MACH};
 const RO_TYPES=new Set(['formula','lookup','rollup','count','created_on','last_modified','created_by','last_modified_by','autonumber','uuid','file','multiple_collaborators','ai','password']);
+/* ---------- Tri générique des tableaux (27/11/2026) ----------
+   Clic sur un titre de colonne = tri croissant, 2e clic = décroissant (nombres, montants, %, dates jj/mm/aaaa, texte).
+   S'applique à tous les tableaux qui n'ont pas déjà leur propre tri (th[data-k], th[data-c], th[data-mk]) ;
+   colonnes avec case à cocher et tableaux .notri exclus. Le tri est réappliqué quand le tableau est redessiné. */
+const TRI_GEN={};
+function triGenVal(td){
+  if(!td)return{v:null};let s=(td.innerText||'').trim().split('\n')[0].trim();
+  if(!s||s==='—'||s==='-')return{v:null};
+  let m=s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);if(m){const a=m[3].length===2?'20'+m[3]:m[3];return{v:+(a+m[2].padStart(2,'0')+m[1].padStart(2,'0')),n:1}}
+  m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);if(m)return{v:+(m[1]+m[2]+m[3]),n:1};
+  const t=s.replace(/[\s  ]/g,'');m=t.match(/^([-−+]?\d+(?:[.,]\d+)?)(k€|k|€|%|h|j)?$/i);
+  if(m){let v=+m[1].replace('−','-').replace(',','.');if(/^k/i.test(m[2]||''))v*=1000;return{v,n:1}}
+  return{v:s.toLowerCase()};
+}
+function triGenCle(tb){const T=[...document.querySelectorAll('#main table')];return tb.id||((location.hash||'').split('?')[0]+'#'+T.indexOf(tb))}
+function triGenAppliquer(tb,col,d){
+  const body=tb.tBodies[0];if(!body)return;
+  const rows=[...body.rows],nb=tb.tHead?.rows[0]?.cells.length||0;
+  const ok=rows.filter(r=>r.cells.length===nb),autres=rows.filter(r=>r.cells.length!==nb);
+  const V=new Map(ok.map(r=>[r,triGenVal(r.cells[col])]));
+  ok.sort((a,b)=>{const x=V.get(a),y=V.get(b);if(x.v==null&&y.v==null)return 0;if(x.v==null)return 1;if(y.v==null)return -1;
+    if(x.n&&y.n)return(x.v-y.v)*d;return String(x.v).localeCompare(String(y.v),'fr',{numeric:true})*d});
+  TRI_GEN._occupe=true;[...ok,...autres].forEach(r=>body.appendChild(r));
+  [...tb.tHead.rows[0].cells].forEach((th,i)=>{th.querySelector('.triG')?.remove();if(i===col){const s=document.createElement('span');s.className='triG';s.textContent=d>0?' ▲':' ▼';th.appendChild(s)}});
+  tb.dataset.triG=col+':'+d;setTimeout(()=>{TRI_GEN._occupe=false},0);
+}
+const triGenExclu=th=>!th||th.closest('table.notri')||th.dataset.k||th.dataset.c||th.dataset.mk||th.querySelector('input,select,button')||th.closest('thead')?.querySelector('th[data-k],th[data-c],th[data-mk]');
+document.addEventListener('click',e=>{
+  const th=e.target.closest('table thead th');if(!th||triGenExclu(th)||e.target.closest('input,select,button,a'))return;
+  const tb=th.closest('table'),col=th.cellIndex,cle=triGenCle(tb),p=TRI_GEN[cle];
+  const d=p&&p.col===col?-p.d:1;TRI_GEN[cle]={col,d};triGenAppliquer(tb,col,d);
+});
+new MutationObserver(()=>{if(TRI_GEN._occupe)return;const M=document.getElementById('main');if(!M)return;
+  M.querySelectorAll('table').forEach(tb=>{if(tb.dataset.triG||!tb.tHead)return;const p=TRI_GEN[triGenCle(tb)];if(p&&tb.tHead.rows[0]?.cells[p.col]&&!triGenExclu(tb.tHead.rows[0].cells[p.col]))triGenAppliquer(tb,p.col,p.d)})
+}).observe(document.documentElement,{childList:true,subtree:true});
+(()=>{const st=document.createElement('style');st.textContent='table thead th:not([data-k]):not([data-c]):not([data-mk]){cursor:pointer;user-select:none}table thead th .triG{color:var(--acc,#2F6FED);font-size:11px}';document.head.appendChild(st)})();
 
 /* ---------- Utilitaires ---------- */
 const $=id=>document.getElementById(id);
