@@ -139,6 +139,20 @@ table.l tr.filtres th{position:static;background:#fff;padding:5px 6px;cursor:def
 table.l tr.filtres input,table.l tr.filtres select{width:100%;min-width:70px;border:1px solid var(--trait);border-radius:6px;padding:4px 7px;font-size:12.5px;background:#fff;outline:none;color:var(--txt)}
 table.l tr.filtres input:focus,table.l tr.filtres select:focus{border-color:var(--accent)}
 table.l tr.filtres .on{border-color:#B8CDF8;background:var(--accentL)}
+table.l tr.filtres .cfz{display:flex;gap:3px;align-items:stretch}
+table.l tr.filtres .cfz input{min-width:56px}
+table.l tr.filtres .cfb{flex:none;border:1px solid var(--trait);border-radius:6px;background:#fff;padding:0 6px;font-size:11.5px;color:var(--mut);cursor:pointer;white-space:nowrap}
+table.l tr.filtres .cfb.on{border-color:#B8CDF8;background:var(--accentL);color:var(--accent);font-weight:600}
+#cfPop{position:fixed;z-index:80;background:#fff;border:1px solid var(--trait);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:10px;width:270px;font-size:13px;color:var(--txt)}
+#cfPop .cfT{font-weight:600;margin-bottom:6px}
+#cfPop input[type=search]{width:100%;border:1px solid var(--trait);border-radius:6px;padding:5px 8px;font-size:12.5px;outline:none}
+#cfPop label{display:flex;gap:7px;align-items:center;padding:3px 2px;cursor:pointer}
+#cfPop label span{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#cfPop label small{color:var(--mut)}
+#cfPop .cfAll{margin-top:6px;color:var(--mut)}
+#cfPop .cfl{max-height:260px;overflow:auto;margin:4px 0 8px;border-top:1px solid var(--trait);border-bottom:1px solid var(--trait);padding:4px 0}
+#cfPop .pied{display:flex;justify-content:flex-end;gap:6px}
+#cfPop .pied .btn.mini{margin-top:0}
 table.l td{padding:9px 12px;border-bottom:1px solid #EFF1F5;vertical-align:middle;max-width:340px;overflow:hidden;text-overflow:ellipsis}
 table.l tbody tr{cursor:pointer}
 table.l tbody tr:hover{background:var(--hover)}
@@ -459,13 +473,13 @@ const MODS={
  clients:{t:1260239,nom:'Clients',un:'client',ico:'clients',grp:'Ventes',cols:['Code client','Entreprise','Ville','Pays','Contact','E-mail','Téléphone'],
    liees:[{nom:'Affaires',mod:'commandes',lien:'Client',affaires:true},{nom:'Contacts',t:T_CONTACTS,lien:'Client',cols:['Nom','Fonction','E-mail','Téléphone','Mobile','Facturation'],ajout:true,contacts:true},{nom:'Devis',mod:'devis',lien:'Client'},{nom:'ARC',mod:'arc',lien:'Client'},{nom:'BL',mod:'bl',lien:'Client'}]},
  taches:{t:1261600,nom:'Tâches',un:'tâche',fem:true,ico:'taches',grp:'Production',cols:['Affaire','Client','Tâche','Délai','Pièces','Fiche','Référent','Statut'],sansPrim:true,virt:'taches',statut:'Statut',date:'Échéance',ref:'Référent',
-   requis:['Libellé','Échéance','Référent'],cacheStatuts:['Fait','Annulée'],solde:'Fait',faitLe:'Fait le'},
+   requis:['Libellé','Échéance','Référent'],cacheStatuts:['Fait','Annulée'],solde:['Fait','Annulée'],faitLe:'Fait le'},
  synthese:{t:1265322,nom:'Synthèse pièces',un:'ligne de synthèse',fem:true,ico:'synthese',grp:'Production',cols:['Libellé','Affaire','Rep','Désignation','Étape','Intervenant','Quantité','Qté attribuée','Date prévue','Statut'],statut:'Statut',date:'Date prévue',ordre:'Ordre',cacheStatuts:['Annulé']},
  plan:{t:T_PLAN,nom:'Planning machines',un:'ligne de planning',fem:true,ico:'cal',grp:'Production',cols:['Libellé','Affaire','Machine','Machine de repli','Heures estimées','Ordre','Délai','Début au plus tôt','Statut'],statut:'Statut',date:'Délai',ordre:'Ordre',
    cacheStatuts:['Terminée','Annulée'],faitLe:'Terminée le',faitRe:/^termin/i,menu:false,ordreStatuts:['Planifiée','En cours','Terminée','Annulée'],
    ordreForm:['Libellé','Affaire','Machine','Machine de repli','Heures estimées','Temps masqué (h)','Délai','Début au plus tôt','Ordre','Statut','Terminée le','Repères','Notes']},
  nc:{t:1284881,nom:'Non-conformités',un:'non-conformité',fem:true,ico:'nc',grp:'Qualité',cols:['N° NC','Date de détection','Affaire','Client','Origine','Secteur','Fournisseur','Repère / pièce','Décision','Coût direct','Responsable','Statut'],
-   statut:'Statut',date:'Date de détection',ref:'Responsable',num:'N° NC',virt:'nc',requis:['Affaire','Origine','Secteur','Description'],cacheStatuts:['Annulée'],faitLe:'Soldée le',faitRe:/^sold/i,
+   statut:'Statut',date:'Date de détection',ref:'Responsable',num:'N° NC',virt:'nc',requis:['Affaire','Origine','Secteur','Description'],cacheStatuts:['Annulée'],solde:['Annulée'],soldeVerbe:'supprimer',libCache:'supprimées',faitLe:'Soldée le',faitRe:/^sold/i,
    ordreForm:['N° NC','Affaire','Date de détection','Origine','Secteur','Fournisseur','Repère / pièce','Quantité','Description','Décision','Plan d\'action','Responsable','Échéance','Coût direct','Statut','Soldée le']},
  cf:{t:1263348,nom:'Commandes fournisseurs',un:'commande fournisseur',fem:true,ico:'cf',grp:'Achats',cols:['N° CF','Fournisseur','Affectation','Affaire','Date','Délai','Total','Statut','PDF'],statut:'Statut',date:'Date',ref:'Demandeur',num:'N° CF',
    liees:[{nom:'Lignes',t:1263349,lien:'Commande',cols:['Description','Réf. fournisseur','Quantité','Prix unitaire','Montant','Affectation','Affaire'],ordre:'Ordre',ajout:true},{nom:'Factures',mod:'ffact',lien:'CF'}],cacheStatuts:['Annulée']},
@@ -723,6 +737,7 @@ let SALE=null; // brouillon en cours {t,id,draft}
 window.addEventListener('hashchange',()=>{if(SALE&&Object.keys(SALE.draft).length&&!confirm('Des modifications ne sont pas enregistrées. Quitter quand même ?')){history.back();return}route()});
 function params(){const q=location.hash.split('?')[1]||'';return Object.fromEntries(new URLSearchParams(q))}
 async function route(){
+  cfFermer();
   SALE=null;barre();fermerModal(true);$('gres').style.display='none';
   const h=(location.hash.replace(/^#\/?/,'').split('?')[0])||'accueil';
   const [k,id]=h.split('/');
@@ -3086,7 +3101,7 @@ function feBrouillon(x){
   const cde=String(x.c['N° Cde Client']||x.bls.map(b=>b['N° commande client']).find(Boolean)||'').trim();
   const blTxt=x.bls.map(b=>`${b['N° BL']}${b.Date?' du '+dfr(b.Date):''}`).join(', ');
   return{aff:x.k,cmdId:x.c.id,client:txt(x.c.Client),company_id:cid?+cid:null,contract_id:x.ctr?.id||null,date,due:ech.d,regle:ech.regle,cond,tva,
-    cde,bl:blTxt,condSrc,totArc,aArc:la.length>0,viaArc,devis:ids(x.c.Devis).length?(x.c.Devis||[]).map(d=>d.value).join(', '):'',mentions:[cde?`Votre commande N° ${cde}`:'',blTxt?`BL N° ${blTxt}`:''].filter(Boolean).join('\n'),lignes,mt:x.mt,fa:x.fa,
+    cde,bl:blTxt,condSrc,totArc,aArc:la.length>0,viaArc,devis:ids(x.c.Devis).length?(x.c.Devis||[]).map(d=>d.value).join(', '):'',mentions:[cde?`Votre commande N° ${cde}`:'',blTxt?`Notre BL N° ${blTxt}`:''].filter(Boolean).join('\n'),lignes,mt:x.mt,fa:x.fa,
     adresse:[x.cli?.['Raison sociale (Axonaut)']||x.cli?.Entreprise||txt(x.c.Client),x.cli?.Adresse,[x.cli?.['Code postal'],x.cli?.Ville].filter(Boolean).join(' '),pays&&!/france/i.test(pays)?pays:''].filter(Boolean)};
 }
 const feTot=b=>{const ht=b.lignes.reduce((s,l)=>s+(+l.qte||0)*(+l.pu||0),0);return{ht,tva:ht*b.tva/100,ttc:ht*(1+b.tva/100)}};
@@ -3719,8 +3734,8 @@ async function vueListe(k){
 }
 // statut(s) qui soldent / clôturent : retirés de la liste même en recherche (tâche Fait, devis Accepté / Refusé / Annulé)
 function estSolde(m,v){return !!m.solde&&(Array.isArray(m.solde)?m.solde.includes(v):m.solde===v)}
-function soldeMots(m){const v=m.soldeVerbe||'solder';return{v,pp:v.replace(/er$/,'é')+(m.fem?'e':'')}}
-function filtrer(k){
+function soldeMots(m,val){const v=m.soldeVerbe||(/^annul/i.test(val||'')?'annuler':'solder');return{v,pp:v.replace(/er$/,'é')+(m.fem?'e':'')}}
+function filtrer(k,sauf){
   enrichir(k);
   // une recherche ou un filtre de colonne retrouve aussi les éléments masqués (ex. commandes soldées), sauf les statuts « solde »
   const recherche=!!(etat(k).q.trim()||nbCf(etat(k)));
@@ -3728,24 +3743,62 @@ function filtrer(k){
   return R.filter(r=>{
     const st=m.statut?txt(r[m.statut]):'';
     if(E.st.length&&!E.st.includes(st))return false;
-    if(!E.st.length&&!E.tout&&!recherche&&m.cacheStatuts?.includes(st))return false;
+    const libre=!!sauf&&sauf===m.statut; // menu ▾ de la colonne Statut : proposer aussi les statuts masqués (Fait, Annulée…)
+    if(!libre&&!E.st.length&&!E.tout&&!recherche&&m.cacheStatuts?.includes(st))return false;
     // commande facturée en totalité dans Axonaut (23/11/2026) : sortie de la liste comme une commande livrée / soldée
     if(k==='commandes'&&!E.tout&&!recherche&&cmdFacturee(r))return false;
     // statut soldé (tâche « Fait ») : retiré du tableau, même pendant une recherche, sauf demande explicite
-    if(estSolde(m,st)&&!E.st.includes(st)&&!E.tout&&(E.cf||{})[m.statut]!==st)return false;
+    if(!libre&&estSolde(m,st)&&!E.st.includes(st)&&!E.tout&&!cfDe(E,m.statut,sc.par[m.statut]).v.includes(st))return false;
     if(E.retard&&!(tacheOuverte(r)&&r[m.date]&&r[m.date]<auj()))return false;
     if(E.encours&&!devisEnCours(r))return false;
     if(E.ref&&m.ref&&!ids(r[m.ref]).includes(+E.ref))return false;
     if(q.length){const s=norm(Object.values(r).map(txt).join(' '));if(!q.every(w=>s.includes(w)))return false}
-    for(const [c,v] of Object.entries(E.cf||{})){if(!v||!sc.par[c])continue;const f=sc.par[c];
-      if(estChoix(f)){if(!valsChoix(f,r[c]).includes(v))return false}
-      else if(!norm(txtFiltre(r[c])).includes(norm(v)))return false}
+    for(const c of Object.keys(E.cf||{})){if(c===sauf||!sc.par[c])continue;const f=sc.par[c],x=cfDe(E,c,f);
+      if(x.q.trim()&&!norm(txtFiltre(r[c])+' '+valsCol(f,r[c]).join(' ')).includes(norm(x.q.trim())))return false;
+      if(x.v.length&&!valsCol(f,r[c]).some(y=>x.v.includes(y)))return false}
     return true});
 }
 const estChoix=f=>f&&['single_select','multiple_select','link_row','boolean'].includes(f.type);
 function valsChoix(f,x){if(f.type==='boolean')return[x?'Oui':'Non'];if(x==null||x===''||(Array.isArray(x)&&!x.length))return['(vide)'];return Array.isArray(x)?x.map(o=>txt(o)):[txt(x)]}
 function txtFiltre(x){const t=txt(x);return /^\d{4}-\d{2}-\d{2}/.test(t)?t+' '+dfr(t.slice(0,10)):t}
-const nbCf=E=>Object.values(E.cf||{}).filter(Boolean).length;
+const nbCf=E=>Object.values(E.cf||{}).filter(cfActif).length;
+/* Filtres de colonnes façon Excel (27/11/2026, idée de William) : dans chaque colonne, une saisie « Contient… » (aussi pour
+   Client, Affaire… qui n'avaient qu'un menu) + ▾ = liste des valeurs à cocher, plusieurs à la fois, avec recherche.
+   E.cf[col] = {q:'texte', v:[valeurs cochées]} ; ancien format (chaîne) encore lu. Filtres de plusieurs colonnes cumulés. */
+function cfDe(E,c,f){let x=(E.cf||{})[c];if(!x)return{q:'',v:[]};if(typeof x==='string')x=estChoix(f)?{q:'',v:[x]}:{q:x,v:[]};return{q:String(x.q||''),v:Array.isArray(x.v)?x.v.map(String):[]}}
+function cfActif(x){return !!x&&(typeof x==='string'?!!x.trim():!!(String(x.q||'').trim()||(x.v||[]).length))}
+function cfPoser(E,c,x){E.cf=E.cf||{};if(cfActif(x))E.cf[c]={q:x.q||'',v:x.v||[]};else delete E.cf[c]}
+function valsCol(f,x){if(estChoix(f))return valsChoix(f,x);const t=txt(x);if(t==='')return['(vide)'];return[/^\d{4}-\d{2}-\d{2}/.test(t)?dfr(t.slice(0,10)):t]}
+function cfTriVals(f,vals){
+  if(f?.type==='single_select'&&f.select_options){const i=v=>{const n=f.select_options.findIndex(o=>o.value===v);return n<0?999:n};return vals.sort((a,b)=>i(a)-i(b))}
+  const cle=v=>{const d=/^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);return d?d[3]+d[2]+d[1]:v};const num=v=>/^-?\d+([.,]\d+)?$/.test(v)?+v.replace(',','.'):null;
+  return vals.sort((a,b)=>a==='(vide)'?1:b==='(vide)'?-1:num(a)!=null&&num(b)!=null?num(a)-num(b):String(cle(a)).localeCompare(String(cle(b)),'fr',{numeric:true}))}
+function cfFermer(){const p=document.getElementById('cfPop');if(p)p.remove();document.removeEventListener('mousedown',cfDehors,true)}
+function cfDehors(e){const p=document.getElementById('cfPop');if(p&&!p.contains(e.target)&&!e.target.closest('[data-cfm]'))cfFermer()}
+function cfMenu(k,c,btn){
+  const ouvert=document.getElementById('cfPop');if(ouvert&&ouvert.dataset.c===c){cfFermer();return}cfFermer();
+  const m=MODS[k],E=etat(k),f=sch(m.t).par[c],x=cfDe(E,c,f);
+  const cpt=new Map();filtrer(k,c).forEach(r=>valsCol(f,r[c]).forEach(v=>cpt.set(v,(cpt.get(v)||0)+1)));
+  x.v.forEach(v=>{if(!cpt.has(v))cpt.set(v,0)});
+  if(f?.type==='single_select')(f.select_options||[]).forEach(o=>{if(!cpt.has(o.value))cpt.set(o.value,0)});
+  const vals=cfTriVals(f,[...cpt.keys()]),coche=new Set(x.v.length?x.v:vals);
+  const p=document.createElement('div');p.id='cfPop';p.dataset.c=c;
+  p.innerHTML=`<div class="cfT">${esc(c)}</div><input type="search" id="cfQ" placeholder="Rechercher une valeur…"><label class="cfAll"><input type="checkbox" id="cfAll"> (Tout sélectionner)</label>
+    <div class="cfl">${vals.map((v,i)=>`<label data-i="${i}"><input type="checkbox" data-i="${i}" ${coche.has(v)?'checked':''}><span>${esc(v)}</span><small>${cpt.get(v)||0}</small></label>`).join('')||'<div class="mut">Aucune valeur</div>'}</div>
+    <div class="pied"><button class="btn mini" id="cfEff">Effacer</button><button class="btn mini p" id="cfOk">OK</button></div>`;
+  document.body.appendChild(p);
+  const b=btn.getBoundingClientRect();p.style.top=Math.min(b.bottom+4,innerHeight-p.offsetHeight-8)+'px';p.style.left=Math.max(8,Math.min(b.right-p.offsetWidth,innerWidth-p.offsetWidth-8))+'px';
+  const cases=[...p.querySelectorAll('.cfl input')],vis=()=>cases.filter(i=>i.closest('label').style.display!=='none');
+  const maj=()=>{const V=vis(),n=V.filter(i=>i.checked).length;$('cfAll').checked=V.length>0&&n===V.length;$('cfAll').indeterminate=n>0&&n<V.length;$('cfOk').disabled=!V.some(i=>i.checked)};
+  $('cfQ').oninput=()=>{const q=norm($('cfQ').value.trim());cases.forEach(i=>{const l=i.closest('label');l.style.display=!q||norm(vals[+i.dataset.i]).includes(q)?'':'none'});if(q)cases.forEach(i=>i.checked=i.closest('label').style.display!=='none');maj()};
+  $('cfAll').onchange=()=>{vis().forEach(i=>i.checked=$('cfAll').checked);maj()};
+  cases.forEach(i=>i.onchange=maj);
+  const appliquer=v=>{cfPoser(E,c,{q:x.q,v});E.lim=100;sauverEtat();cfFermer();dessinerListe(k)};
+  $('cfEff').onclick=()=>appliquer([]);
+  $('cfOk').onclick=()=>{const V=vis().filter(i=>i.checked).map(i=>vals[+i.dataset.i]);appliquer(V.length===vals.length&&!$('cfQ').value.trim()?[]:V)};
+  p.onkeydown=e=>{if(e.key==='Escape')cfFermer();if(e.key==='Enter'&&!$('cfOk').disabled)$('cfOk').click()};
+  maj();$('cfQ').focus();setTimeout(()=>document.addEventListener('mousedown',cfDehors,true),0);
+}
 function colonnes(k){enrichir(k);const m=MODS[k],sc=sch(m.t);let c=m.cols.filter(n=>sc.par[n]&&!masque(n));if(c.length<2)c=sc.fields.slice(0,7).map(f=>f.name);if(!m.sansPrim&&!c.includes(sc.prim))c.unshift(sc.prim);return c.filter(n=>!masque(n))}
 function trier(k,L){
   const m=MODS[k],E=etat(k),sc=sch(m.t);
@@ -3755,6 +3808,7 @@ function trier(k,L){
   return L.map(r=>[triVal(F,r[f]),r]).sort((a,b)=>a[0]==null?1:b[0]==null?-1:(a[0]<b[0]?-dir:a[0]>b[0]?dir:0)).map(x=>x[1]);
 }
 function dessinerListe(k){
+  cfFermer();
   const m=MODS[k],E=etat(k),sc=sch(m.t),R=S.rows[m.t]||[];
   const cols=colonnes(k);
   const L=trier(k,filtrer(k));
@@ -3789,9 +3843,10 @@ function dessinerListe(k){
   }
   $('main').innerHTML=h;
   document.querySelectorAll('tr.filtres [data-cf]').forEach(e=>{const c=e.dataset.cf;
-    e[e.tagName==='SELECT'?'onchange':'oninput']=()=>{E.cf=E.cf||{};if(e.value)E.cf[c]=e.value;else delete E.cf[c];E.lim=100;sauverEtat();dessinerListe(k);
+    e[e.tagName==='SELECT'?'onchange':'oninput']=()=>{cfPoser(E,c,{...cfDe(E,c,sc.par[c]),q:e.value});E.lim=100;sauverEtat();dessinerListe(k);
       const n=[...document.querySelectorAll('tr.filtres [data-cf]')].find(x=>x.dataset.cf===c);if(n){n.focus();if(n.tagName==='INPUT')n.setSelectionRange(n.value.length,n.value.length)}}});
   document.querySelectorAll('[data-cfclear]').forEach(b=>b.onclick=()=>{E.cf={};sauverEtat();dessinerListe(k)});
+  document.querySelectorAll('tr.filtres [data-cfm]').forEach(b=>b.onclick=e=>{e.stopPropagation();cfMenu(k,b.dataset.cfm,b)});
   const lq=$('lq');lq.oninput=()=>{E.q=lq.value;E.lim=100;dessinerListe(k);const n=$('lq');n.focus();n.setSelectionRange(n.value.length,n.value.length)};
   if($('lref')){$('lref').value=E.ref;$('lref').onchange=e=>{E.ref=e.target.value;sauverEtat();dessinerListe(k)}}
   document.querySelectorAll('.puce[data-s]').forEach(b=>b.onclick=()=>{const s=b.dataset.s;E.retard=false;E.encours=false;if(!s)E.st=[];else E.st=E.st.includes(s)?E.st.filter(x=>x!==s):[...E.st,s];if(location.hash.includes('?'))history.replaceState(null,'','#/'+k);sauverEtat();dessinerListe(k)});
@@ -3866,19 +3921,15 @@ function brancherAmelio(){const R=S.rows[MODS.amelio.t]||[];
   document.querySelectorAll('table.l tbody tr[data-id], .kcard[data-id]').forEach(e=>{if(!NL.has(e.dataset.id))return;const c=e.querySelector('td.prim, .t');if(c&&!c.querySelector('.nonlu'))c.insertAdjacentHTML('afterbegin','<span class="nonlu" title="Non lue">Non lue</span> ')})}
 function ligneFiltres(k,cols){
   const m=MODS[k],E=etat(k),sc=sch(m.t),R=S.rows[m.t]||[];
-  return`<tr class="filtres">${cols.map(c=>{const f=sc.par[c],v=(E.cf||{})[c]||'';
-    if(estChoix(f)){const cpt=new Map();R.forEach(r=>valsChoix(f,r[c]).forEach(x=>cpt.set(x,(cpt.get(x)||0)+1)));
-      let vals=[...cpt.keys()];if(f.type==='single_select'&&f.select_options)vals.sort((a,b)=>{const i=f.select_options.findIndex(o=>o.value===a),j=f.select_options.findIndex(o=>o.value===b);return(i<0?999:i)-(j<0?999:j)});else vals.sort((a,b)=>a==='(vide)'?1:b==='(vide)'?-1:a.localeCompare(b,'fr'));
-      if(v&&!cpt.has(v))vals.unshift(v);
-      return`<th><select data-cf="${esc(c)}" class="${v?'on':''}"><option value="">Tous</option>${vals.map(x=>`<option value="${esc(x)}" ${x===v?'selected':''}>${esc(x)} (${cpt.get(x)||0})</option>`).join('')}</select></th>`}
-    return`<th><input data-cf="${esc(c)}" class="${v?'on':''}" placeholder="Contient…" value="${esc(v)}"></th>`}).join('')}</tr>`;
+  return`<tr class="filtres">${cols.map(c=>{const f=sc.par[c],x=cfDe(E,c,f),n=x.v.length;
+    return`<th><div class="cfz"><input data-cf="${esc(c)}" class="${x.q.trim()?'on':''}" placeholder="Contient…" value="${esc(x.q)}"><button type="button" class="cfb ${n?'on':''}" data-cfm="${esc(c)}" title="${n?esc(x.v.slice(0,8).join(', '))+(n>8?'…':''):'Choisir une ou plusieurs valeurs'}">${n?n+' ':''}▾</button></div></th>`}).join('')}</tr>`;
 }
 function kanban(k,L,opts){
   const m=MODS[k],sc=sch(m.t),E=etat(k),a=auj();
   const cols=opts.filter(o=>E.st.length?E.st.includes(o.value):E.tout||!m.cacheStatuts?.includes(o.value)||estSolde(m,o.value));
   const sec=m.cols.filter(c=>c!==sc.prim&&c!==m.statut&&sc.par[c]).slice(0,3);
   return`<div class="kanban">${cols.map(o=>{const [bg,fg]=coul(o.color);const C=L.filter(r=>r[m.statut]?.id===o.id||txt(r[m.statut])===o.value);const zs=estSolde(m,o.value)&&!C.length&&!E.tout&&!E.st.includes(o.value);
-    return`<div class="kcol" data-o="${o.id}" data-v="${esc(o.value)}"><h3><span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span><span class="nb">${zs?'':C.length}</span></h3>${zs?`<div class="mut" style="font-size:12px;padding:14px 6px;text-align:center;border:1px dashed var(--bord,#D1D5DB);border-radius:8px">Déposer ici pour ${soldeMots(m).v} ${m.fem?'la':'le'} ${esc(m.un)}</div>`:''}
+    return`<div class="kcol" data-o="${o.id}" data-v="${esc(o.value)}"><h3><span class="badge" style="background:${bg};color:${fg}">${esc(o.value)}</span><span class="nb">${zs?'':C.length}</span></h3>${zs?`<div class="mut" style="font-size:12px;padding:14px 6px;text-align:center;border:1px dashed var(--bord,#D1D5DB);border-radius:8px">Déposer ici pour ${soldeMots(m,o.value).v} ${m.fem?'la':'le'} ${esc(m.un)}</div>`:''}
     ${C.slice(0,150).map(r=>{const d=m.date&&r[m.date];return`<div class="kcard" draggable="true" data-id="${r.id}" style="border-left-color:${fg}"><div class="t">${esc(titre(m.t,r))}</div><div class="m">${sec.map(c=>{const v=r[c];if(v==null||v===''||(Array.isArray(v)&&!v.length))return'';const f=sc.par[c];return`<span class="${c===m.date&&v<a&&tacheOuverte(r)?'retard':''}">${f.type==='date'?'📅 '+dfr(v):esc(txt(v)).slice(0,40)}</span>`}).join('')}${d&&!sec.includes(m.date)?`<span class="${d<a&&tacheOuverte(r)?'retard':''}">📅 ${dfr(d)}</span>`:''}</div></div>`}).join('')}</div>`}).join('')}</div>`;
 }
 function brancherKanban(k){
@@ -3890,13 +3941,27 @@ function brancherKanban(k){
       const row=S.rows[m.t].find(r=>r.id==drag);if(row[m.statut]?.id==col.dataset.o)return;
       try{await changerStatut(k,row,+col.dataset.o,col.dataset.v);dessinerListe(k)}catch(er){toast('Échec : '+er.message,true)}}});
 }
+/* Suppression d'une non-conformité (27/11/2026, idée de William) : rien n'est effacé de Baserow (règle « aucune suppression ») ;
+   la NC passe au statut Annulée (= supprimée : hors liste même en recherche, hors synthèse et KPI), une ligne est ajoutée
+   au Plan d'action. Son numéro n'est pas réattribué. Retrouvable par la puce « Afficher supprimées » ou le filtre Statut. */
+async function ncSupprimer(row){
+  const m=MODS.nc,o=(sch(m.t).par[m.statut]?.select_options||[]).find(x=>/^annul/i.test(x.value));if(!o)throw new Error('statut « Annulée » introuvable');
+  const num=txt(row['N° NC'])||'cette NC';
+  const motif=prompt(`Supprimer la non-conformité ${num} ?\n\nElle sort des listes et de la synthèse (statut Annulée) ; rien n'est effacé, elle reste retrouvable par « Afficher supprimées ».\n\nMotif (facultatif, ex. doublon de NC-26-012) :`,'');
+  if(motif===null)return;
+  const qui=MOI?titre(MODS.referents.t,(S.rows[MODS.referents.t]||[]).find(x=>x.id===MOI)||{}):'';
+  const ligne=`Supprimée dans Akteev le ${new Date().toLocaleDateString('fr-FR')}${qui?' par '+qui:''}${motif.trim()?' – '+motif.trim():''}.`;
+  const corps={[m.statut]:o.id,"Plan d'action":[txt(row["Plan d'action"]),ligne].filter(Boolean).join('\n')};
+  const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
+  majRow(m.t,r);majCompteurs();toast(`${num} supprimée (statut Annulée), retirée de la liste`);location.hash='#/nc';
+}
 async function changerStatut(k,row,oid,val){
   const m=MODS[k],corps={[m.statut]:oid>0?oid:val};
   if(m.faitLe&&sch(m.t).par[m.faitLe]&&faitRe(m).test(val)&&(m.faitMaj||!row[m.faitLe]))corps[m.faitLe]=auj();
   // devis annulé remis en Envoyé : « Réactivé le » dans le Commentaire interne, le délai d'annulation automatique repart (23/11/2026)
   if(k==='devis'&&txt(row[m.statut])==='Annulé'&&!/^annul/i.test(val))corps['Commentaire interne']=[txt(row['Commentaire interne']),`Réactivé le ${new Date().toLocaleDateString('fr-FR')}${MOI?' par '+titre(MODS.referents.t,(S.rows[MODS.referents.t]||[]).find(x=>x.id===MOI)||{}):''} (statut ${val}) : délai d’annulation automatique reparti de ce jour.`].filter(Boolean).join('\n');
   const r=await api(`/rows/table/${m.t}/${row.id}/?user_field_names=true`,{method:'PATCH',body:JSON.stringify(corps)});
-  majRow(m.t,r);majCompteurs();toast(estSolde(m,val)?`${titre(m.t,r)} → ${val} : ${m.un} ${soldeMots(m).pp}, retiré${m.fem?'e':''} de la liste`:`${titre(m.t,r)} → ${val}`);return r;
+  majRow(m.t,r);majCompteurs();toast(estSolde(m,val)?`${titre(m.t,r)} → ${val} : ${m.un} ${soldeMots(m,val).pp}, retiré${m.fem?'e':''} de la liste`:`${titre(m.t,r)} → ${val}`);return r;
 }
 function exporter(k){
   const m=MODS[k],cols=colonnes(k),L=trier(k,filtrer(k));
@@ -3963,6 +4028,7 @@ function dessinerFiche(){
     ${k==='commandes'&&!nouveau&&peutEcrire('bl')?`<button class="btn p" id="bBL">${ico('bl')}Créer un BL</button>`:''}
     ${devisCde&&peutVoir('devis')?`<a class="btn" href="${EDITEUR}?devis=${encodeURIComponent(devisCde)}" target="_blank">${ico('ext')}Devis / ARC dans l’éditeur</a>`:''}
     ${!nouveau&&m.editeur!=='devis'&&k!=='referents'?'':''}
+    ${k==='nc'&&!nouveau&&peutEcrire('nc')&&!/^annul/i.test(txt(row.Statut))?`<button class="btn" id="bNcSup" style="color:var(--err)" title="Doublon, erreur de saisie… : la NC passe au statut Annulée et sort des listes et de la synthèse (retrouvable par « Afficher supprimées »)">✕ Supprimer la NC</button>`:''}
     ${!nouveau&&estAdmin()?`<a class="btn" href="https://baserow.io/database/592007/table/${t}/row/${row.id}" target="_blank" title="Ouvrir la ligne dans Baserow">Baserow ↗</a>`:''}</div></div>
   <div class="fiche"><div>
    <div class="card">${ecr?`<div class="form">${ed.map(f=>champ(f)).join('')}</div>`:''}
@@ -3977,6 +4043,7 @@ function dessinerFiche(){
   if($('bPlan'))$('bPlan').onclick=async()=>{try{await Promise.all([charger(T_PLAN),charger(T_MACH),charger(MODS.commandes.t),peutVoir('taches')?charger(MODS.taches.t).catch(()=>[]):null]);chmFormAffaire(SALE.row.id)}catch(e){toast('Erreur : '+e.message,true)}};
   if($('bRev'))$('bRev').onclick=()=>chmAfficherRevient(SALE.row.id);
   if($('bReact'))$('bReact').onclick=()=>devisReactiver(SALE.row).then(r=>{if(r){SALE.row=r;dessinerFiche()}}).catch(e=>toast('Échec : '+e.message,true));
+  if($('bNcSup'))$('bNcSup').onclick=()=>ncSupprimer(SALE.row).catch(e=>toast('Échec : '+e.message,true));
   if($('bCmp'))$('bCmp').onclick=()=>comparerSST(SALE.row).catch(e=>toast('Erreur : '+e.message,true));
   if(k==='devis'&&!nouveau&&peutVoir('consult')&&!S.rows[MODS.consult.t])charger(MODS.consult.t).then(()=>{if(SALE&&SALE.k==='devis'&&SALE.id===row.id&&!Object.keys(SALE.draft).length)dessinerFiche()}).catch(()=>{});
   if($('bCfPdf')){$('bCfPdf').onclick=()=>cfEditer(SALE.row);prechargerMSAL()}
