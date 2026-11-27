@@ -5379,6 +5379,9 @@ function faLisible(t){if(t==null)return'';
     s=s.replace(/ (?=[–—:;!?\/×x]\s)/g,FA_NB);
     const m=s.match(/ (\S{1,6})$/);if(m)s=s.slice(0,m.index)+FA_NB+m[1];
     return s}).join('\n')}
+/* Initiales du référent sur les fiches atelier (27/11/2026) : Matthias → MK, Sébastien → SD, William → WB */
+function faInitiales(nom){nom=String(nom||'').trim();if(!nom)return'';const k={matthias:'MK',sébastien:'SD',sebastien:'SD',william:'WB'}[nom.split(/\s+/)[0].toLowerCase()];
+  if(k)return k;const m=nom.split(/[\s-]+/).filter(Boolean);return m.length>1?m.slice(0,2).map(w=>w[0].toUpperCase()).join(''):nom}
 async function faConstruirePDF(a,f,opt={}){
   await chargerScript(CF_JSPDF);
   const {jsPDF}=window.jspdf,doc=new jsPDF({unit:'mm',format:'a4',compress:true}),F=await cfPolice(doc);
@@ -5439,8 +5442,10 @@ async function faConstruirePDF(a,f,opt={}){
   const noir=d=>P_([{t:d||'',size:15,bold:true,color:NOIR}],N);
   const infos=ach?[['Réception au plus tard',rouge(f.reception)],['Délai atelier',P_(a.delai_atelier||'',B)],['Expédition client',noir(a.expedition)],
       ['Référent achat',P_(f.referent_achat||a.referent||'',N)]]
-    :[['Délai atelier',rouge(a.delai_atelier)],['Expédition client',noir(a.expedition)],['Référent affaire',P_(a.referent||'',N)]];
-  const info=TAB({w:[40,142],grille:true,bg:(i,j)=>j===0?FOND:null,pad:()=>({l:6*pt,r:6*pt,t:4*pt,b:4*pt}),rows:infos.map(([k,v])=>[P_(k,B),v])});
+    :[['Délai atelier',rouge(a.delai_atelier),P_('Référent',B,{align:'center'})],['Expédition client',noir(a.expedition),P_(faInitiales(a.referent),{size:15,lead:18,bold:true},{align:'center'})]];
+  // Fabrication (27/11/2026) : 2 lignes de même hauteur (9 mm), « Référent » puis ses initiales (MK, SD, WB) à droite
+  const info=TAB({w:ach?[40,142]:[40,117,25],grille:true,bg:(i,j)=>j===0||(!ach&&j===2&&i===0)?FOND:null,align:(i,j)=>j===2?'center':'left',pad:()=>({l:6*pt,r:6*pt,t:4*pt,b:4*pt}),rows:infos.map(([k,v,r])=>r?[P_(k,B),v,r]:[P_(k,B),v])});
+  if(!ach)info.rows.forEach(r=>{r.h=Math.max(r.h,9)});
   y=info.dessiner(info.rows,y);
   // 3. Autres pièces de la commande (25/11/2026) : Aucune / KTE / Sous-traitance (cases vides si non renseigné), puis Gravure
   if(!ach){y+=4;const ap=f.autres_pieces&&typeof f.autres_pieces==='object'?f.autres_pieces:{},apK=!!ap.kte,apS=!!ap.sst,apA=!!ap.aucune&&!apK&&!apS;
