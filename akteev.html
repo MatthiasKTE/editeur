@@ -3477,15 +3477,23 @@ function finMargeClients(L){
 }
 function finVueMarge(X,o){
   const P=finMargePeriodes(X),per=P.some(p=>p[0]===FINV.mp)?FINV.mp:P[0][0];
-  const L=finMargeCalc(X,per),q=String(FINV.mq||'').trim().toLowerCase();
-  const filtre=r=>!q||[r.aff,r.cli,r.objet,r.fours].join(' ').toLowerCase().includes(q);
+  const L=finMargeCalc(X,per),cle=r=>String(r.cid||r.cli);
+  const clis=[...new Map(L.map(r=>[cle(r),r.cli])).entries()].sort((a,b)=>String(a[1]).localeCompare(String(b[1]),'fr'));
+  const fc=clis.some(c=>c[0]===FINV.mcl)?FINV.mcl:'';
+  const affs=L.filter(r=>!fc||cle(r)===fc).map(r=>r.aff).sort();const fa=affs.includes(FINV.maf)?FINV.maf:'';
+  const filtre=r=>(!fc||cle(r)===fc)&&(!fa||r.aff===fa);
   const tot=x=>x.reduce((s,r)=>({ca:s.ca+r.ca,ach:s.ach+r.ach,marge:s.marge+r.marge,caSans:s.caSans+(r.sans?r.ca:(r.caSans||0))}),{ca:0,ach:0,marge:0,caSans:0});
   const pc=v=>pctFr(v),coulT=v=>v<0?'var(--err)':v<0.3?'#B45309':v>=0.6?'#15803D':'inherit';
   const cli=o==='mcli',R=(cli?finMargeClients(L):L).filter(filtre),T=tot(R);
+  const COLS=cli?[['cli','Client'],['nb','Nombre d’affaires'],['ca','Facturé HT'],['ach','Achats imputés HT'],['marge','Marge HT'],['taux','Taux de marge'],['caSans','CA sans achat']]
+    :[['aff','Affaire'],['cli','Client'],['derF','Dernière facture'],['cde','Commandé HT'],['ca','Facturé HT'],['ach','Achats imputés HT'],['marge','Marge HT'],['taux','Taux de marge'],['fours','Fournisseurs']];
   const st=FINV.mt?.[o]||{k:'marge',d:-1},cmp=(a,b)=>{const x=a[st.k],y=b[st.k];return(typeof x==='number'||typeof y==='number'?((+x||0)-(+y||0)):String(x??'').localeCompare(String(y??''),'fr'))*st.d};
   R.sort(cmp);
   let h=`<div class="outils"><span class="mut">Période</span><select id="fiMp">${P.map(([k,l])=>`<option value="${k}" ${k===per?'selected':''}>${esc(l)}</option>`).join('')}</select>
-    <input id="fiMq" placeholder="${cli?'Client…':'Affaire, client, fournisseur…'}" value="${esc(FINV.mq||'')}" style="width:220px"></div>`;
+    ${cli?'':`<span class="mut" style="margin-left:10px">Client</span><select id="fiMcl"><option value="">Tous les clients</option>${clis.map(([k,l])=>`<option value="${esc(k)}" ${k===fc?'selected':''}>${esc(l)}</option>`).join('')}</select>
+    <span class="mut" style="margin-left:10px">Affaire</span><select id="fiMaf"><option value="">Toutes les affaires</option>${affs.map(a=>`<option ${a===fa?'selected':''}>${esc(a)}</option>`).join('')}</select>`}
+    <span class="mut" style="margin-left:10px">Trier par</span><select id="fiMtk">${COLS.map(([k,l])=>`<option value="${k}" ${k===st.k?'selected':''}>${esc(l)}</option>`).join('')}</select>
+    <select id="fiMtd"><option value="-1" ${st.d<0?'selected':''}>décroissant ↓</option><option value="1" ${st.d>0?'selected':''}>croissant ↑</option></select></div>`;
   h+=finW(cli?'mc-kpi':'ma-kpi','',3,`<div class="kpis">
     <div class="card kpi" style="cursor:default"><div class="lab">CA facturé HT</div><div class="val">${finK(T.ca)}</div><div class="det">${R.length} ${cli?'client(s)':'affaire(s)'}</div></div>
     <div class="card kpi" style="cursor:default"><div class="lab">Achats imputés HT</div><div class="val">${finK(T.ach)}</div><div class="det">sous-traitance, matière, traitements</div></div>
@@ -3509,15 +3517,17 @@ function finVueMarge(X,o){
   }
   if(!R.length)t+='<div class="vide">Aucune facture sur la période</div>';
   h+=finW(cli?'mc-table':'ma-table',cli?'Marge par client':'Marge par affaire',12,t);
-  h+=finW(cli?'mc-note':'ma-note','',12,`<div class="mut" style="font-size:12px">Marge sur achats : CA facturé (Axonaut, date de facture) − achats de l’affaire (le plus élevé entre achats Axonaut, commandes fournisseurs Akteev en euros et factures fournisseurs affectées), au prorata du CA de la période. Hors main-d’œuvre, heures machines et frais de structure. ${cli?'Cliquez sur un client pour voir ses affaires.':'Survolez les achats pour le détail par source ; cliquez sur une affaire pour ouvrir la commande.'}${per.startsWith('an:')&&+per.slice(3)<X.an?' Exercice N-1 : les achats Axonaut de cet exercice ne sont pas chargés, seuls les achats Akteev sont pris en compte.':''}</div>`);
+  h+=finW(cli?'mc-note':'ma-note','',12,`<div class="mut" style="font-size:12px">Marge sur achats : CA facturé (Axonaut, date de facture) − achats de l’affaire (le plus élevé entre achats Axonaut, commandes fournisseurs Akteev en euros et factures fournisseurs affectées), au prorata du CA de la période. Hors main-d’œuvre, heures machines et frais de structure. Tri : menu « Trier par » ou clic sur un titre de colonne. ${cli?'Cliquez sur un client pour voir ses affaires.':'Survolez les achats pour le détail par source ; cliquez sur une affaire pour ouvrir la commande.'}${per.startsWith('an:')&&+per.slice(3)<X.an?' Exercice N-1 : les achats Axonaut de cet exercice ne sont pas chargés, seuls les achats Akteev sont pris en compte.':''}</div>`);
   return h;
 }
 function finBrancherMarge(o){
   const s=$('fiMp');if(s)s.onchange=()=>{FINV.mp=s.value;ls.set('fin',FINV);dessinerFinance()};
-  const q=$('fiMq');if(q){let tm;q.oninput=()=>{clearTimeout(tm);tm=setTimeout(()=>{FINV.mq=q.value;ls.set('fin',FINV);dessinerFinance();const z=$('fiMq');if(z){z.focus();z.setSelectionRange(z.value.length,z.value.length)}},300)}}
+  const c=$('fiMcl');if(c)c.onchange=()=>{FINV.mcl=c.value;FINV.maf='';ls.set('fin',FINV);dessinerFinance()};
+  const a=$('fiMaf');if(a)a.onchange=()=>{FINV.maf=a.value;ls.set('fin',FINV);dessinerFinance()};
+  const tk=$('fiMtk'),td=$('fiMtd'),tri=()=>{FINV.mt=FINV.mt||{};FINV.mt[o]={k:tk.value,d:+td.value};ls.set('fin',FINV);dessinerFinance()};if(tk)tk.onchange=tri;if(td)td.onchange=tri;
   document.querySelectorAll('#main th[data-mk]').forEach(th=>th.onclick=()=>{FINV.mt=FINV.mt||{};const st=FINV.mt[o]||{k:'marge',d:-1};
     FINV.mt[o]=st.k===th.dataset.mk?{k:st.k,d:-st.d}:{k:th.dataset.mk,d:-1};ls.set('fin',FINV);dessinerFinance()});
-  document.querySelectorAll('#main tr[data-mc]').forEach(tr=>tr.onclick=()=>{const c=(window._finMC||[])[+tr.dataset.mc];if(!c)return;FINV.o='maff';FINV.mq=c.cli;ls.set('fin',FINV);dessinerFinance()});
+  document.querySelectorAll('#main tr[data-mc]').forEach(tr=>tr.onclick=()=>{const c=(window._finMC||[])[+tr.dataset.mc];if(!c)return;FINV.o='maff';FINV.mcl=String(c.cid||c.cli);FINV.maf='';ls.set('fin',FINV);dessinerFinance()});
 }
 function finAchatsAff(X){
   const SD=statsDonnees(),ak={},ff={};
